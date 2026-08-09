@@ -1,0 +1,13 @@
+{
+  "name": "experiment-2-cookie-to-jwt",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Prove a Brightspace session cookie can mint a fresh JWT and call the Valence REST API over pure HTTP (no Playwright).",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "vitest": "^4.0.18"
+  }
+}

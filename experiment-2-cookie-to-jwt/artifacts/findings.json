@@ -1,0 +1,12 @@
+{
+  "csrfRequired": true,
+  "csrfOmittedMintStatus": 200,
+  "csrfOmittedMintSucceeded": false,
+  "csrfOmittedWasSessionStub": true,
+  "mintRepeatable": true,
+  "secondJwtDiffers": true,
+  "bothJwtsValid": true,
+  "freshXsrfObtainable": false,
+  "freshXsrfSource": null,
+  "freshXsrfWasSessionStub": true
+}

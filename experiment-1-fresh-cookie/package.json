@@ -1,0 +1,12 @@
+{
+  "name": "experiment-1-fresh-cookie",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "playwright": "1.58.2",
+    "vitest": "^4.0.18"
+  }
+}
