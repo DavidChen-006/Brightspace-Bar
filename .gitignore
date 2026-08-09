@@ -1,5 +1,10 @@
 node_modules/
 brightspace-mcp-server/
+
+# Swift build products — 158M of derived data
+.build/
+*.xcuserstate
+
 **/artifacts/session.json
 .env
 .env.*

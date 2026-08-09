@@ -1,0 +1,90 @@
+{
+  "outcome": "OK",
+  "verdict": "NO_VALIDATOR",
+  "capturedAt": 1786229080118,
+  "ageHours": 1.6090977777777777,
+  "jwtLen": 812,
+  "endpoints": [
+    {
+      "path": "/d2l/api/lp/1.62/users/whoami",
+      "baseline": {
+        "status": 200,
+        "bytes": 132,
+        "elapsedMs": 37,
+        "headers": {
+          "cache-control": "no-cache, no-store",
+          "expires": "-1",
+          "vary": "Accept-Encoding",
+          "x-request-id": "906665c7-da64-4241-a06a-ced59396adf7",
+          "content-encoding": "gzip"
+        },
+        "isSessionStub": false
+      },
+      "etagConditional": null,
+      "dateConditional": null,
+      "bogusControl": {
+        "status": 200,
+        "bytes": 132
+      },
+      "classification": "NO_VALIDATOR",
+      "savedBytes": null,
+      "savedPct": null,
+      "note": "no etag and no last-modified on the baseline response"
+    },
+    {
+      "path": "/d2l/api/lp/1.62/enrollments/myenrollments/?orgUnitTypeId=3&isActive=true",
+      "baseline": {
+        "status": 200,
+        "bytes": 14938,
+        "elapsedMs": 92,
+        "headers": {
+          "cache-control": "no-cache, no-store",
+          "expires": "-1",
+          "vary": "Accept-Encoding",
+          "x-request-id": "fff95be0-381c-4e91-93fb-2231fa62f099",
+          "content-encoding": "gzip"
+        },
+        "isSessionStub": false
+      },
+      "etagConditional": null,
+      "dateConditional": null,
+      "bogusControl": {
+        "status": 200,
+        "bytes": 14938
+      },
+      "classification": "NO_VALIDATOR",
+      "savedBytes": null,
+      "savedPct": null,
+      "note": "no etag and no last-modified on the baseline response"
+    },
+    {
+      "path": "/d2l/api/versions/",
+      "baseline": {
+        "status": 200,
+        "bytes": 2307,
+        "elapsedMs": 49,
+        "headers": {
+          "cache-control": "no-cache, no-store",
+          "expires": "-1",
+          "vary": "Accept-Encoding",
+          "x-request-id": "3e165b76-df52-4945-a5ef-5ae477b4cda0",
+          "content-encoding": "gzip"
+        },
+        "isSessionStub": false
+      },
+      "etagConditional": null,
+      "dateConditional": null,
+      "bogusControl": {
+        "status": 200,
+        "bytes": 2307
+      },
+      "classification": "NO_VALIDATOR",
+      "savedBytes": null,
+      "savedPct": null,
+      "note": "no etag and no last-modified on the baseline response"
+    }
+  ],
+  "totalBaselineBytes": 17377,
+  "totalSavedBytes": 0,
+  "totalSavedPct": 0
+}
