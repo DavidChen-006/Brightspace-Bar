@@ -82,6 +82,15 @@ active session cookie and CSRF token). Only `fixture-session.json`, which
 contains fake values, is committed. These experiments run against the author's
 own account only.
 
+## Vendored reference: `RepoBar/`
+
+`RepoBar/` is a vendored, **unmodified** copy of
+[steipete/RepoBar](https://github.com/steipete/RepoBar) (MIT, © 2025 Peter
+Steinberger). It is third-party code, included only as a reference
+implementation of a native macOS menu-bar app — the intended UI pattern for a
+future Brightspace menu-bar client. Its license is retained verbatim at
+`RepoBar/LICENSE`.
+
 ## Credit
 
 Reference implementation:

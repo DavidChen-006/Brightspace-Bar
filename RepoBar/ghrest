@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Convenience wrapper for REST CLI (ghrest)
+exec pnpx dotenv-cli -e .env -- tsx "$(dirname "$0")/Scripts/ghrest.ts" "$@"

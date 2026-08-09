@@ -1,0 +1,770 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		058B0ED7732E2B4C76CCD0A4 /* GitHubReferenceMatch+Display.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DDA676FBF67AB625794875B /* GitHubReferenceMatch+Display.swift */; };
+		08A14ABAC7D8F60F1CECB4F4 /* RepoWebURLBuilderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A70A092BAC0A867A97415D9 /* RepoWebURLBuilderTests.swift */; };
+		0DC367D0B45B1E71D3FF0103 /* AppSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8DAAD776BCFAD8C0BB42258 /* AppSession.swift */; };
+		15A96DF4CF7EA83F7745A031 /* RepositoryCardModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22C23DF7BC5FCE3DB16F3D11 /* RepositoryCardModel.swift */; };
+		1843CDC27F756953CBC10286 /* IncomingReferenceURL.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84059B3F58ED56D01DC050FA /* IncomingReferenceURL.swift */; };
+		199928082E7435CBCF1DA6C4 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC878EFB8821470DCE58F60D /* ShareViewController.swift */; };
+		23A160313A67F857ADFC6D4A /* RepoFilesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E1E7701B5D0E364FF641342 /* RepoFilesView.swift */; };
+		27F69985DFF2FB738CFC3F50 /* RepoBariOSShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 8593BCB0DFABDADD6DC9E0D3 /* RepoBariOSShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		3A706924DDE8F2D1E868302A /* ActivityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA5158A8B61F0C91606A901C /* ActivityView.swift */; };
+		3A7E17D2737B1E31C7DED394 /* RepoWebURLBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1E7D39231041D1F1E081140 /* RepoWebURLBuilder.swift */; };
+		3C8F96017A15E9AC87C0045F /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA750CFD80CCBC401B5DC04D /* AppModel.swift */; };
+		42576806C6901849276ABF8E /* RepoDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAA36FA2FA5C305E417B6144 /* RepoDetailView.swift */; };
+		426BADF74ECFBB3FE53095C4 /* AppLimits.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99903F321991C6D627B95C7B /* AppLimits.swift */; };
+		4AC61DEAFCB295CD488A7DF1 /* AddRepoSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 476C6F1C986C9CC7DF6E8B12 /* AddRepoSheet.swift */; };
+		5074CE9150A55025D76699B0 /* RepositorySortKey+Label.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A807101819ECB8D6B0206A2 /* RepositorySortKey+Label.swift */; };
+		5FCE45A91ABA50AA40CEB4E4 /* IncomingReferenceURLTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83ACEE3DBA3F2C3F05B624D8 /* IncomingReferenceURLTests.swift */; };
+		60FA047F7447D028CC0FA510 /* RefreshScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 563EFBA30794CEB2595BB966 /* RefreshScheduler.swift */; };
+		6120CFEFB0EBF1767980D7D2 /* OwnerFilterParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000464CD2D3EE982842823CC /* OwnerFilterParser.swift */; };
+		62E4F059A529E8841DF296FA /* RefreshInterval+Label.swift in Sources */ = {isa = PBXBuildFile; fileRef = 107319F688D7A775FF4B780A /* RefreshInterval+Label.swift */; };
+		6DCEAE33CA9039A750958314 /* Array+Chunked.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4792F0101A6FEF71165BF40 /* Array+Chunked.swift */; };
+		77D804506AD7E74D5C847938 /* RepoBariOSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F000CC2F6DC230D5F7E73768 /* RepoBariOSApp.swift */; };
+		7A98978CA4B9380E36625C0D /* RepoListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A6BDB645F79B05AA4E6D081 /* RepoListView.swift */; };
+		825AE4CE4B24F85651E6B04D /* RepoBarCore in Frameworks */ = {isa = PBXBuildFile; productRef = D74BFA436D25399AB8463C39 /* RepoBarCore */; };
+		83B109981F44549DB4DB3D75 /* RepoDetailModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D89DAEE5516C46C8BAC2A1C /* RepoDetailModel.swift */; };
+		85B2F5E4B5D4A76CA37B8D3C /* GlassStyles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75D8389DE4F45804274941BA /* GlassStyles.swift */; };
+		8871EA5BB70B99440560589F /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19773282646A9A2DB727AF12 /* RootView.swift */; };
+		8C49EFF89D886FB970E46BC1 /* StatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EB8F93FD03F62DE4DD32B68 /* StatusView.swift */; };
+		9A19228C2B2DAD068484E2F3 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F6DCC45EE38226927897FD5 /* LoginView.swift */; };
+		9EB435999454B779FF86A75A /* HeatmapAxisLabelsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 510AC84D637E88023A17306D /* HeatmapAxisLabelsView.swift */; };
+		CB310F27739DFC95A11A5E77 /* ReferencePreviewWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CC254874FF7822474E06D9B /* ReferencePreviewWebView.swift */; };
+		CC9F8DF042D5DC542AAED771 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 62BC99DC837638D8143BC707 /* Assets.xcassets */; };
+		D4D4EA55ECCFFC67AF34ACF1 /* RepoCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B742897CD4D1AFF0E5C8C58E /* RepoCardView.swift */; };
+		E996683F55FF706C55BA1716 /* OAuthCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 497C519044532FBA808AFAD6 /* OAuthCoordinator.swift */; };
+		F01E2B7126A428C0203549BC /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 508743FD9791CD15FD2F83A9 /* SettingsView.swift */; };
+		F18E5D8590BE40700F75055E /* HeatmapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3E3352673824AD6557FB3B1 /* HeatmapView.swift */; };
+		F25A5BD87EC7963E554E5581 /* Kingfisher in Frameworks */ = {isa = PBXBuildFile; productRef = 1C4F088BC7981AB35E04C21C /* Kingfisher */; };
+		F61F21A79415EE0B0A123D30 /* OwnerFilterParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D72E27B247AA11DE617F905 /* OwnerFilterParserTests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		62E1A68765442066B1520498 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 5BFEB3656CBA58AEEB2195D1 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 6E49CAAD1C4E63C2D8C130CA;
+			remoteInfo = RepoBariOSShareExtension;
+		};
+		C87E6AF5C39FD96679E8A067 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 5BFEB3656CBA58AEEB2195D1 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 860816B9D94E96E3FC2C43C2;
+			remoteInfo = RepoBariOS;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		636D828FE6487BA146D60D84 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				27F69985DFF2FB738CFC3F50 /* RepoBariOSShareExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		000464CD2D3EE982842823CC /* OwnerFilterParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OwnerFilterParser.swift; sourceTree = "<group>"; };
+		0A69DFC5AF5C8E89F06A692D /* RepoBar */ = {isa = PBXFileReference; lastKnownFileType = folder; name = RepoBar; path = ..; sourceTree = SOURCE_ROOT; };
+		0D89DAEE5516C46C8BAC2A1C /* RepoDetailModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepoDetailModel.swift; sourceTree = "<group>"; };
+		107319F688D7A775FF4B780A /* RefreshInterval+Label.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RefreshInterval+Label.swift"; sourceTree = "<group>"; };
+		19773282646A9A2DB727AF12 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		1DDA676FBF67AB625794875B /* GitHubReferenceMatch+Display.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GitHubReferenceMatch+Display.swift"; sourceTree = "<group>"; };
+		1E1E7701B5D0E364FF641342 /* RepoFilesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepoFilesView.swift; sourceTree = "<group>"; };
+		22C23DF7BC5FCE3DB16F3D11 /* RepositoryCardModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepositoryCardModel.swift; sourceTree = "<group>"; };
+		2540C2570FFCFA055E2A951F /* RepoBariOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = RepoBariOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		3A70A092BAC0A867A97415D9 /* RepoWebURLBuilderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepoWebURLBuilderTests.swift; sourceTree = "<group>"; };
+		476C6F1C986C9CC7DF6E8B12 /* AddRepoSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddRepoSheet.swift; sourceTree = "<group>"; };
+		497C519044532FBA808AFAD6 /* OAuthCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OAuthCoordinator.swift; sourceTree = "<group>"; };
+		4D26FAB33B6A0F5D3125A8DC /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		4D72E27B247AA11DE617F905 /* OwnerFilterParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OwnerFilterParserTests.swift; sourceTree = "<group>"; };
+		508743FD9791CD15FD2F83A9 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		510AC84D637E88023A17306D /* HeatmapAxisLabelsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeatmapAxisLabelsView.swift; sourceTree = "<group>"; };
+		563EFBA30794CEB2595BB966 /* RefreshScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefreshScheduler.swift; sourceTree = "<group>"; };
+		5A6BDB645F79B05AA4E6D081 /* RepoListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepoListView.swift; sourceTree = "<group>"; };
+		5EB8F93FD03F62DE4DD32B68 /* StatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusView.swift; sourceTree = "<group>"; };
+		62BC99DC837638D8143BC707 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		6CC084C55EC6FC1753E01A2E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		6F6DCC45EE38226927897FD5 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
+		75D8389DE4F45804274941BA /* GlassStyles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassStyles.swift; sourceTree = "<group>"; };
+		83ACEE3DBA3F2C3F05B624D8 /* IncomingReferenceURLTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IncomingReferenceURLTests.swift; sourceTree = "<group>"; };
+		84059B3F58ED56D01DC050FA /* IncomingReferenceURL.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IncomingReferenceURL.swift; sourceTree = "<group>"; };
+		8593BCB0DFABDADD6DC9E0D3 /* RepoBariOSShareExtension.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = RepoBariOSShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		8CC254874FF7822474E06D9B /* ReferencePreviewWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReferencePreviewWebView.swift; sourceTree = "<group>"; };
+		99903F321991C6D627B95C7B /* AppLimits.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLimits.swift; sourceTree = "<group>"; };
+		9A807101819ECB8D6B0206A2 /* RepositorySortKey+Label.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RepositorySortKey+Label.swift"; sourceTree = "<group>"; };
+		A3E3352673824AD6557FB3B1 /* HeatmapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeatmapView.swift; sourceTree = "<group>"; };
+		B4792F0101A6FEF71165BF40 /* Array+Chunked.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Array+Chunked.swift"; sourceTree = "<group>"; };
+		B5276C582EE6B9E37FEFFDD1 /* RepoBariOSTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = RepoBariOSTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		B742897CD4D1AFF0E5C8C58E /* RepoCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepoCardView.swift; sourceTree = "<group>"; };
+		BA5158A8B61F0C91606A901C /* ActivityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityView.swift; sourceTree = "<group>"; };
+		BA750CFD80CCBC401B5DC04D /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		D8DAAD776BCFAD8C0BB42258 /* AppSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSession.swift; sourceTree = "<group>"; };
+		E1E7D39231041D1F1E081140 /* RepoWebURLBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepoWebURLBuilder.swift; sourceTree = "<group>"; };
+		F000CC2F6DC230D5F7E73768 /* RepoBariOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepoBariOSApp.swift; sourceTree = "<group>"; };
+		FAA36FA2FA5C305E417B6144 /* RepoDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepoDetailView.swift; sourceTree = "<group>"; };
+		FC878EFB8821470DCE58F60D /* ShareViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		037F72F1686ECC2EE10B0B1C /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				825AE4CE4B24F85651E6B04D /* RepoBarCore in Frameworks */,
+				F25A5BD87EC7963E554E5581 /* Kingfisher in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		03D49F92C75B9231471D1B3A /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				0D89DAEE5516C46C8BAC2A1C /* RepoDetailModel.swift */,
+				22C23DF7BC5FCE3DB16F3D11 /* RepositoryCardModel.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		16EC9F6AFD72881BE7C4C1AF /* RepoBariOSTests */ = {
+			isa = PBXGroup;
+			children = (
+				83ACEE3DBA3F2C3F05B624D8 /* IncomingReferenceURLTests.swift */,
+				4D72E27B247AA11DE617F905 /* OwnerFilterParserTests.swift */,
+				3A70A092BAC0A867A97415D9 /* RepoWebURLBuilderTests.swift */,
+			);
+			path = RepoBariOSTests;
+			sourceTree = "<group>";
+		};
+		20A98D708A05C3DF79C17591 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				BA5158A8B61F0C91606A901C /* ActivityView.swift */,
+				476C6F1C986C9CC7DF6E8B12 /* AddRepoSheet.swift */,
+				510AC84D637E88023A17306D /* HeatmapAxisLabelsView.swift */,
+				A3E3352673824AD6557FB3B1 /* HeatmapView.swift */,
+				6F6DCC45EE38226927897FD5 /* LoginView.swift */,
+				8CC254874FF7822474E06D9B /* ReferencePreviewWebView.swift */,
+				B742897CD4D1AFF0E5C8C58E /* RepoCardView.swift */,
+				FAA36FA2FA5C305E417B6144 /* RepoDetailView.swift */,
+				1E1E7701B5D0E364FF641342 /* RepoFilesView.swift */,
+				5A6BDB645F79B05AA4E6D081 /* RepoListView.swift */,
+				19773282646A9A2DB727AF12 /* RootView.swift */,
+				508743FD9791CD15FD2F83A9 /* SettingsView.swift */,
+				5EB8F93FD03F62DE4DD32B68 /* StatusView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		32E9D35A2B8E384EE5468AA0 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				BA750CFD80CCBC401B5DC04D /* AppModel.swift */,
+				D8DAAD776BCFAD8C0BB42258 /* AppSession.swift */,
+				F000CC2F6DC230D5F7E73768 /* RepoBariOSApp.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		5E080CDAD2FC0EAAD766FEDE = {
+			isa = PBXGroup;
+			children = (
+				5EB943939EB8313D7C3729DB /* Packages */,
+				EBF9C653CD616DDF8430A803 /* Resources */,
+				FC5E36700C168A07516A096A /* ShareExtension */,
+				D22127F4F0B91F0926E7CD67 /* Sources */,
+				CDCB8FCA8A768CEE08E81AD8 /* Tests */,
+				E608A1C270FEF0431C7E3F30 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		5EB943939EB8313D7C3729DB /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				0A69DFC5AF5C8E89F06A692D /* RepoBar */,
+			);
+			name = Packages;
+			sourceTree = "<group>";
+		};
+		5FE0861623E1856E05E39BB2 /* Auth */ = {
+			isa = PBXGroup;
+			children = (
+				497C519044532FBA808AFAD6 /* OAuthCoordinator.swift */,
+			);
+			path = Auth;
+			sourceTree = "<group>";
+		};
+		6F3402DA15B5D4E102BAA707 /* Support */ = {
+			isa = PBXGroup;
+			children = (
+				99903F321991C6D627B95C7B /* AppLimits.swift */,
+				B4792F0101A6FEF71165BF40 /* Array+Chunked.swift */,
+				1DDA676FBF67AB625794875B /* GitHubReferenceMatch+Display.swift */,
+				75D8389DE4F45804274941BA /* GlassStyles.swift */,
+				84059B3F58ED56D01DC050FA /* IncomingReferenceURL.swift */,
+				000464CD2D3EE982842823CC /* OwnerFilterParser.swift */,
+				107319F688D7A775FF4B780A /* RefreshInterval+Label.swift */,
+				563EFBA30794CEB2595BB966 /* RefreshScheduler.swift */,
+				9A807101819ECB8D6B0206A2 /* RepositorySortKey+Label.swift */,
+				E1E7D39231041D1F1E081140 /* RepoWebURLBuilder.swift */,
+			);
+			path = Support;
+			sourceTree = "<group>";
+		};
+		CDCB8FCA8A768CEE08E81AD8 /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				16EC9F6AFD72881BE7C4C1AF /* RepoBariOSTests */,
+			);
+			path = Tests;
+			sourceTree = "<group>";
+		};
+		D22127F4F0B91F0926E7CD67 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				32E9D35A2B8E384EE5468AA0 /* App */,
+				5FE0861623E1856E05E39BB2 /* Auth */,
+				03D49F92C75B9231471D1B3A /* Models */,
+				6F3402DA15B5D4E102BAA707 /* Support */,
+				20A98D708A05C3DF79C17591 /* Views */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		E608A1C270FEF0431C7E3F30 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				2540C2570FFCFA055E2A951F /* RepoBariOS.app */,
+				8593BCB0DFABDADD6DC9E0D3 /* RepoBariOSShareExtension.appex */,
+				B5276C582EE6B9E37FEFFDD1 /* RepoBariOSTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		EBF9C653CD616DDF8430A803 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				62BC99DC837638D8143BC707 /* Assets.xcassets */,
+				4D26FAB33B6A0F5D3125A8DC /* Info.plist */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		FC5E36700C168A07516A096A /* ShareExtension */ = {
+			isa = PBXGroup;
+			children = (
+				6CC084C55EC6FC1753E01A2E /* Info.plist */,
+				FC878EFB8821470DCE58F60D /* ShareViewController.swift */,
+			);
+			path = ShareExtension;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		6A05C34DF93D0621653EBE91 /* RepoBariOSTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5C36276CE517C5BE86828B51 /* Build configuration list for PBXNativeTarget "RepoBariOSTests" */;
+			buildPhases = (
+				3EB2B8F3097E1B5960589454 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				667E4CE5430746B6E5396165 /* PBXTargetDependency */,
+			);
+			name = RepoBariOSTests;
+			packageProductDependencies = (
+			);
+			productName = RepoBariOSTests;
+			productReference = B5276C582EE6B9E37FEFFDD1 /* RepoBariOSTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		6E49CAAD1C4E63C2D8C130CA /* RepoBariOSShareExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0C35D2ED56EE987BEC29551A /* Build configuration list for PBXNativeTarget "RepoBariOSShareExtension" */;
+			buildPhases = (
+				E1B39553067642F06FB5AA15 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = RepoBariOSShareExtension;
+			packageProductDependencies = (
+			);
+			productName = RepoBariOSShareExtension;
+			productReference = 8593BCB0DFABDADD6DC9E0D3 /* RepoBariOSShareExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		860816B9D94E96E3FC2C43C2 /* RepoBariOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5899D7BF3FCBE152A6DACB1E /* Build configuration list for PBXNativeTarget "RepoBariOS" */;
+			buildPhases = (
+				2AC93594BF386BC460BBF755 /* Sources */,
+				E066B89F2FD1BD564707AAD2 /* Resources */,
+				037F72F1686ECC2EE10B0B1C /* Frameworks */,
+				636D828FE6487BA146D60D84 /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A88D0ED775DF974F670E69F6 /* PBXTargetDependency */,
+			);
+			name = RepoBariOS;
+			packageProductDependencies = (
+				D74BFA436D25399AB8463C39 /* RepoBarCore */,
+				1C4F088BC7981AB35E04C21C /* Kingfisher */,
+			);
+			productName = RepoBariOS;
+			productReference = 2540C2570FFCFA055E2A951F /* RepoBariOS.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		5BFEB3656CBA58AEEB2195D1 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					6E49CAAD1C4E63C2D8C130CA = {
+						DevelopmentTeam = 2ZAC4GM7GD;
+					};
+					860816B9D94E96E3FC2C43C2 = {
+						DevelopmentTeam = 2ZAC4GM7GD;
+					};
+				};
+			};
+			buildConfigurationList = 36549CEF3A120C71607F8CDA /* Build configuration list for PBXProject "RepoBariOS" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 5E080CDAD2FC0EAAD766FEDE;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				426815DB1A295EB41062859E /* XCRemoteSwiftPackageReference "Kingfisher" */,
+				1EE30F4F720752374C32387A /* XCLocalSwiftPackageReference ".." */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = E608A1C270FEF0431C7E3F30 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				860816B9D94E96E3FC2C43C2 /* RepoBariOS */,
+				6E49CAAD1C4E63C2D8C130CA /* RepoBariOSShareExtension */,
+				6A05C34DF93D0621653EBE91 /* RepoBariOSTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		E066B89F2FD1BD564707AAD2 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CC9F8DF042D5DC542AAED771 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		2AC93594BF386BC460BBF755 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3A706924DDE8F2D1E868302A /* ActivityView.swift in Sources */,
+				4AC61DEAFCB295CD488A7DF1 /* AddRepoSheet.swift in Sources */,
+				426BADF74ECFBB3FE53095C4 /* AppLimits.swift in Sources */,
+				3C8F96017A15E9AC87C0045F /* AppModel.swift in Sources */,
+				0DC367D0B45B1E71D3FF0103 /* AppSession.swift in Sources */,
+				6DCEAE33CA9039A750958314 /* Array+Chunked.swift in Sources */,
+				058B0ED7732E2B4C76CCD0A4 /* GitHubReferenceMatch+Display.swift in Sources */,
+				85B2F5E4B5D4A76CA37B8D3C /* GlassStyles.swift in Sources */,
+				9EB435999454B779FF86A75A /* HeatmapAxisLabelsView.swift in Sources */,
+				F18E5D8590BE40700F75055E /* HeatmapView.swift in Sources */,
+				1843CDC27F756953CBC10286 /* IncomingReferenceURL.swift in Sources */,
+				9A19228C2B2DAD068484E2F3 /* LoginView.swift in Sources */,
+				E996683F55FF706C55BA1716 /* OAuthCoordinator.swift in Sources */,
+				6120CFEFB0EBF1767980D7D2 /* OwnerFilterParser.swift in Sources */,
+				CB310F27739DFC95A11A5E77 /* ReferencePreviewWebView.swift in Sources */,
+				62E4F059A529E8841DF296FA /* RefreshInterval+Label.swift in Sources */,
+				60FA047F7447D028CC0FA510 /* RefreshScheduler.swift in Sources */,
+				77D804506AD7E74D5C847938 /* RepoBariOSApp.swift in Sources */,
+				D4D4EA55ECCFFC67AF34ACF1 /* RepoCardView.swift in Sources */,
+				83B109981F44549DB4DB3D75 /* RepoDetailModel.swift in Sources */,
+				42576806C6901849276ABF8E /* RepoDetailView.swift in Sources */,
+				23A160313A67F857ADFC6D4A /* RepoFilesView.swift in Sources */,
+				7A98978CA4B9380E36625C0D /* RepoListView.swift in Sources */,
+				3A7E17D2737B1E31C7DED394 /* RepoWebURLBuilder.swift in Sources */,
+				15A96DF4CF7EA83F7745A031 /* RepositoryCardModel.swift in Sources */,
+				5074CE9150A55025D76699B0 /* RepositorySortKey+Label.swift in Sources */,
+				8871EA5BB70B99440560589F /* RootView.swift in Sources */,
+				F01E2B7126A428C0203549BC /* SettingsView.swift in Sources */,
+				8C49EFF89D886FB970E46BC1 /* StatusView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3EB2B8F3097E1B5960589454 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5FCE45A91ABA50AA40CEB4E4 /* IncomingReferenceURLTests.swift in Sources */,
+				F61F21A79415EE0B0A123D30 /* OwnerFilterParserTests.swift in Sources */,
+				08A14ABAC7D8F60F1CECB4F4 /* RepoWebURLBuilderTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E1B39553067642F06FB5AA15 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				199928082E7435CBCF1DA6C4 /* ShareViewController.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		667E4CE5430746B6E5396165 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 860816B9D94E96E3FC2C43C2 /* RepoBariOS */;
+			targetProxy = C87E6AF5C39FD96679E8A067 /* PBXContainerItemProxy */;
+		};
+		A88D0ED775DF974F670E69F6 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 6E49CAAD1C4E63C2D8C130CA /* RepoBariOSShareExtension */;
+			targetProxy = 62E1A68765442066B1520498 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		2F00BDEEDD1534E0B84F9E31 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = RepoBariOS.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 2ZAC4GM7GD;
+				INFOPLIST_FILE = Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.steipete.repobar.ios;
+				SDKROOT = iphoneos;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		2F262BAE5AE73892C9C0FEF7 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.steipete.repobar.ios.tests;
+				SDKROOT = iphoneos;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/RepoBariOS.app/RepoBariOS";
+			};
+			name = Release;
+		};
+		AE7B1F1A103DD703755D59B5 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = RepoBariOS.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 2ZAC4GM7GD;
+				INFOPLIST_FILE = Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.steipete.repobar.ios;
+				SDKROOT = iphoneos;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		B755C4E010C70F875BE8258D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.2;
+			};
+			name = Debug;
+		};
+		C2682559BB88BF5CBFEF106B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 2ZAC4GM7GD;
+				INFOPLIST_FILE = ShareExtension/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.steipete.repobar.ios.ShareExtension;
+				SDKROOT = iphoneos;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		D29BA0A10D2D6E3C16644D9F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.steipete.repobar.ios.tests;
+				SDKROOT = iphoneos;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/RepoBariOS.app/RepoBariOS";
+			};
+			name = Debug;
+		};
+		E3896BF4DDCB32CFD8EDD82C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 6.2;
+			};
+			name = Release;
+		};
+		EB6C3706EA77B7C02A972575 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 2ZAC4GM7GD;
+				INFOPLIST_FILE = ShareExtension/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.steipete.repobar.ios.ShareExtension;
+				SDKROOT = iphoneos;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		0C35D2ED56EE987BEC29551A /* Build configuration list for PBXNativeTarget "RepoBariOSShareExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				EB6C3706EA77B7C02A972575 /* Debug */,
+				C2682559BB88BF5CBFEF106B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		36549CEF3A120C71607F8CDA /* Build configuration list for PBXProject "RepoBariOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B755C4E010C70F875BE8258D /* Debug */,
+				E3896BF4DDCB32CFD8EDD82C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		5899D7BF3FCBE152A6DACB1E /* Build configuration list for PBXNativeTarget "RepoBariOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2F00BDEEDD1534E0B84F9E31 /* Debug */,
+				AE7B1F1A103DD703755D59B5 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		5C36276CE517C5BE86828B51 /* Build configuration list for PBXNativeTarget "RepoBariOSTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D29BA0A10D2D6E3C16644D9F /* Debug */,
+				2F262BAE5AE73892C9C0FEF7 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		1EE30F4F720752374C32387A /* XCLocalSwiftPackageReference ".." */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ..;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		426815DB1A295EB41062859E /* XCRemoteSwiftPackageReference "Kingfisher" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/onevcat/Kingfisher";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 8.6.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		1C4F088BC7981AB35E04C21C /* Kingfisher */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 426815DB1A295EB41062859E /* XCRemoteSwiftPackageReference "Kingfisher" */;
+			productName = Kingfisher;
+		};
+		D74BFA436D25399AB8463C39 /* RepoBarCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = RepoBarCore;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 5BFEB3656CBA58AEEB2195D1 /* Project object */;
+}

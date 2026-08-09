@@ -1,0 +1,102 @@
+name: RepoBariOS
+options:
+  bundleIdPrefix: com.steipete
+  deploymentTarget:
+    iOS: "26.0"
+settings:
+  base:
+    SWIFT_VERSION: 6.2
+packages:
+  RepoBar:
+    path: ..
+  Kingfisher:
+    url: https://github.com/onevcat/Kingfisher
+    from: 8.6.0
+targets:
+  RepoBariOS:
+    type: application
+    platform: iOS
+    sources:
+      - Sources
+      - Resources
+    dependencies:
+      - target: RepoBariOSShareExtension
+        embed: true
+      - package: RepoBar
+        product: RepoBarCore
+      - package: Kingfisher
+        product: Kingfisher
+    settings:
+      base:
+        DEVELOPMENT_TEAM: 2ZAC4GM7GD
+        PRODUCT_BUNDLE_IDENTIFIER: com.steipete.repobar.ios
+        INFOPLIST_FILE: Resources/Info.plist
+        TARGETED_DEVICE_FAMILY: "1,2"
+        MARKETING_VERSION: 0.1.0
+        CURRENT_PROJECT_VERSION: 1
+        CODE_SIGN_ENTITLEMENTS: RepoBariOS.entitlements
+        SWIFT_STRICT_CONCURRENCY: complete
+    info:
+      path: Resources/Info.plist
+      properties:
+        CFBundleDisplayName: RepoBar
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        CFBundleURLTypes:
+          - CFBundleURLName: com.steipete.repobar.auth
+            CFBundleURLSchemes:
+              - repobar
+        UILaunchScreen: {}
+        RepoBarKeychainAccessGroup: "$(AppIdentifierPrefix)com.steipete.repobar.shared"
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: true
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+    frameworks:
+      - AuthenticationServices
+      - WebKit
+  RepoBariOSShareExtension:
+    type: app-extension
+    platform: iOS
+    sources:
+      - ShareExtension
+    settings:
+      base:
+        DEVELOPMENT_TEAM: 2ZAC4GM7GD
+        PRODUCT_BUNDLE_IDENTIFIER: com.steipete.repobar.ios.ShareExtension
+        INFOPLIST_FILE: ShareExtension/Info.plist
+        MARKETING_VERSION: 0.1.0
+        CURRENT_PROJECT_VERSION: 1
+        APPLICATION_EXTENSION_API_ONLY: YES
+        SWIFT_STRICT_CONCURRENCY: complete
+    info:
+      path: ShareExtension/Info.plist
+      properties:
+        CFBundleDisplayName: RepoBar
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.share-services
+          NSExtensionPrincipalClass: "$(PRODUCT_MODULE_NAME).ShareViewController"
+          NSExtensionAttributes:
+            NSExtensionActivationRule:
+              NSExtensionActivationSupportsText: true
+              NSExtensionActivationSupportsWebURLWithMaxCount: 1
+  RepoBariOSTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - Tests
+    dependencies:
+      - target: RepoBariOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.steipete.repobar.ios.tests
+        SWIFT_STRICT_CONCURRENCY: complete

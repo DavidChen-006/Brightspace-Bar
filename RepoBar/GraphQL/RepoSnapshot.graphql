@@ -1,0 +1,17 @@
+query RepoSnapshot($owner: String!, $name: String!) {
+  repository(owner: $owner, name: $name) {
+    name
+    latestRelease {
+      name
+      tagName
+      publishedAt
+      createdAt
+      url
+      isDraft
+      isPrerelease
+      isLatest
+    }
+    issues(states: OPEN) { totalCount }
+    pullRequests(states: OPEN) { totalCount }
+  }
+}

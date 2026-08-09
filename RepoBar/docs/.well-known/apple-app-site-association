@@ -1,0 +1,19 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "2ZAC4GM7GD.com.steipete.repobar.ios",
+        "paths": [
+          "/oauth-callback",
+          "/oauth-callback/*"
+        ]
+      }
+    ]
+  },
+  "webcredentials": {
+    "apps": [
+      "2ZAC4GM7GD.com.steipete.repobar.ios"
+    ]
+  }
+}

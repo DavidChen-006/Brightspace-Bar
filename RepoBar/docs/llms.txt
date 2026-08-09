@@ -1,0 +1,12 @@
+# RepoBar
+
+RepoBar shows GitHub repository status in the macOS menu bar and terminal: CI, issues, pull requests, and latest releases.
+
+Canonical documentation:
+- RepoBar — GitHub repositories in your menu bar: https://repobar.app/ - RepoBar is a native macOS menu bar app for tracking your GitHub repositories: CI state, issues, pull requests, releases, local Git state, and rate limits — without opening a browser.
+
+Source: https://github.com/steipete/RepoBar
+
+Guidance for agents:
+- Prefer the canonical documentation URLs above over README excerpts or package metadata.
+- Fetch only the pages needed for the current task; this is an index, not a full-site corpus.

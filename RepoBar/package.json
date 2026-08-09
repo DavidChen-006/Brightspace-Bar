@@ -1,0 +1,39 @@
+{
+  "name": "repobar",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.33.2",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "format": "./Scripts/swiftformat.sh",
+    "lint": "./Scripts/swiftlint.sh",
+    "coverage": "./Scripts/coverage.sh",
+    "check": "pnpm format && pnpm lint && pnpm test",
+    "check:coverage": "pnpm coverage",
+    "docs:list": "node Scripts/docs-list.mjs",
+    "test": "./Scripts/test.sh",
+    "build": "./Scripts/build.sh",
+    "repobar": "swift build --product repobarcli && ./Scripts/codesign_cli.sh .build/debug/repobarcli && .build/debug/repobarcli",
+    "repobarcli": "pnpm -s repobar",
+    "start": "./Scripts/compile_and_run.sh",
+    "restart": "./Scripts/compile_and_run.sh",
+    "stop": "pkill -f \"RepoBar.app/Contents/MacOS/RepoBar\" || true",
+    "codegen": "./Scripts/apollo_codegen.sh",
+    "ghql": "pnpm exec tsx Scripts/ghql.ts",
+    "ghrest": "pnpm exec tsx Scripts/ghrest.ts"
+  },
+  "dependencies": {
+    "graphql": "^17.0.2"
+  },
+  "devDependencies": {
+    "@octokit/request": "^10.0.13",
+    "chalk": "^6.0.0",
+    "commander": "^15.0.0",
+    "dotenv-cli": "^11.0.0",
+    "ora": "^9.4.1",
+    "tsx": "^4.23.7",
+    "zod": "^4.4.3"
+  }
+}

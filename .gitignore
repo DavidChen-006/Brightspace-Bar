@@ -1,6 +1,5 @@
 node_modules/
 brightspace-mcp-server/
-RepoBar/
 **/artifacts/session.json
 .env
 .env.*
