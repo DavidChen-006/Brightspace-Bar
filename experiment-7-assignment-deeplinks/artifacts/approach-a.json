@@ -1,0 +1,1043 @@
+{
+  "baseUrl": "https://purdue.brightspace.com",
+  "courses": {
+    "440703": {
+      "name": "Scholarly Project Milestones",
+      "dropboxFolders": [
+        {
+          "id": 445296,
+          "name": "Upload your CITI Certificate to Complete Module 2",
+          "dueDate": null,
+          "fields": {
+            "Id": {
+              "type": "int",
+              "value": 445296
+            },
+            "CategoryId": {
+              "type": "NoneType",
+              "value": null
+            },
+            "Name": {
+              "type": "string(49)",
+              "value": "Upload your CITI Certificate to Complete Module 2"
+            },
+            "CustomInstructions": {
+              "type": "object(2 keys)"
+            },
+            "Attachments": {
+              "type": "array[0]"
+            },
+            "TotalFiles": {
+              "type": "int",
+              "value": -1
+            },
+            "UnreadFiles": {
+              "type": "int",
+              "value": -1
+            },
+            "FlaggedFiles": {
+              "type": "int",
+              "value": -1
+            },
+            "TotalUsers": {
+              "type": "int",
+              "value": -1
+            },
+            "TotalUsersWithSubmissions": {
+              "type": "int",
+              "value": -1
+            },
+            "TotalUsersWithFeedback": {
+              "type": "int",
+              "value": -1
+            },
+            "Availability": {
+              "type": "NoneType",
+              "value": null
+            },
+            "IsHidden": {
+              "type": "bool",
+              "value": false
+            },
+            "Assessment": {
+              "type": "object(2 keys)"
+            },
+            "DropboxType": {
+              "type": "int",
+              "value": 2
+            },
+            "GroupTypeId": {
+              "type": "NoneType",
+              "value": null
+            },
+            "DueDate": {
+              "type": "NoneType",
+              "value": null
+            },
+            "DisplayInCalendar": {
+              "type": "bool",
+              "value": false
+            },
+            "NotificationEmail": {
+              "type": "NoneType",
+              "value": null
+            },
+            "LinkAttachments": {
+              "type": "array[0]",
+              "LINKISH": true
+            },
+            "ActivityId": {
+              "type": "string(91)",
+              "value": "https://ids.brightspace.com/activities/dropbox/354644E0-4CD8-419D-A32F-4E78D8778E5C-2993966"
+            },
+            "IsAnonymous": {
+              "type": "bool",
+              "value": false
+            },
+            "SubmissionType": {
+              "type": "int",
+              "value": 0
+            },
+            "CompletionType": {
+              "type": "int",
+              "value": 0
+            },
+            "AllowableFileType": {
+              "type": "int",
+              "value": 0
+            },
+            "CustomAllowableFileTypes": {
+              "type": "NoneType",
+              "value": null
+            },
+            "GradeItemId": {
+              "type": "NoneType",
+              "value": null
+            },
+            "AllowOnlyUsersWithSpecialAccess": {
+              "type": "NoneType",
+              "value": null
+            }
+          },
+          "linkishFields": [
+            "LinkAttachments"
+          ],
+          "linkAttachments": []
+        },
+        {
+          "id": 445297,
+          "name": "Report on your PURC Experience.",
+          "dueDate": null,
+          "fields": {
+            "Id": {
+              "type": "int",
+              "value": 445297
+            },
+            "CategoryId": {
+              "type": "NoneType",
+              "value": null
+            },
+            "Name": {
+              "type": "string(31)",
+              "value": "Report on your PURC Experience."
+            },
+            "CustomInstructions": {
+              "type": "object(2 keys)"
+            },
+            "Attachments": {
+              "type": "array[0]"
+            },
+            "TotalFiles": {
+              "type": "int",
+              "value": -1
+            },
+            "UnreadFiles": {
+              "type": "int",
+              "value": -1
+            },
+            "FlaggedFiles": {
+              "type": "int",
+              "value": -1
+            },
+            "TotalUsers": {
+              "type": "int",
+              "value": -1
+            },
+            "TotalUsersWithSubmissions": {
+              "type": "int",
+              "value": -1
+            },
+            "TotalUsersWithFeedback": {
+              "type": "int",
+              "value": -1
+            },
+            "Availability": {
+              "type": "NoneType",
+              "value": null
+            },
+            "IsHidden": {
+              "type": "bool",
+              "value": false
+            },
+            "Assessment": {
+              "type": "object(2 keys)"
+            },
+            "DropboxType": {
+              "type": "int",
+              "value": 2
+            },
+            "GroupTypeId": {
+              "type": "NoneType",
+              "value": null
+            },
+            "DueDate": {
+              "type": "NoneType",
+              "value": null
+            },
+            "DisplayInCalendar": {
+              "type": "bool",
+              "value": false
+            },
+            "NotificationEmail": {
+              "type": "NoneType",
+              "value": null
+            },
+            "LinkAttachments": {
+              "type": "array[0]",
+              "LINKISH": true
+            },
+            "ActivityId": {
+              "type": "string(91)",
+              "value": "https://ids.brightspace.com/activities/dropbox/354644E0-4CD8-419D-A32F-4E78D8778E5C-3001012"
+            },
+            "IsAnonymous": {
+              "type": "bool",
+              "value": false
+            },
+            "SubmissionType": {
+              "type": "int",
+              "value": 1
+            },
+            "CompletionType": {
+              "type": "int",
+              "value": 0
+            },
+            "AllowableFileType": {
+              "type": "int",
+              "value": 0
+            },
+            "CustomAllowableFileTypes": {
+              "type": "NoneType",
+              "value": null
+            },
+            "GradeItemId": {
+              "type": "NoneType",
+              "value": null
+            },
+            "AllowOnlyUsersWithSpecialAccess": {
+              "type": "NoneType",
+              "value": null
+            }
+          },
+          "linkishFields": [
+            "LinkAttachments"
+          ],
+          "linkAttachments": []
+        },
+        {
+          "id": 529524,
+          "name": "Getting Started on Scholarly Project Ideation",
+          "dueDate": null,
+          "fields": {
+            "Id": {
+              "type": "int",
+              "value": 529524
+            },
+            "CategoryId": {
+              "type": "NoneType",
+              "value": null
+            },
+            "Name": {
+              "type": "string(45)",
+              "value": "Getting Started on Scholarly Project Ideation"
+            },
+            "CustomInstructions": {
+              "type": "object(2 keys)"
+            },
+            "Attachments": {
+              "type": "array[1]"
+            },
+            "TotalFiles": {
+              "type": "int",
+              "value": -1
+            },
+            "UnreadFiles": {
+              "type": "int",
+              "value": -1
+            },
+            "FlaggedFiles": {
+              "type": "int",
+              "value": -1
+            },
+            "TotalUsers": {
+              "type": "int",
+              "value": -1
+            },
+            "TotalUsersWithSubmissions": {
+              "type": "int",
+              "value": -1
+            },
+            "TotalUsersWithFeedback": {
+              "type": "int",
+              "value": -1
+            },
+            "Availability": {
+              "type": "NoneType",
+              "value": null
+            },
+            "IsHidden": {
+              "type": "bool",
+              "value": false
+            },
+            "Assessment": {
+              "type": "object(2 keys)"
+            },
+            "DropboxType": {
+              "type": "int",
+              "value": 2
+            },
+            "GroupTypeId": {
+              "type": "NoneType",
+              "value": null
+            },
+            "DueDate": {
+              "type": "NoneType",
+              "value": null
+            },
+            "DisplayInCalendar": {
+              "type": "bool",
+              "value": false
+            },
+            "NotificationEmail": {
+              "type": "NoneType",
+              "value": null
+            },
+            "LinkAttachments": {
+              "type": "array[0]",
+              "LINKISH": true
+            },
+            "ActivityId": {
+              "type": "string(91)",
+              "value": "https://ids.brightspace.com/activities/dropbox/354644E0-4CD8-419D-A32F-4E78D8778E5C-4439050"
+            },
+            "IsAnonymous": {
+              "type": "bool",
+              "value": false
+            },
+            "SubmissionType": {
+              "type": "int",
+              "value": 0
+            },
+            "CompletionType": {
+              "type": "int",
+              "value": 0
+            },
+            "AllowableFileType": {
+              "type": "int",
+              "value": 0
+            },
+            "CustomAllowableFileTypes": {
+              "type": "NoneType",
+              "value": null
+            },
+            "GradeItemId": {
+              "type": "NoneType",
+              "value": null
+            },
+            "AllowOnlyUsersWithSpecialAccess": {
+              "type": "NoneType",
+              "value": null
+            }
+          },
+          "linkishFields": [
+            "LinkAttachments"
+          ],
+          "linkAttachments": []
+        }
+      ],
+      "contentTopics": [
+        {
+          "id": 7441349,
+          "type": 0,
+          "title": "Overview and Contact Information",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 0
+        },
+        {
+          "id": 7480442,
+          "type": 1,
+          "title": "Information Before You Begin",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 1
+        },
+        {
+          "id": 7441350,
+          "type": 0,
+          "title": "Module 1: What Is Research?",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 0
+        },
+        {
+          "id": 7441379,
+          "type": 1,
+          "title": "Video Lesson - Not By Test Tubes Alone (7 min.)",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 1
+        },
+        {
+          "id": 7441367,
+          "type": 1,
+          "title": "[video transcript for Module 1]",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 1
+        },
+        {
+          "id": 7441358,
+          "type": 1,
+          "title": "Purdue Libraries - Empirical Research (4 min.)",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 1
+        },
+        {
+          "id": 7441359,
+          "type": 1,
+          "title": "Purdue Libraries - Interpretive Research (4 min.)",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 1
+        },
+        {
+          "id": 7441361,
+          "type": 1,
+          "title": "Purdue Libraries - Creative Research (4 min.)",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 1
+        },
+        {
+          "id": 7441360,
+          "type": 1,
+          "title": "Purdue Libraries - Action Research (4 min.)",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 1
+        },
+        {
+          "id": 7441362,
+          "type": 1,
+          "title": "Module 1 Completion Quiz - What Is Research? (5 min.)",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 1
+        },
+        {
+          "id": 7441351,
+          "type": 0,
+          "title": "Module 2: The Responsible Conduct of Research",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 0
+        },
+        {
+          "id": 7441380,
+          "type": 1,
+          "title": "Video Lesson - The Responsible Conduct of Research (4 min.)",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 1
+        },
+        {
+          "id": 7441371,
+          "type": 1,
+          "title": "[video transcript for Module 2]",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 1
+        },
+        {
+          "id": 7441364,
+          "type": 1,
+          "title": "[optional] What is IRB? (3 min.)",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 1
+        },
+        {
+          "id": 7441366,
+          "type": 1,
+          "title": "Purdue RCR Training (60 min.)",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 1
+        },
+        {
+          "id": 7441365,
+          "type": 1,
+          "title": "Purdue IRB website",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 1
+        },
+        {
+          "id": 7441368,
+          "type": 1,
+          "title": "Upload your CITI Certificate to Complete Module 2",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 1
+        },
+        {
+          "id": 7441352,
+          "type": 0,
+          "title": "Module 3: Introduction to The Scholarly Project Requirement",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 0
+        },
+        {
+          "id": 7441381,
+          "type": 1,
+          "title": "Video Lesson 3-1, The Scholarly Project Defined (4 min.)",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 1
+        },
+        {
+          "id": 9837763,
+          "type": 1,
+          "title": "Module 3-1 transcript",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 1
+        },
+        {
+          "id": 7441382,
+          "type": 1,
+          "title": "Video Lesson 3-2, How to Complete the Scholarly Project (9 min.)",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 1
+        },
+        {
+          "id": 9861985,
+          "type": 1,
+          "title": "Module 3-2 transcript",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 1
+        },
+        {
+          "id": 8671075,
+          "type": 1,
+          "title": "Getting Started on Scholarly Project Ideation",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 1
+        },
+        {
+          "id": 7441353,
+          "type": 0,
+          "title": "Module 4: Engaging the Culture of Research - Year 1",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 0
+        },
+        {
+          "id": 7441383,
+          "type": 1,
+          "title": "Engaging the Culture of Research in Year 1 (9 min.)",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 1
+        },
+        {
+          "id": 7441375,
+          "type": 1,
+          "title": "[video transcript for Module 4]",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 1
+        },
+        {
+          "id": 7441377,
+          "type": 1,
+          "title": "Purdue Undergraduate Research Conference (PURC)",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 1
+        },
+        {
+          "id": 7441378,
+          "type": 1,
+          "title": "Report on your PURC Experience.",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 1
+        },
+        {
+          "id": 9833338,
+          "type": 0,
+          "title": "Module 5: Finding a Mentor",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 0
+        },
+        {
+          "id": 16881836,
+          "type": 1,
+          "title": "Finding a Mentor for the Traditional Pathway",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 1
+        },
+        {
+          "id": 9835096,
+          "type": 1,
+          "title": "Sample Email to Faculty",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 1
+        },
+        {
+          "id": 9833342,
+          "type": 0,
+          "title": "Module 6: The Mentoring Relationship",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 0
+        },
+        {
+          "id": 9835101,
+          "type": 1,
+          "title": "Mentor Mentee Relationship",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 1
+        },
+        {
+          "id": 9835099,
+          "type": 1,
+          "title": "Aligning Expectations Worksheet",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 1
+        },
+        {
+          "id": 9835098,
+          "type": 1,
+          "title": "Mentor Mentee Compact",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 1
+        },
+        {
+          "id": 14852082,
+          "type": 0,
+          "title": "Module 7: Building Your Research Bio",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 0
+        },
+        {
+          "id": 14852117,
+          "type": 1,
+          "title": "Market Your Research Experience-Purdue Office of Undergraduate Research",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 1
+        },
+        {
+          "id": 14852083,
+          "type": 1,
+          "title": "Example CV - STEM",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 1
+        },
+        {
+          "id": 14852085,
+          "type": 1,
+          "title": "Example CV - Liberal Arts/Social Science/Humanities",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 1
+        },
+        {
+          "id": 11371668,
+          "type": 0,
+          "title": "Faculty Research Network",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 0
+        },
+        {
+          "id": 14079733,
+          "type": 0,
+          "title": "link for FRN:",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 1
+        },
+        {
+          "id": 17836975,
+          "type": 0,
+          "title": "Information for Purdue Indianapolis - JMHC Students",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 0
+        },
+        {
+          "id": 17837039,
+          "type": 1,
+          "title": "GMT20240923-135848_Recording.cutfile.20240923192905451_1920x1080 (1)",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 1
+        },
+        {
+          "id": 19915146,
+          "type": 0,
+          "title": "BGR 2025 Presentation",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 0
+        },
+        {
+          "id": 19915147,
+          "type": 1,
+          "title": "BGR 2025",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 1
+        }
+      ],
+      "dropboxStatus": 200,
+      "contentStatus": 200
+    },
+    "412690": {
+      "name": "Purdue Civics Knowledge Test",
+      "dropboxFolders": [
+        {
+          "id": 648911,
+          "name": "Untitled",
+          "dueDate": null,
+          "fields": {
+            "Id": {
+              "type": "int",
+              "value": 648911
+            },
+            "CategoryId": {
+              "type": "NoneType",
+              "value": null
+            },
+            "Name": {
+              "type": "string(8)",
+              "value": "Untitled"
+            },
+            "CustomInstructions": {
+              "type": "object(2 keys)"
+            },
+            "Attachments": {
+              "type": "array[0]"
+            },
+            "TotalFiles": {
+              "type": "int",
+              "value": -1
+            },
+            "UnreadFiles": {
+              "type": "int",
+              "value": -1
+            },
+            "FlaggedFiles": {
+              "type": "int",
+              "value": -1
+            },
+            "TotalUsers": {
+              "type": "int",
+              "value": -1
+            },
+            "TotalUsersWithSubmissions": {
+              "type": "int",
+              "value": -1
+            },
+            "TotalUsersWithFeedback": {
+              "type": "int",
+              "value": -1
+            },
+            "Availability": {
+              "type": "NoneType",
+              "value": null
+            },
+            "IsHidden": {
+              "type": "bool",
+              "value": false
+            },
+            "Assessment": {
+              "type": "object(2 keys)"
+            },
+            "DropboxType": {
+              "type": "int",
+              "value": 2
+            },
+            "GroupTypeId": {
+              "type": "NoneType",
+              "value": null
+            },
+            "DueDate": {
+              "type": "NoneType",
+              "value": null
+            },
+            "DisplayInCalendar": {
+              "type": "bool",
+              "value": false
+            },
+            "NotificationEmail": {
+              "type": "NoneType",
+              "value": null
+            },
+            "LinkAttachments": {
+              "type": "array[0]",
+              "LINKISH": true
+            },
+            "ActivityId": {
+              "type": "string(91)",
+              "value": "https://ids.brightspace.com/activities/dropbox/354644E0-4CD8-419D-A32F-4E78D8778E5C-5458282"
+            },
+            "IsAnonymous": {
+              "type": "bool",
+              "value": false
+            },
+            "SubmissionType": {
+              "type": "int",
+              "value": 0
+            },
+            "CompletionType": {
+              "type": "int",
+              "value": 0
+            },
+            "AllowableFileType": {
+              "type": "int",
+              "value": 0
+            },
+            "CustomAllowableFileTypes": {
+              "type": "NoneType",
+              "value": null
+            },
+            "GradeItemId": {
+              "type": "NoneType",
+              "value": null
+            },
+            "AllowOnlyUsersWithSpecialAccess": {
+              "type": "NoneType",
+              "value": null
+            }
+          },
+          "linkishFields": [
+            "LinkAttachments"
+          ],
+          "linkAttachments": []
+        }
+      ],
+      "contentTopics": [
+        {
+          "id": 13044043,
+          "type": 0,
+          "title": "Welcome to Civics Literacy",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 0
+        },
+        {
+          "id": 13044044,
+          "type": 0,
+          "title": "What is Civics Literacy?",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 1
+        },
+        {
+          "id": 13044045,
+          "type": 0,
+          "title": "Gaining your Civics Literacy Certificate",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 1
+        },
+        {
+          "id": 13044046,
+          "type": 0,
+          "title": "How to Access your Pathway and Track your Progress",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 1
+        },
+        {
+          "id": 13044047,
+          "type": 0,
+          "title": "Welcome Quiz",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 1
+        },
+        {
+          "id": 7018017,
+          "type": 0,
+          "title": "Civics Test",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 0
+        },
+        {
+          "id": 9861889,
+          "type": 1,
+          "title": "Practice Quiz - Requires Respondus LockDown Browser + Webcam",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 1
+        },
+        {
+          "id": 9861890,
+          "type": 1,
+          "title": "Honor Pledge",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 1
+        },
+        {
+          "id": 7018022,
+          "type": 0,
+          "title": "Civics Literacy Study & Resource Guide",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 0
+        },
+        {
+          "id": 7018023,
+          "type": 1,
+          "title": "Civics Literacy Study & Resource Guide",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 1
+        },
+        {
+          "id": 7018024,
+          "type": 0,
+          "title": "Civics Test Guide",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 0
+        },
+        {
+          "id": 7018025,
+          "type": 1,
+          "title": "Civics Test Guide",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 1
+        },
+        {
+          "id": 7018026,
+          "type": 0,
+          "title": "Civics FAQs",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 0
+        },
+        {
+          "id": 7018027,
+          "type": 1,
+          "title": "FAQs",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 1
+        },
+        {
+          "id": 14859748,
+          "type": 0,
+          "title": "Virtual Office Hours",
+          "topicType": null,
+          "url": null,
+          "linkishFields": [],
+          "depth": 0
+        }
+      ],
+      "dropboxStatus": 200,
+      "contentStatus": 200
+    }
+  }
+}

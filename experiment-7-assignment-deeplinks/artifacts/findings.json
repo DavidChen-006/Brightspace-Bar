@@ -1,0 +1,198 @@
+{
+  "experiment": "7 \u2014 assignment deep links",
+  "question": "Can a per-assignment URL be derived from API-available ids?",
+  "verdict": "DERIVABLE",
+  "template": "{baseUrl}/d2l/lms/dropbox/user/folder_submit_files.d2l?db={folderId}&grpid=0&ou={orgUnitId}",
+  "templateInputs": {
+    "baseUrl": "session.baseUrl",
+    "orgUnitId": "enrollments myenrollments -> OrgUnit.Id (already Course.id in the app)",
+    "folderId": "GET /d2l/api/le/1.96/{ou}/dropbox/folders/ -> folder.Id"
+  },
+  "holdsForBothCourses": true,
+  "approaches": {
+    "A_api_provides_link": {
+      "verdict": "FAILED \u2014 no deep-link field exists",
+      "dropboxFolderFields": [
+        "ActivityId",
+        "AllowOnlyUsersWithSpecialAccess",
+        "AllowableFileType",
+        "Assessment",
+        "Attachments",
+        "Availability",
+        "CategoryId",
+        "CompletionType",
+        "CustomAllowableFileTypes",
+        "CustomInstructions",
+        "DisplayInCalendar",
+        "DropboxType",
+        "DueDate",
+        "FlaggedFiles",
+        "GradeItemId",
+        "GroupTypeId",
+        "Id",
+        "IsAnonymous",
+        "IsHidden",
+        "LinkAttachments",
+        "Name",
+        "NotificationEmail",
+        "SubmissionType",
+        "TotalFiles",
+        "TotalUsers",
+        "TotalUsersWithFeedback",
+        "TotalUsersWithSubmissions",
+        "UnreadFiles"
+      ],
+      "onlyLinkShapedField": "LinkAttachments",
+      "linkAttachmentsNote": "instructor-attached EXTERNAL resources, not a link to the assignment; using it would open unrelated third-party pages",
+      "contentTopicUrlNote": "content/root/ returns no Url at all; the per-topic detail route DOES carry Url but it is a raw content file path (e.g. /content/enforced/440703-.../Information Before You Begin.html), not a UI page"
+    },
+    "B_harvest_from_ui": {
+      "verdict": "SUCCEEDED \u2014 this is where the answer came from",
+      "harvestedHrefPattern": "/d2l/lms/dropbox/user/folder_submit_files.d2l?db={folderId}&grpid=0&isprv=&bp=0&ou={orgUnitId}",
+      "mappingProof": "the db= value equals the dropbox API's folder Id exactly (445296, 445297, 529524, 648911)",
+      "perCourse": [
+        {
+          "ou": 440703,
+          "anchors": 6,
+          "listOutcome": "LOADED"
+        },
+        {
+          "ou": 412690,
+          "anchors": 2,
+          "listOutcome": "LOADED"
+        }
+      ]
+    },
+    "C_constructed_patterns": {
+      "verdict": "SUCCEEDED for one shape; isprv and bp turn out to be optional",
+      "results": [
+        {
+          "ou": 440703,
+          "label": "folder_submit_files.d2l?db&grpid&ou",
+          "status": 200,
+          "outcome": "WORKS"
+        },
+        {
+          "ou": 440703,
+          "label": "le/{ou}/dropbox/user/folder_submit_files?db",
+          "status": 404,
+          "outcome": "WRONG_PAGE"
+        },
+        {
+          "ou": 440703,
+          "label": "lms/dropbox/dropbox.d2l?ou (list only)",
+          "status": 200,
+          "outcome": "WORKS"
+        },
+        {
+          "ou": 440703,
+          "label": "folders_list.d2l?ou (list only)",
+          "status": 200,
+          "outcome": "WORKS"
+        },
+        {
+          "ou": 412690,
+          "label": "folder_submit_files.d2l?db&grpid&ou",
+          "status": 200,
+          "outcome": "WORKS"
+        },
+        {
+          "ou": 412690,
+          "label": "le/{ou}/dropbox/user/folder_submit_files?db",
+          "status": 404,
+          "outcome": "WRONG_PAGE"
+        },
+        {
+          "ou": 412690,
+          "label": "lms/dropbox/dropbox.d2l?ou (list only)",
+          "status": 200,
+          "outcome": "WORKS"
+        },
+        {
+          "ou": 412690,
+          "label": "folders_list.d2l?ou (list only)",
+          "status": 200,
+          "outcome": "WORKS"
+        }
+      ],
+      "classifierCaveat": "the naive check 'assignment name appears on page' scored the LIST pages as WORKS too, because a list contains every name. Superseded by the distinctness test below."
+    },
+    "D_mcp_server": {
+      "verdict": "had not solved it",
+      "finding": "brightspace-mcp-server uses LinkAttachments[].Href (external resources) and content topic Url; it constructs no assignment deep links. Only /d2l/home is navigated, for auth."
+    }
+  },
+  "distinctnessTest": {
+    "why": "name-on-page is too weak: the assignments list contains every name. The real property is that folder n's link opens folder n's page, not a neighbour's.",
+    "listPageHeading": "Assignments",
+    "courses": [
+      {
+        "ou": 440703,
+        "course": "Scholarly Project Milestones",
+        "listHeading": "Assignments",
+        "folders": [
+          {
+            "id": 445296,
+            "expectedName": "Upload your CITI Certificate to Complete Module 2",
+            "renderedHeading": "Upload your CITI Certificate to Complete Module 2",
+            "status": 200,
+            "headingMatchesOwn": true,
+            "screenshot": "D-440703-445296.png"
+          },
+          {
+            "id": 445297,
+            "expectedName": "Report on your PURC Experience.",
+            "renderedHeading": "Report on your PURC Experience.",
+            "status": 200,
+            "headingMatchesOwn": true,
+            "screenshot": "D-440703-445297.png"
+          },
+          {
+            "id": 529524,
+            "expectedName": "Getting Started on Scholarly Project Ideation",
+            "renderedHeading": "Getting Started on Scholarly Project Ideation",
+            "status": 200,
+            "headingMatchesOwn": true,
+            "screenshot": "D-440703-529524.png"
+          }
+        ],
+        "checks": {
+          "everyHeadingNamesItsOwnFolder": true,
+          "headingsDistinctAcrossFolders": true,
+          "deepLinkHeadingDiffersFromListPage": true,
+          "noLoginRedirects": true,
+          "verdict": "DERIVABLE"
+        }
+      },
+      {
+        "ou": 412690,
+        "course": "Purdue Civics Knowledge Test",
+        "listHeading": "Assignments",
+        "folders": [
+          {
+            "id": 648911,
+            "expectedName": "Untitled",
+            "renderedHeading": "Untitled",
+            "status": 200,
+            "headingMatchesOwn": true,
+            "screenshot": "D-412690-648911.png"
+          }
+        ],
+        "checks": {
+          "everyHeadingNamesItsOwnFolder": true,
+          "headingsDistinctAcrossFolders": true,
+          "deepLinkHeadingDiffersFromListPage": true,
+          "noLoginRedirects": true,
+          "verdict": "DERIVABLE"
+        }
+      }
+    ],
+    "caveat": "412690 has only one folder, so its distinctness check is trivially satisfied. The three-folder course (440703) carries the real proof."
+  },
+  "rulesObserved": {
+    "nonGetRequests": "token mint POST only",
+    "submissions": "none \u2014 Submit buttons present on the rendered pages were never clicked",
+    "secretsLogged": "none; JWT length only (812)",
+    "sessionState": "live throughout"
+  }
+}

@@ -1,4 +1,5 @@
 import Foundation
+import AssignmentPipeline
 import CourseMenu
 import CoursePipeline
 
@@ -15,14 +16,32 @@ import CoursePipeline
 // ─────────────────────────────────────────────────────────────────────────────
 public enum MenuTranslation {
 
-    /// The whole translation. Pinned by `MenuTranslationTests`; every rule below
-    /// is specified there, not here.
+    /// The whole translation. Pinned by `MenuTranslationTests`,
+    /// `CurrentnessTests`, and `AssignmentWiringTests`; every rule below is
+    /// specified there, not here.
+    ///
+    /// - Parameters:
+    ///   - assignments: what is known about each course's assignments, keyed by
+    ///     course id. A course absent from the map is `neverFetched`, which yields
+    ///     no submenu — so the `[:]` default reproduces the pre-assignment output
+    ///     exactly, and every call site written before this feature stays correct.
+    ///   - timeZone: which zone deadline dates are rendered in. A parameter for
+    ///     the same reason `now` is — a pure function may not read ambient state.
+    ///     `.current` belongs in the composition root.
     public static func menu(
-        courses: [Course], lastFetch: Date?, now: Date, baseURL: URL
+        courses: [Course],
+        lastFetch: Date?,
+        now: Date,
+        baseURL: URL,
+        assignments: [Int: AssignmentsState] = [:],
+        timeZone: TimeZone = .current
     ) -> MenuModel {
         // Cold start — nothing loaded, nothing fetched — is exactly the
         // placeholder, so the GUI's `Equatable` skip-rebuild sees one value.
         if courses.isEmpty && lastFetch == nil { return .placeholder }
+
+        let visible = self.visibleCourses(courses, now: now)
+        let hasCurrent = visible.contains { self.isCurrent($0, now: now) }
 
         var rows: [MenuRow] = []
         if courses.isEmpty {
@@ -30,7 +49,15 @@ public enum MenuTranslation {
             // start; the status row below is what distinguishes the two.
             rows.append(.message("No enrolled courses"))
         } else {
-            rows.append(contentsOf: self.groupedCourseRows(courses, baseURL: baseURL))
+            if !hasCurrent {
+                // Semester break, honestly stated — the alternative readings
+                // ("app broke" / "still showing last term") are both worse.
+                rows.append(.message("No current courses"))
+            }
+            rows.append(contentsOf: self.groupedCourseRows(
+                visible, baseURL: baseURL, assignments: assignments,
+                now: now, timeZone: timeZone
+            ))
         }
         rows.append(.separator)
         rows.append(.status(self.statusText(lastFetch: lastFetch, now: now)))
@@ -39,14 +66,69 @@ public enum MenuTranslation {
         return MenuModel(rows: rows)
     }
 
+    /// The courses this menu would render, given `now`.
+    ///
+    /// Public because it answers a question the shell also has to ask: which
+    /// courses are worth spending a network request on. Sharing the one filter is
+    /// what keeps "what we fetch" and "what we show" from drifting — fanning out
+    /// over all 27 enrollments would waste calls on ended courses that answer 403.
+    ///
+    /// The currentness policy (user decision, 2026-08-09): what is being taken NOW
+    /// plus the undated administrative shells; ended and not-yet-started terms are
+    /// hidden. `IsActive` is deliberately not consulted — it is true for every
+    /// enrollment back to Fall 2024 (measured).
+    public static func visibleCourses(_ courses: [Course], now: Date) -> [Course] {
+        courses.filter { self.isCurrent($0, now: now) || self.isUndated($0) }
+    }
+
+    // MARK: - Currentness (pure policy on Access dates)
+
+    /// Start ≤ now ≤ end, inclusive; a missing or unparseable bound is open.
+    /// Fully undated courses are NOT current — they are a separate class
+    /// (`isUndated`) rendered under "Other".
+    private static func isCurrent(_ course: Course, now: Date) -> Bool {
+        if self.isUndated(course) { return false }
+        let start = self.parseDate(course.startDate)
+        let end = self.parseDate(course.endDate)
+        return (start.map { $0 <= now } ?? true) && (end.map { $0 >= now } ?? true)
+    }
+
+    /// No usable date on either side — the administrative shells (Civics Test,
+    /// Scholarly Project Milestones). Also where unparseable dates degrade to:
+    /// if D2L ever changes its wire format, courses fail OPEN into "Other"
+    /// instead of silently vanishing.
+    private static func isUndated(_ course: Course) -> Bool {
+        self.parseDate(course.startDate) == nil && self.parseDate(course.endDate) == nil
+    }
+
+    /// D2L sends `2025-08-14T04:00:00.000Z`. `ISO8601FormatStyle` is strict
+    /// about fractional seconds, so both variants are tried. Pure: a value in,
+    /// a value out, no formatter state.
+    private static func parseDate(_ raw: String?) -> Date? {
+        guard let raw else { return nil }
+        return (try? Date(raw, strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true)))
+            ?? (try? Date(raw, strategy: .iso8601))
+    }
+
     // MARK: - Grouping
 
     /// Header for courses whose code carries no term.
     private static let untermedHeader = "Other"
 
     /// `[.sectionHeader, .course...]` per term, newest term first, untermed last.
-    private static func groupedCourseRows(_ courses: [Course], baseURL: URL) -> [MenuRow] {
-        let grouped = Dictionary(grouping: courses) { self.term(of: $0.code) }
+    /// Undated courses group under "Other" even when their code carries a term:
+    /// with no dates, "which semester is this?" is unanswerable, and filing it
+    /// under a term header would claim otherwise.
+    private static func groupedCourseRows(
+        _ courses: [Course],
+        baseURL: URL,
+        assignments: [Int: AssignmentsState],
+        now: Date,
+        timeZone: TimeZone
+    ) -> [MenuRow] {
+        let grouped = Dictionary(grouping: courses) {
+            self.isUndated($0) ? nil : self.term(of: $0.code)
+        }
 
         // Dictionaries have no iteration order, so BOTH levels are sorted
         // explicitly — otherwise the menu would reshuffle between refreshes and
@@ -62,7 +144,15 @@ public enum MenuTranslation {
         return groups.flatMap { group -> [MenuRow] in
             // Intra-group order: code ascending (id breaks ties for determinism).
             let sorted = group.courses.sorted { ($0.code, $0.id) < ($1.code, $1.id) }
-            return [.sectionHeader(group.header)] + sorted.map { .course(self.row(for: $0, baseURL: baseURL)) }
+            return [.sectionHeader(group.header)] + sorted.map {
+                .course(self.row(
+                    for: $0, baseURL: baseURL,
+                    // Absent key == `neverFetched` == no submenu, which is what
+                    // makes the empty map reproduce the pre-assignment output.
+                    assignments: assignments[$0.id] ?? .neverFetched,
+                    now: now, timeZone: timeZone
+                ))
+            }
         }
     }
 
@@ -76,7 +166,13 @@ public enum MenuTranslation {
 
     // MARK: - Per-course derivations
 
-    private static func row(for course: Course, baseURL: URL) -> CourseRow {
+    private static func row(
+        for course: Course,
+        baseURL: URL,
+        assignments: AssignmentsState,
+        now: Date,
+        timeZone: TimeZone
+    ) -> CourseRow {
         CourseRow(
             id: course.id,
             // Verbatim by design. Real names embed the term and code
@@ -84,7 +180,14 @@ public enum MenuTranslation {
             // name-mangling heuristic deliberately deferred to a human call.
             title: course.name,
             subtitle: self.subtitle(from: course.code),
-            url: self.url(id: course.id, baseURL: baseURL)
+            url: self.url(id: course.id, baseURL: baseURL),
+            // SEAM: the assignments join. `AssignmentTranslation` owns every
+            // decision inside the submenu; this only says which course it is for,
+            // which is what guarantees a row can never carry another course's id.
+            submenu: AssignmentTranslation.submenu(
+                state: assignments, courseId: course.id,
+                now: now, baseURL: baseURL, timeZone: timeZone
+            )
         )
     }
 

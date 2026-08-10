@@ -142,9 +142,17 @@ private func makeCourse(
     id: Int,
     name: String = "Some Course",
     code: String = "wl.202610.CS.10000.LE1",
-    homeUrl: String? = nil
+    homeUrl: String? = nil,
+    // Wide-open window: fabricated courses are CURRENT at any test `now`, so
+    // tests about URLs and grouping are not entangled with the currentness
+    // policy. Currentness itself is specified in `CurrentnessTests`.
+    startDate: String? = "2000-01-01T00:00:00.000Z",
+    endDate: String? = "2999-01-01T00:00:00.000Z"
 ) -> Course {
-    Course(id: id, name: name, code: code, role: "Learner", isActive: true, homeUrl: homeUrl)
+    Course(
+        id: id, name: name, code: code, role: "Learner", isActive: true,
+        homeUrl: homeUrl, startDate: startDate, endDate: endDate
+    )
 }
 
 private let epoch = Date(timeIntervalSince1970: 1_786_230_000)
@@ -219,38 +227,39 @@ struct MenuTranslationTests {
 
     // ── Priority 2: no silent data loss ──────────────────────────────────────
 
-    @Test("all 27 real courses survive translation")
-    func realPayloadYieldsTwentySevenRows() throws {
+    @Test("every current-or-undated real course survives translation")
+    func realPayloadYieldsTheVisibleSet() throws {
         // Arrange — the genuine bytes through the genuine parser, so this is the
-        // real chain and not hand-built data.
+        // real chain and not hand-built data. `now` is pinned mid-semester;
+        // which courses count as visible then is transcribed truth in RealData.
         let courses = try CrossPackageFixture.realCourses
         try #require(courses.count == RealData.totalCourses)
 
         // Act
         let model = MenuTranslation.menu(
-            courses: courses, lastFetch: epoch, now: epoch, baseURL: RealData.baseURL
+            courses: courses, lastFetch: RealData.midFall2025,
+            now: RealData.midFall2025, baseURL: RealData.baseURL
         )
 
         // Assert
-        #expect(model.courses.count == RealData.totalCourses)
+        #expect(model.courses.count == RealData.visibleIDsAtMidFall2025.count)
     }
 
-    @Test("every real course id appears exactly once")
+    @Test("every visible course id appears exactly once")
     func noCourseIsDroppedOrDuplicated() throws {
         // Arrange
         let courses = try CrossPackageFixture.realCourses
-        let expectedIDs = Set(courses.map(\.id))
-        try #require(expectedIDs.count == RealData.totalCourses)
 
         // Act
         let model = MenuTranslation.menu(
-            courses: courses, lastFetch: epoch, now: epoch, baseURL: RealData.baseURL
+            courses: courses, lastFetch: RealData.midFall2025,
+            now: RealData.midFall2025, baseURL: RealData.baseURL
         )
 
         // Assert
         let actualIDs = model.courses.map(\.id)
-        #expect(Set(actualIDs) == expectedIDs)
-        #expect(actualIDs.count == RealData.totalCourses, "an id was duplicated")
+        #expect(Set(actualIDs) == RealData.visibleIDsAtMidFall2025)
+        #expect(actualIDs.count == RealData.visibleIDsAtMidFall2025.count, "an id was duplicated")
     }
 
     @Test("a course whose code has an unrecognised shape is kept, not dropped")
@@ -353,28 +362,31 @@ struct MenuTranslationTests {
 
     // ── Derivations: term grouping ──────────────────────────────────────────
 
-    @Test("terms appear newest first with untermed courses last")
+    @Test("term header first, Other last — regardless of input order")
     func termsAreDescendingAndUntermedComesLast() throws {
         // Arrange — deliberately shuffled input so a passing test cannot be an
-        // artifact of the input already being in order.
+        // artifact of the input already being in order. With the currentness
+        // filter, one term is current at any instant; multi-term descending
+        // order is pinned by the fabricated-course tests below.
         let courses = try CrossPackageFixture.realCourses.shuffled()
 
         // Act
         let model = MenuTranslation.menu(
-            courses: courses, lastFetch: epoch, now: epoch, baseURL: RealData.baseURL
+            courses: courses, lastFetch: RealData.midFall2025,
+            now: RealData.midFall2025, baseURL: RealData.baseURL
         )
 
         // Assert
-        let expected = RealData.termsDescending + [Expected.untermedHeader]
-        #expect(model.headers == expected)
+        #expect(model.headers == RealData.headersAtMidFall2025)
     }
 
-    @Test("each term group holds exactly its own courses")
+    @Test("each group holds exactly its own courses")
     func groupMembershipMatchesTheData() throws {
         // Arrange
         let courses = try CrossPackageFixture.realCourses
         let model = MenuTranslation.menu(
-            courses: courses, lastFetch: epoch, now: epoch, baseURL: RealData.baseURL
+            courses: courses, lastFetch: RealData.midFall2025,
+            now: RealData.midFall2025, baseURL: RealData.baseURL
         )
 
         // Act — walk the rows, attributing each course to the header above it.
@@ -390,10 +402,7 @@ struct MenuTranslationTests {
 
         // Assert
         try #require(!counts.isEmpty, "no course was attributed to any header")
-        for (term, expected) in RealData.countsByTerm {
-            #expect(counts[term] == expected, "term \(term) held \(counts[term] ?? 0), expected \(expected)")
-        }
-        #expect(counts[Expected.untermedHeader] == RealData.untermedCount)
+        #expect(counts == RealData.countsAtMidFall2025)
     }
 
     @Test("courses within a term are ordered by code")
@@ -415,6 +424,25 @@ struct MenuTranslationTests {
         // Assert — ids ordered as their codes sort, not as they were handed over.
         try #require(model.courses.count == 4)
         #expect(model.courses.map(\.id) == [1, 2, 3, 4])
+    }
+
+    @Test("overlapping current terms appear newest first")
+    func multipleCurrentTermsAreDescending() throws {
+        // Arrange — two terms current at once (overlapping Access windows, e.g.
+        // a year-long course beside a semester one), shuffled on purpose.
+        let courses = [
+            makeCourse(id: 1, code: "wl.202610.CS.25100.LE1"),
+            makeCourse(id: 2, code: "wl.202620.CS.25200.LE1"),
+            makeCourse(id: 3, code: "wl.202610.STAT.35000.018"),
+        ]
+
+        // Act
+        let model = MenuTranslation.menu(
+            courses: courses, lastFetch: epoch, now: epoch, baseURL: RealData.baseURL
+        )
+
+        // Assert — newest term code first.
+        #expect(model.headers == ["202620", "202610"])
     }
 
     @Test("a single-term list still carries its header")
@@ -580,17 +608,19 @@ struct MenuTranslationTests {
 
         // Act
         let a = MenuTranslation.menu(
-            courses: courses, lastFetch: epoch, now: epoch, baseURL: RealData.baseURL
+            courses: courses, lastFetch: RealData.midFall2025,
+            now: RealData.midFall2025, baseURL: RealData.baseURL
         )
         let b = MenuTranslation.menu(
-            courses: courses.shuffled(), lastFetch: epoch, now: epoch, baseURL: RealData.baseURL
+            courses: courses.shuffled(), lastFetch: RealData.midFall2025,
+            now: RealData.midFall2025, baseURL: RealData.baseURL
         )
 
         // Assert — the count guard is load-bearing, not decoration. Without it this
         // test passes against a translation that returns nothing at all, since two
         // empty models are trivially equal. Verified: it did exactly that against a
         // do-nothing stub until this guard was added.
-        try #require(a.courses.count == RealData.totalCourses)
+        try #require(a.courses.count == RealData.visibleIDsAtMidFall2025.count)
         try #require(!a.headers.isEmpty)
         #expect(a == b, "translation depends on input order or on dictionary iteration order")
     }

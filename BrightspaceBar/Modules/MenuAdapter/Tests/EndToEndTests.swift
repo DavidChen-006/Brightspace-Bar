@@ -30,7 +30,10 @@ import MenuAdapter
 // Plus one large, gated on BS_LIVE.
 // ═════════════════════════════════════════════════════════════════════════════
 
-private let epoch = Date(timeIntervalSince1970: 1_786_230_000)
+// Mid Fall 2025: the currentness filter makes `now` part of the expected
+// output, so the suite's instant is pinned where RealData's transcribed
+// visible set applies. All clock arithmetic is relative and unaffected.
+private let epoch = RealData.midFall2025
 
 /// `true` only for `BS_LIVE=1 swift test`. Read once at load, as experiment 4 does,
 /// so the gate cannot change mid-suite.
@@ -78,7 +81,7 @@ struct EndToEndTests {
 
         // Assert — count, then that the rows are genuinely populated: "27" must not
         // be achievable with twenty-seven blank placeholders.
-        try #require(model.courses.count == RealData.totalCourses)
+        try #require(model.courses.count == RealData.visibleIDsAtMidFall2025.count)
         for row in model.courses {
             #expect(row.id > 0)
             #expect(!row.title.isEmpty)
@@ -86,9 +89,9 @@ struct EndToEndTests {
         }
 
         // And a named spot check, so a systematic id shift cannot pass.
-        let compilers = try #require(model.courses.first { $0.id == RealData.compilersID })
-        #expect(compilers.title == RealData.compilersName)
-        #expect(compilers.subtitle == RealData.compilersShortCode)
+        let dataStructures = try #require(model.courses.first { $0.id == RealData.dataStructuresID })
+        #expect(dataStructures.title == RealData.dataStructuresName)
+        #expect(dataStructures.subtitle == RealData.dataStructuresShortCode)
     }
 
     // ── Priority 1: the menu never waits on the network ──────────────────────
@@ -161,7 +164,7 @@ struct EndToEndTests {
         let model = await adapter.currentMenu()
 
         // Assert
-        #expect(model.courses.count == RealData.totalCourses)
+        #expect(model.courses.count == RealData.visibleIDsAtMidFall2025.count)
         #expect(await source.callCount() == 1, "currentMenu triggered a second fetch")
     }
 
@@ -180,13 +183,13 @@ struct EndToEndTests {
         let (adapter, _) = makeAdapter(source: source, file: scratch.file(), clock: clock)
 
         let before = await adapter.refresh()
-        try #require(before.courses.count == RealData.totalCourses)
+        try #require(before.courses.count == RealData.visibleIDsAtMidFall2025.count)
 
         // Act
         let after = await adapter.refresh()
 
         // Assert — the whole point: a dead session must not empty the dropdown.
-        #expect(after.courses.count == RealData.totalCourses)
+        #expect(after.courses.count == RealData.visibleIDsAtMidFall2025.count)
         #expect(after.courses.map(\.id) == before.courses.map(\.id))
     }
 
@@ -213,7 +216,7 @@ struct EndToEndTests {
         let after = await adapter.refresh()
 
         // Assert
-        #expect(after.courses.count == RealData.totalCourses)
+        #expect(after.courses.count == RealData.visibleIDsAtMidFall2025.count)
     }
 
     @Test("currentMenu still serves the courses after a failed refresh")
@@ -234,7 +237,7 @@ struct EndToEndTests {
         let model = await adapter.currentMenu()
 
         // Assert
-        #expect(model.courses.count == RealData.totalCourses)
+        #expect(model.courses.count == RealData.visibleIDsAtMidFall2025.count)
         #expect(!model.rows.isEmpty)
     }
 
@@ -291,7 +294,7 @@ struct EndToEndTests {
         let model = await second.currentMenu()
 
         // Assert — the courses came off disk, and no fetch was needed to get them.
-        #expect(model.courses.count == RealData.totalCourses)
+        #expect(model.courses.count == RealData.visibleIDsAtMidFall2025.count)
         #expect(await secondRun.callCount() == 0)
     }
 

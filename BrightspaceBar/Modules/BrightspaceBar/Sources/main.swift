@@ -1,4 +1,5 @@
 import AppKit
+import AssignmentPipeline
 import BrightspaceSession
 import CourseMenu
 import CoursePipeline
@@ -52,12 +53,14 @@ if ProcessInfo.processInfo.environment["BRIGHTSPACEBAR_STUB"] == "1" {
 } else {
     // ── The backend stack, assembled bottom-up ────────────────────────────────
     //
-    //   BrightspaceCourseSource → Poller ⇄ CourseCache → MenuAdapter
-    //                              (PollPolicy decides, SystemClock ticks)
+    //   BrightspaceCourseSource     → Poller ⇄ CourseCache      ─┐
+    //                                 (PollPolicy decides)       ├→ MenuAdapter
+    //   BrightspaceAssignmentSource → AssignmentFetcher ⇄ Store ─┘
+    //                                 (one request per visible course)
     //
     // Every constructor here is synchronous by design, which is what lets this
-    // file stay a sync main. The only async steps (load + tick) run in the Task
-    // at the bottom.
+    // file stay a sync main. The only async steps (load + tick + fan-out) run in
+    // the Task at the bottom.
     let clock = SystemClock()
 
     // Cache file under ~/Library/Caches/BrightspaceBar/, so a relaunch shows
@@ -82,7 +85,10 @@ if ProcessInfo.processInfo.environment["BRIGHTSPACEBAR_STUB"] == "1" {
     // `.transport`, dead cookie → `.sessionExpired` — both of which the cache
     // folds into `.preservedStale`, so cached courses still render with an honest
     // staleness line instead of the app dying at launch.
-    let source = BrightspaceCourseSource(provider: FileSessionProvider.standard)
+    // One provider serves both sources, so courses and assignments always
+    // authenticate with the same session and a refreshed cookie reaches both.
+    let sessionProvider = FileSessionProvider.standard
+    let source = BrightspaceCourseSource(provider: sessionProvider)
 
     let poller = Poller(
         source: source,
@@ -91,16 +97,42 @@ if ProcessInfo.processInfo.environment["BRIGHTSPACEBAR_STUB"] == "1" {
         clock: clock
     )
 
-    // SEAM: the launch trigger, driven against the poller directly — NOT via
+    // SEAM: the assignments half. `AssignmentFeed` builds the fetcher and its
+    // store together — passing them separately would allow a fetcher wired to a
+    // different store than the adapter reads, which fails silently as
+    // permanently-empty submenus.
+    //
+    // Not persisted, deliberately: courses are the warm-start data, and
+    // assignments are cheap to refetch once the course list is known. A dead
+    // session surfaces as `.failed(lastKnown:)`, which still renders the last
+    // known assignments plus an honest staleness note.
+    let assignmentFeed = AssignmentFeed(
+        source: BrightspaceAssignmentSource(provider: sessionProvider),
+        clock: clock
+    )
+
+    // SEAM: from here down the stack is only ever seen as `MenuDataSource`.
+    // `timeZone` is `.current` — read once here, in the shell, because
+    // `AssignmentTranslation` must stay pure and take it as a parameter.
+    let adapter = MenuAdapter(
+        poller: poller,
+        cache: cache,
+        baseURL: brightspaceBaseURL,
+        clock: clock,
+        assignments: assignmentFeed,
+        timeZone: .current
+    )
+
+    // SEAM: the launch trigger. `MenuAdapter.launch()` — NOT
     // `MenuDataSource.refresh()`, which maps to `.manual` and would bypass
     // `PollPolicy` entirely. `.launch` fetches when the cache is stale or empty
     // and declines when a recent relaunch left it fresh, so a warm start costs
     // nothing. A dead session yields `.preservedStale`, leaving cached courses
     // intact — which is why an expired cookie shows stale data, not an empty menu.
-    launchFetch = { _ = await poller.tick(.launch) }
+    // Assignments always fetch, because nothing on disk can supply them.
+    launchFetch = { await adapter.launch() }
 
-    // SEAM: from here down the stack is only ever seen as `MenuDataSource`.
-    dataSource = MenuAdapter(poller: poller, cache: cache, baseURL: brightspaceBaseURL, clock: clock)
+    dataSource = adapter
 }
 
 // Top-level `let` keeps the controller (and its status item) alive for the

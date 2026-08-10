@@ -1,0 +1,32 @@
+[
+  {
+    "Id": 648911,
+    "CategoryId": null,
+    "Name": "Untitled",
+    "CustomInstructions": { "Text": "", "Html": "" },
+    "Attachments": [],
+    "TotalFiles": -1,
+    "UnreadFiles": -1,
+    "FlaggedFiles": -1,
+    "TotalUsers": -1,
+    "TotalUsersWithSubmissions": -1,
+    "TotalUsersWithFeedback": -1,
+    "Availability": null,
+    "IsHidden": false,
+    "Assessment": { "ScoreDenominator": null, "Rubrics": [] },
+    "DropboxType": 2,
+    "GroupTypeId": null,
+    "DueDate": null,
+    "DisplayInCalendar": false,
+    "NotificationEmail": null,
+    "LinkAttachments": [],
+    "ActivityId": "https://ids.brightspace.com/activities/dropbox/354644E0-4CD8-419D-A32F-4E78D8778E5C-4116703",
+    "IsAnonymous": false,
+    "SubmissionType": 0,
+    "CompletionType": 0,
+    "AllowableFileType": 0,
+    "CustomAllowableFileTypes": null,
+    "GradeItemId": null,
+    "AllowOnlyUsersWithSpecialAccess": null
+  }
+]

@@ -184,4 +184,31 @@ enum RealData {
     static let civicsID = 412_690
     static let civicsCode = "wl.nc.civics.test"
     static let civicsName = "Purdue Civics Knowledge Test"
+
+    // ── Currentness policy truth (added 2026-08-09) ──────────────────────────
+    //
+    // The menu now filters to current + undated. At a probe instant of
+    // 2025-10-01T00:00:00Z (mid Fall 2025), the JSON says: six termed Fall 2025
+    // courses are inside their Access window, STARS 2025 has a nil start and an
+    // end of 2026-01-12 (current, untermed code → "Other"), and the two shells
+    // (Civics, Scholarly Project) carry no dates at all → "Other".
+
+    /// 2025-10-01T00:00:00Z — mid Fall 2025 semester.
+    static let midFall2025 = Date(timeIntervalSince1970: 1_759_276_800)
+
+    /// Every id visible at that instant, transcribed from the JSON by hand.
+    static let visibleIDsAtMidFall2025: Set<Int> = [
+        1_360_020,  // Fall 2025 CS 25000 - Merge
+        1_360_027,  // Fall 2025 CS 25100-LEC - Merge
+        1_360_055,  // Fall 2025 CS 25100-P06 PSO
+        1_361_997,  // Fall 2025 ECON 57600-004 LEC
+        1_372_751,  // Fall 2025 STAT 35000-018 DIS
+        1_413_404,  // Fall 2025 PHIL 30400-001 LEC
+        1_415_558,  // STARS 2025 — nil start, ends 2026-01-12
+        412_690,    // Civics Knowledge Test — undated
+        440_703,    // Scholarly Project Milestones — undated
+    ]
+
+    static let headersAtMidFall2025 = ["202610", "Other"]
+    static let countsAtMidFall2025: [String: Int] = ["202610": 6, "Other": 3]
 }

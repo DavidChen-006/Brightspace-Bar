@@ -24,13 +24,28 @@ public struct MenuAssembler {
     /// `NSMenuItem` between menus: an item belongs to exactly one `NSMenu`, and
     /// reuse would silently detach it from the previously built menu.
     public func assemble(_ model: MenuModel) -> NSMenu {
+        self.menu(model.rows)
+    }
+
+    /// The one row-list → `NSMenu` builder, shared by the top level and by every
+    /// submenu. Deliberately general rather than two specialised builders: a
+    /// second copy is where `autoenablesItems` gets forgotten on one level and
+    /// where the two levels drift apart in how they construct items.
+    ///
+    /// `leadingWith` carries the structural rows a submenu needs before its model
+    /// rows, and is genuinely per-call — the top level has none.
+    private func menu(_ rows: [MenuRow], leadingWith prefix: [NSMenuItem] = []) -> NSMenu {
         let menu = NSMenu()
-        // Load-bearing. `action == nil` is what makes inert rows inert, but with
-        // autoenabling on (the default) AppKit recomputes `isEnabled` at display
-        // time — so section headers would light back up in the real app even
-        // though headless tests, which never display the menu, stay green.
+        // Load-bearing, and needed on submenus too. `action == nil` is what makes
+        // inert rows inert, but with autoenabling on (the default) AppKit
+        // recomputes `isEnabled` at display time — so section headers and the
+        // "No assignments" line would light back up in the real app even though
+        // headless tests, which never display the menu, stay green.
         menu.autoenablesItems = false
-        for row in model.rows {
+        for item in prefix {
+            menu.addItem(item)
+        }
+        for row in rows {
             menu.addItem(self.item(for: row))
         }
         return menu
@@ -39,17 +54,16 @@ public struct MenuAssembler {
     private func item(for row: MenuRow) -> NSMenuItem {
         switch row {
         case .course(let course):
-            let item = NSMenuItem(
-                title: RowTitle.course(course),
-                action: #selector(MenuActionTarget.openCourse(_:)),
-                keyEquivalent: ""
-            )
-            item.target = self.target
-            // Click identity travels *with the item*. Non-course rows interleave
-            // among courses, so NSMenu item index ≠ course index — resolving the
-            // click from an index is where every off-by-one lives.
-            item.representedObject = course.url
+            let item = self.linkItem(title: RowTitle.course(course), url: course.url)
+            // Attached only when the model actually has submenu rows. An empty
+            // NSMenu would render as a hover arrow onto a blank box *and* make
+            // this item non-actionable — silently killing the plain click that
+            // every course row shipping today depends on.
+            item.submenu = self.submenu(for: course)
             return item
+
+        case .assignment(let assignment):
+            return self.linkItem(title: RowTitle.assignment(assignment), url: assignment.url)
 
         case .command(let command):
             let item = NSMenuItem(
@@ -71,25 +85,84 @@ public struct MenuAssembler {
             return NSMenuItem.separator()
         }
     }
+
+    /// A course's assignment submenu, or nil when the model gave it no rows.
+    ///
+    /// The course-home row is the one row this layer adds on its own, and it is
+    /// not a policy choice: AppKit refuses to deliver a click to an item that owns
+    /// a submenu, so `CourseRow.url` becomes unreachable the moment assignments
+    /// appear. Re-exposing it here is what stops this feature from silently
+    /// deleting the ability to open a course. Everything *else* in the submenu —
+    /// order, the empty-state message, any staleness note — comes from the model.
+    private func submenu(for course: CourseRow) -> NSMenu? {
+        guard !course.submenu.isEmpty else { return nil }
+        return self.menu(
+            course.submenu,
+            leadingWith: [
+                self.linkItem(title: RowTitle.courseHome, url: course.url),
+                .separator(),
+            ]
+        )
+    }
+
+    /// One builder for every row that opens a URL — course, assignment, and the
+    /// course-home escape hatch. They differ only in their title and destination,
+    /// so they share a single construction path and a single action.
+    private func linkItem(title: String, url: URL) -> NSMenuItem {
+        let item = NSMenuItem(
+            title: title,
+            action: #selector(MenuActionTarget.openLink(_:)),
+            keyEquivalent: ""
+        )
+        item.target = self.target
+        // Click identity travels *with the item*, never resolved from an index.
+        // Non-course rows interleave among courses, so NSMenu item index ≠ course
+        // index — and a submenu adds a second level of indexing on top. Resolving
+        // a click positionally is where every off-by-one lives, and at two levels
+        // the wrong answer is a plausible-looking page belonging to another course.
+        item.representedObject = url
+        return item
+    }
 }
 
 /// Pure formatting core: row content in, display string out. No AppKit.
 ///
 /// Pinned display format:
 ///
-///     subtitle present │ "CS 17600 — Data Engineering"    (SPACE EM-DASH SPACE)
-///     subtitle nil     │ "Purdue Civics Knowledge Test"   (bare title, no dash)
-///     .refresh         │ "Refresh"
-///     .quit            │ "Quit"
+///     course, subtitle present     │ "CS 17600 — Data Engineering"
+///     course, subtitle nil         │ "Purdue Civics Knowledge Test"
+///     assignment, subtitle present │ "Report on your PURC Experience. — Due Mar 1"
+///     assignment, subtitle nil     │ "Untitled"
+///     .refresh                     │ "Refresh"
+///     .quit                        │ "Quit"
 ///
-/// Code first because students identify a class by its code, so leading with it
-/// makes the dropdown scannable and the short codes form a rough left column.
+/// Separator is SPACE + EM DASH (U+2014) + SPACE throughout.
+///
+/// Note the deliberate INVERSION between the two row kinds. A course leads with
+/// its code, because students identify a class by its code and the short codes
+/// form a rough left column. An assignment leads with its NAME, because the name
+/// is the identity you scan for and the date is metadata — and because leading
+/// with the date would leave a ragged column, given that every assignment in the
+/// currently reachable courses has no due date at all.
 enum RowTitle {
     static let subtitleSeparator = " — "
+
+    /// The submenu's escape hatch, restoring the click AppKit takes away from a
+    /// course that owns a submenu.
+    static let courseHome = "Open Course Home"
 
     static func course(_ row: CourseRow) -> String {
         guard let subtitle = row.subtitle else { return row.title }
         return subtitle + Self.subtitleSeparator + row.title
+    }
+
+    /// `subtitle` is rendered VERBATIM. The view must never format `dueDate`
+    /// itself: date formatting is policy — locale, time zone, "tomorrow" versus a
+    /// date — and policy belongs in the pure backend layer that already decided
+    /// what this row should say.
+    static func assignment(_ row: AssignmentRow) -> String {
+        guard let subtitle = row.subtitle else { return row.title }
+        return row.title + Self.subtitleSeparator + subtitle
     }
 
     static func command(_ command: MenuCommand) -> String {
@@ -114,7 +187,9 @@ private final class MenuActionTarget: NSObject {
         self.onCommand = onCommand
     }
 
-    @objc func openCourse(_ sender: NSMenuItem) {
+    /// Serves every URL-opening row — course, assignment, course-home — because it
+    /// only ever needed the destination the item carries, never the row's kind.
+    @objc func openLink(_ sender: NSMenuItem) {
         guard let url = sender.representedObject as? URL else { return }
         self.opener.open(url)
     }

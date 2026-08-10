@@ -1,0 +1,163 @@
+{
+  "baseUrl": "https://purdue.brightspace.com",
+  "approachB": [
+    {
+      "ou": 440703,
+      "course": "Scholarly Project Milestones",
+      "listUrl": "https://purdue.brightspace.com/d2l/lms/dropbox/user/folders_list.d2l?ou=440703",
+      "listOutcome": "LOADED",
+      "harvested": [
+        {
+          "href": "/d2l/lms/dropbox/user/folder_submit_files.d2l?db=445296&grpid=0&isprv=&bp=0&ou=440703",
+          "text": "Upload your CITI Certificate to Complete Module 2"
+        },
+        {
+          "href": "/d2l/lms/dropbox/user/folder_submit_files.d2l?db=445296&grpid=0&isprv=0&bp=0&ou=440703",
+          "text": "Not Submitted"
+        },
+        {
+          "href": "/d2l/lms/dropbox/user/folder_submit_files.d2l?db=445297&grpid=0&isprv=&bp=0&ou=440703",
+          "text": "Report on your PURC Experience."
+        },
+        {
+          "href": "/d2l/lms/dropbox/user/folder_submit_files.d2l?db=445297&grpid=0&isprv=0&bp=0&ou=440703",
+          "text": "Not Submitted"
+        },
+        {
+          "href": "/d2l/lms/dropbox/user/folder_submit_files.d2l?db=529524&grpid=0&isprv=&bp=0&ou=440703",
+          "text": "Getting Started on Scholarly Project Ideation"
+        },
+        {
+          "href": "/d2l/lms/dropbox/user/folder_submit_files.d2l?db=529524&grpid=0&isprv=0&bp=0&ou=440703",
+          "text": "Not Submitted"
+        }
+      ],
+      "listStatus": 200,
+      "finalUrl": "https://purdue.brightspace.com/d2l/lms/dropbox/user/folders_list.d2l?ou=440703"
+    },
+    {
+      "ou": 412690,
+      "course": "Purdue Civics Knowledge Test",
+      "listUrl": "https://purdue.brightspace.com/d2l/lms/dropbox/user/folders_list.d2l?ou=412690",
+      "listOutcome": "LOADED",
+      "harvested": [
+        {
+          "href": "/d2l/lms/dropbox/user/folder_submit_files.d2l?db=648911&grpid=0&isprv=&bp=0&ou=412690",
+          "text": "Untitled"
+        },
+        {
+          "href": "/d2l/lms/dropbox/user/folder_submit_files.d2l?db=648911&grpid=0&isprv=0&bp=0&ou=412690",
+          "text": "Not Submitted"
+        }
+      ],
+      "listStatus": 200,
+      "finalUrl": "https://purdue.brightspace.com/d2l/lms/dropbox/user/folders_list.d2l?ou=412690"
+    }
+  ],
+  "approachC": [
+    {
+      "ou": 440703,
+      "folderId": 445296,
+      "folderName": "Upload your CITI Certificate to Complete",
+      "label": "folder_submit_files.d2l?db&grpid&ou",
+      "url": "https://purdue.brightspace.com/d2l/lms/dropbox/user/folder_submit_files.d2l?db=445296&grpid=0&ou=440703",
+      "status": 200,
+      "outcome": "WORKS",
+      "finalUrl": "https://purdue.brightspace.com/d2l/lms/dropbox/user/folder_submit_files.d2l?db=445296&grpid=0&ou=440703",
+      "title": "Upload your CITI Certificate to Complete Module 2 - Scholarly Project Milestones - Purdue University System",
+      "evidence": "page text contains \"Upload your CITI Certifi\"",
+      "screenshot": "C-440703-1.png"
+    },
+    {
+      "ou": 440703,
+      "folderId": 445296,
+      "folderName": "Upload your CITI Certificate to Complete",
+      "label": "le/{ou}/dropbox/user/folder_submit_files?db",
+      "url": "https://purdue.brightspace.com/d2l/le/440703/dropbox/user/folder_submit_files?db=445296",
+      "status": 404,
+      "outcome": "WRONG_PAGE",
+      "finalUrl": "https://purdue.brightspace.com/d2l/error/404",
+      "title": "Page Not Found - Purdue University System",
+      "evidence": "assignment name absent; page opens \"David Chen Announcements Calendar Help Page Not Found Error: Page Not Found The page you are looking for cannot be found\"",
+      "screenshot": "C-440703-2.png"
+    },
+    {
+      "ou": 440703,
+      "folderId": 445296,
+      "folderName": "Upload your CITI Certificate to Complete",
+      "label": "lms/dropbox/dropbox.d2l?ou (list only)",
+      "url": "https://purdue.brightspace.com/d2l/lms/dropbox/dropbox.d2l?ou=440703",
+      "status": 200,
+      "outcome": "WORKS",
+      "finalUrl": "https://purdue.brightspace.com/d2l/lms/dropbox/user/folders_list.d2l?ou=440703&isprv=0",
+      "title": "Assignments - Scholarly Project Milestones - Purdue University System",
+      "evidence": "page text contains \"Upload your CITI Certifi\"",
+      "screenshot": "C-440703-3.png"
+    },
+    {
+      "ou": 440703,
+      "folderId": 445296,
+      "folderName": "Upload your CITI Certificate to Complete",
+      "label": "folders_list.d2l?ou (list only)",
+      "url": "https://purdue.brightspace.com/d2l/lms/dropbox/user/folders_list.d2l?ou=440703",
+      "status": 200,
+      "outcome": "WORKS",
+      "finalUrl": "https://purdue.brightspace.com/d2l/lms/dropbox/user/folders_list.d2l?ou=440703",
+      "title": "Assignments - Scholarly Project Milestones - Purdue University System",
+      "evidence": "page text contains \"Upload your CITI Certifi\"",
+      "screenshot": "C-440703-4.png"
+    },
+    {
+      "ou": 412690,
+      "folderId": 648911,
+      "folderName": "Untitled",
+      "label": "folder_submit_files.d2l?db&grpid&ou",
+      "url": "https://purdue.brightspace.com/d2l/lms/dropbox/user/folder_submit_files.d2l?db=648911&grpid=0&ou=412690",
+      "status": 200,
+      "outcome": "WORKS",
+      "finalUrl": "https://purdue.brightspace.com/d2l/lms/dropbox/user/folder_submit_files.d2l?db=648911&grpid=0&ou=412690",
+      "title": "Untitled - Purdue Civics Knowledge Test - Purdue University System",
+      "evidence": "page text contains \"Untitled\"",
+      "screenshot": "C-412690-1.png"
+    },
+    {
+      "ou": 412690,
+      "folderId": 648911,
+      "folderName": "Untitled",
+      "label": "le/{ou}/dropbox/user/folder_submit_files?db",
+      "url": "https://purdue.brightspace.com/d2l/le/412690/dropbox/user/folder_submit_files?db=648911",
+      "status": 404,
+      "outcome": "WRONG_PAGE",
+      "finalUrl": "https://purdue.brightspace.com/d2l/error/404",
+      "title": "Page Not Found - Purdue University System",
+      "evidence": "assignment name absent; page opens \"David Chen Announcements Calendar Help Page Not Found Error: Page Not Found The page you are looking for cannot be found\"",
+      "screenshot": "C-412690-2.png"
+    },
+    {
+      "ou": 412690,
+      "folderId": 648911,
+      "folderName": "Untitled",
+      "label": "lms/dropbox/dropbox.d2l?ou (list only)",
+      "url": "https://purdue.brightspace.com/d2l/lms/dropbox/dropbox.d2l?ou=412690",
+      "status": 200,
+      "outcome": "WORKS",
+      "finalUrl": "https://purdue.brightspace.com/d2l/lms/dropbox/user/folders_list.d2l?ou=412690&isprv=0",
+      "title": "Assignments - Purdue Civics Knowledge Test - Purdue University System",
+      "evidence": "page text contains \"Untitled\"",
+      "screenshot": "C-412690-3.png"
+    },
+    {
+      "ou": 412690,
+      "folderId": 648911,
+      "folderName": "Untitled",
+      "label": "folders_list.d2l?ou (list only)",
+      "url": "https://purdue.brightspace.com/d2l/lms/dropbox/user/folders_list.d2l?ou=412690",
+      "status": 200,
+      "outcome": "WORKS",
+      "finalUrl": "https://purdue.brightspace.com/d2l/lms/dropbox/user/folders_list.d2l?ou=412690",
+      "title": "Assignments - Purdue Civics Knowledge Test - Purdue University System",
+      "evidence": "page text contains \"Untitled\"",
+      "screenshot": "C-412690-4.png"
+    }
+  ]
+}

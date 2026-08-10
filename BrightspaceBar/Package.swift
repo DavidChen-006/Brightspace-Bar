@@ -5,8 +5,8 @@ import PackageDescription
 // own Sources/, Tests/, and Makefile. The dependency arrows that matter:
 //
 //   BrightspaceSession   (the cookie seam: how credentials are obtained)
-//        ↑
-//   CoursePipeline       (backend: parse, cache, poll, fetch)
+//        ↑                            ↑
+//   CoursePipeline  ←──  AssignmentPipeline  (backend: per-course assignments)
 //        ↑
 //   MenuAdapter ──→ CourseMenu   (the contract: pure values, no AppKit, no network)
 //                       ↑
@@ -25,6 +25,7 @@ let package = Package(
     products: [
         .library(name: "BrightspaceSession", targets: ["BrightspaceSession"]),
         .library(name: "CoursePipeline", targets: ["CoursePipeline"]),
+        .library(name: "AssignmentPipeline", targets: ["AssignmentPipeline"]),
         .library(name: "CourseMenu", targets: ["CourseMenu"]),
         .library(name: "MenuAdapter", targets: ["MenuAdapter"]),
         .executable(name: "BrightspaceBar", targets: ["BrightspaceBar"]),
@@ -56,6 +57,27 @@ let package = Package(
             exclude: ["Fixtures"]
         ),
 
+        // ── The backend: one course's assignments, fanned out ────────────────
+        //
+        // Depends on CoursePipeline for the shared vocabulary — `Course`, `Clock`,
+        // `CacheOutcome`, `CourseSourceError`. Two backend modules with two words
+        // for "the fetch failed, keep what you had" would be two places to sync.
+        .target(
+            name: "AssignmentPipeline",
+            dependencies: ["CoursePipeline", "BrightspaceSession"],
+            path: "Modules/AssignmentPipeline/Sources"
+        ),
+        .testTarget(
+            name: "AssignmentPipelineTests",
+            dependencies: ["AssignmentPipeline", "CoursePipeline", "BrightspaceSession"],
+            path: "Modules/AssignmentPipeline/Tests",
+            // Fixtures are read via #filePath (see TestSupport.Fixture), not as
+            // bundle resources. Excluding the whole directory also covers the
+            // README documenting them, which SPM would otherwise reject as an
+            // unhandled resource.
+            exclude: ["Fixtures"]
+        ),
+
         // ── The contract between backend and GUI ─────────────────────────────
         .target(
             name: "CourseMenu",
@@ -70,21 +92,31 @@ let package = Package(
         // ── The wiring: [Course] → MenuModel, behind MenuDataSource ──────────
         .target(
             name: "MenuAdapter",
-            dependencies: ["CourseMenu", "CoursePipeline"],
+            // AssignmentPipeline is a genuine Sources dependency, not a test-only
+            // one: `AssignmentsState` appears in `MenuTranslation.menu`'s public
+            // signature, and `AssignmentTranslation` builds deep links with
+            // `AssignmentLink`.
+            dependencies: ["CourseMenu", "CoursePipeline", "AssignmentPipeline"],
             path: "Modules/MenuAdapter/Sources"
         ),
         .testTarget(
             name: "MenuAdapterTests",
-            dependencies: ["MenuAdapter", "CourseMenu", "CoursePipeline", "BrightspaceSession"],
+            dependencies: [
+                "MenuAdapter", "CourseMenu", "CoursePipeline",
+                "AssignmentPipeline", "BrightspaceSession",
+            ],
             path: "Modules/MenuAdapter/Tests"
         ),
 
         // ── The GUI + composition root ───────────────────────────────────────
         .executableTarget(
             name: "BrightspaceBar",
-            // CoursePipeline and BrightspaceSession are here for main.swift ONLY;
-            // ArchitectureTests fails the suite if any view file imports them.
-            dependencies: ["CourseMenu", "MenuAdapter", "CoursePipeline", "BrightspaceSession"],
+            // The backend modules are here for main.swift ONLY; ArchitectureTests
+            // fails the suite if any view file imports them.
+            dependencies: [
+                "CourseMenu", "MenuAdapter", "CoursePipeline",
+                "AssignmentPipeline", "BrightspaceSession",
+            ],
             path: "Modules/BrightspaceBar/Sources",
             exclude: ["Info.plist"],
             swiftSettings: [

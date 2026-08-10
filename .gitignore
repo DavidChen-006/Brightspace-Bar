@@ -1,4 +1,7 @@
 node_modules/
+# Without a trailing slash this also matches a node_modules SYMLINK, which is how
+# experiment 7 borrows experiment 1's playwright install.
+node_modules
 brightspace-mcp-server/
 
 # Swift build products — 158M of derived data

@@ -1,0 +1,43 @@
+[
+  {
+    "Id": 445296,
+    "CategoryId": null,
+    "Name": "Upload your CITI Certificate to Complete Module 2",
+    "CustomInstructions": { "Text": "", "Html": "" },
+    "Attachments": [],
+    "TotalFiles": -1,
+    "UnreadFiles": -1,
+    "FlaggedFiles": -1,
+    "TotalUsers": -1,
+    "TotalUsersWithSubmissions": -1,
+    "TotalUsersWithFeedback": -1,
+    "Availability": null,
+    "IsHidden": false,
+    "Assessment": { "ScoreDenominator": null, "Rubrics": [] },
+    "DropboxType": 2,
+    "GroupTypeId": null,
+    "DueDate": null,
+    "DisplayInCalendar": false,
+    "NotificationEmail": null,
+    "LinkAttachments": [
+      {
+        "LinkId": 99001,
+        "Name": "CITI Program training portal",
+        "Href": "https://about.citiprogram.org/not-the-assignment-page"
+      },
+      {
+        "LinkId": 99002,
+        "Name": "Instructor's rubric (external)",
+        "Href": "https://example.invalid/external/rubric.pdf"
+      }
+    ],
+    "ActivityId": "https://ids.brightspace.com/activities/dropbox/354644E0-4CD8-419D-A32F-4E78D8778E5C-2993966",
+    "IsAnonymous": false,
+    "SubmissionType": 0,
+    "CompletionType": 0,
+    "AllowableFileType": 0,
+    "CustomAllowableFileTypes": null,
+    "GradeItemId": null,
+    "AllowOnlyUsersWithSpecialAccess": null
+  }
+]

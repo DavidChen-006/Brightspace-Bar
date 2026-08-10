@@ -70,7 +70,9 @@ struct ArchitectureTests {
     /// Backend modules. View code may not name any of them — `BrightspaceSession`
     /// included: a view file holding a credential type is exactly the leak this
     /// suite exists to prevent.
-    private static let backendModules: Set<String> = ["MenuAdapter", "CoursePipeline", "BrightspaceSession"]
+    private static let backendModules: Set<String> = [
+        "MenuAdapter", "CoursePipeline", "AssignmentPipeline", "BrightspaceSession",
+    ]
 
     /// The single exemption: the composition root exists precisely to know both
     /// sides, and there is no way to wire two halves together while seeing only one.

@@ -28,9 +28,23 @@ log() { printf '==> %s\n' "$*"; }
 SRC="${DEFAULT_SRC}"
 if [ "${1:-}" = "--capture" ]; then
     # Experiment 1 is the proven interactive path: headed Chromium, Purdue SSO,
-    # Duo MFA. It writes its capture to artifacts/session.json; we only copy it.
-    log "Running experiment 1's interactive capture (browser will open; approve MFA on your phone)"
-    (cd "${CAPTURE_DIR}" && node src/acquire-session.mjs)
+    # Duo MFA. Its e2e test drives the capture and writes artifacts/session.json;
+    # we only copy the result.
+    #
+    # Credentials: prompted here, exported to the child only — never an argument
+    # (would land in `ps`), never echoed (read -s), never written anywhere.
+    if [ -z "${BS_EMAIL:-}" ]; then
+        printf 'Purdue email: ' >&2
+        read -r BS_EMAIL
+    fi
+    if [ -z "${BS_PASSWORD:-}" ]; then
+        printf 'Purdue password (not echoed): ' >&2
+        read -rs BS_PASSWORD
+        printf '\n' >&2
+    fi
+    export BS_EMAIL BS_PASSWORD
+    log "Opening the login browser — approve MFA on your phone when it appears"
+    (cd "${CAPTURE_DIR}" && npm test)
 elif [ -n "${1:-}" ]; then
     SRC="$1"
 fi

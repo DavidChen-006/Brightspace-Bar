@@ -1,0 +1,250 @@
+{
+  "experiment": "6-ended-course-access",
+  "capturedAt": "2026-08-09T21:13:32.792837+00:00",
+  "baseUrl": "https://purdue.brightspace.com",
+  "routes": [
+    "course_info",
+    "content_root",
+    "news",
+    "my_grades",
+    "dropbox_folders"
+  ],
+  "results": [
+    {
+      "orgUnit": 1488325,
+      "name": "Spring 2026 CS 25200",
+      "bucket": "ended_recent",
+      "routes": {
+        "course_info": {
+          "status": 403,
+          "error": {
+            "parseError": "Expecting value: line 1 column 1 (char 0)"
+          }
+        },
+        "content_root": {
+          "status": 403,
+          "error": {
+            "parseError": "Expecting value: line 1 column 1 (char 0)"
+          }
+        },
+        "news": {
+          "status": 403,
+          "error": {
+            "title": null,
+            "detail": null
+          }
+        },
+        "my_grades": {
+          "status": 403,
+          "error": {
+            "parseError": "Expecting value: line 1 column 1 (char 0)"
+          }
+        },
+        "dropbox_folders": {
+          "status": 403,
+          "error": {
+            "title": null,
+            "detail": null
+          }
+        }
+      }
+    },
+    {
+      "orgUnit": 1495427,
+      "name": "Spring 2026 CS 47100",
+      "bucket": "ended_recent",
+      "routes": {
+        "course_info": {
+          "status": 403,
+          "error": {
+            "parseError": "Expecting value: line 1 column 1 (char 0)"
+          }
+        },
+        "content_root": {
+          "status": 403,
+          "error": {
+            "parseError": "Expecting value: line 1 column 1 (char 0)"
+          }
+        },
+        "news": {
+          "status": 403,
+          "error": {
+            "title": null,
+            "detail": null
+          }
+        },
+        "my_grades": {
+          "status": 403,
+          "error": {
+            "parseError": "Expecting value: line 1 column 1 (char 0)"
+          }
+        },
+        "dropbox_folders": {
+          "status": 403,
+          "error": {
+            "title": null,
+            "detail": null
+          }
+        }
+      }
+    },
+    {
+      "orgUnit": 1360027,
+      "name": "Fall 2025 CS 25100",
+      "bucket": "ended_older",
+      "routes": {
+        "course_info": {
+          "status": 403,
+          "error": {
+            "parseError": "Expecting value: line 1 column 1 (char 0)"
+          }
+        },
+        "content_root": {
+          "status": 403,
+          "error": {
+            "parseError": "Expecting value: line 1 column 1 (char 0)"
+          }
+        },
+        "news": {
+          "status": 403,
+          "error": {
+            "title": null,
+            "detail": null
+          }
+        },
+        "my_grades": {
+          "status": 403,
+          "error": {
+            "parseError": "Expecting value: line 1 column 1 (char 0)"
+          }
+        },
+        "dropbox_folders": {
+          "status": 403,
+          "error": {
+            "title": null,
+            "detail": null
+          }
+        }
+      }
+    },
+    {
+      "orgUnit": 1095299,
+      "name": "Fall 2024 CS 17600",
+      "bucket": "ended_older",
+      "routes": {
+        "course_info": {
+          "status": 403,
+          "error": {
+            "parseError": "Expecting value: line 1 column 1 (char 0)"
+          }
+        },
+        "content_root": {
+          "status": 403,
+          "error": {
+            "parseError": "Expecting value: line 1 column 1 (char 0)"
+          }
+        },
+        "news": {
+          "status": 403,
+          "error": {
+            "title": null,
+            "detail": null
+          }
+        },
+        "my_grades": {
+          "status": 403,
+          "error": {
+            "parseError": "Expecting value: line 1 column 1 (char 0)"
+          }
+        },
+        "dropbox_folders": {
+          "status": 403,
+          "error": {
+            "title": null,
+            "detail": null
+          }
+        }
+      }
+    },
+    {
+      "orgUnit": 412690,
+      "name": "Civics Knowledge Test",
+      "bucket": "live_control",
+      "routes": {
+        "course_info": {
+          "status": 403,
+          "error": {
+            "parseError": "Expecting value: line 1 column 1 (char 0)"
+          }
+        },
+        "content_root": {
+          "status": 200,
+          "summary": {
+            "modules": 6,
+            "firstTitle": "Welcome to Civics Literacy"
+          }
+        },
+        "news": {
+          "status": 200,
+          "summary": {
+            "items": 4,
+            "firstTitle": "Due Date Error Posting"
+          }
+        },
+        "my_grades": {
+          "status": 200,
+          "summary": {
+            "gradeValues": 1
+          }
+        },
+        "dropbox_folders": {
+          "status": 200,
+          "summary": {
+            "folders": 1,
+            "firstName": "Untitled"
+          }
+        }
+      }
+    },
+    {
+      "orgUnit": 440703,
+      "name": "Scholarly Project Milestones",
+      "bucket": "live_control",
+      "routes": {
+        "course_info": {
+          "status": 403,
+          "error": {
+            "parseError": "Expecting value: line 1 column 1 (char 0)"
+          }
+        },
+        "content_root": {
+          "status": 200,
+          "summary": {
+            "modules": 11,
+            "firstTitle": "Overview and Contact Information"
+          }
+        },
+        "news": {
+          "status": 200,
+          "summary": {
+            "items": 466,
+            "firstTitle": "Urdu Translation Project"
+          }
+        },
+        "my_grades": {
+          "status": 200,
+          "summary": {
+            "gradeValues": 0
+          }
+        },
+        "dropbox_folders": {
+          "status": 200,
+          "summary": {
+            "folders": 3,
+            "firstName": "Upload your CITI Certificate to Complete Module 2"
+          }
+        }
+      }
+    }
+  ]
+}
