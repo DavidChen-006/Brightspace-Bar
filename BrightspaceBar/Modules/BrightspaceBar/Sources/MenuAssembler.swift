@@ -36,6 +36,16 @@ public struct MenuAssembler {
     /// rows, and is genuinely per-call — the top level has none.
     private func menu(_ rows: [MenuRow], leadingWith prefix: [NSMenuItem] = []) -> NSMenu {
         let menu = NSMenu()
+        // Hover unity's delivery mechanism. A view-backed item is never told it
+        // is highlighted — AppKit only tells the menu's delegate — so without
+        // this every course row draws forever unhighlighted. Retained by the
+        // menu itself because `NSMenu.delegate` is WEAK: a delegate merely
+        // assigned here would deallocate before the menu was ever shown.
+        let highlighter = MenuHighlightDelegate()
+        menu.delegate = highlighter
+        objc_setAssociatedObject(
+            menu, &MenuHighlightDelegate.associationKey, highlighter, .OBJC_ASSOCIATION_RETAIN
+        )
         // Load-bearing, and needed on submenus too. `action == nil` is what makes
         // inert rows inert, but with autoenabling on (the default) AppKit
         // recomputes `isEnabled` at display time — so section headers and the
@@ -53,20 +63,30 @@ public struct MenuAssembler {
         return menu
     }
 
-    /// A list, not a single item, because a graphed course occupies two menu
-    /// rows: the clickable course and the strip beneath it. Keeping that here
-    /// rather than in the loop above is what keeps the loop free of row kinds.
+    /// Still a list, though only separators and single rows come out of it
+    /// today: keeping the fan-out here is what keeps the loop above free of row
+    /// kinds.
     private func items(for row: MenuRow) -> [NSMenuItem] {
         switch row {
         case .course(let course):
-            let item = self.linkItem(title: RowTitle.course(course), url: course.url)
+            let title = RowTitle.course(course)
+            let item = self.linkItem(title: title, url: course.url)
             // Attached only when the model actually has submenu rows. An empty
             // NSMenu would render as a hover arrow onto a blank box *and* make
             // this item non-actionable — silently killing the plain click that
             // every course row shipping today depends on.
             item.submenu = self.submenu(for: course)
-            guard !course.graph.isEmpty else { return [item] }
-            return [item, self.stripItem(cells: course.graph)]
+            // The course becomes ONE component: title and cells in a single
+            // view, because AppKit highlights an item and not a pair of them.
+            // Kept on EVERY course, graphed or not — a course rendered natively
+            // among components would not merely look different, it would sit at
+            // a different height. The item keeps its `title` even though the
+            // view draws the text: it is how the rest of the suite, and
+            // accessibility, find this row.
+            item.view = MenuItemHostingView(
+                title: title, cells: course.graph, showsChevron: item.submenu != nil
+            )
+            return [item]
 
         case .assignment(let assignment):
             return [self.linkItem(title: RowTitle.assignment(assignment), url: assignment.url)]
@@ -90,21 +110,6 @@ public struct MenuAssembler {
         case .separator:
             return [NSMenuItem.separator()]
         }
-    }
-
-    /// The course's activity graph, on a line of its own directly under the
-    /// course name. It cannot ride on the course item itself: an `NSMenuItem`
-    /// draws either its `view` or its title, so hosting the strip there would
-    /// erase the course name and its click along with it.
-    ///
-    /// Inert by both halves — no action means it can never be activated, and
-    /// disabled is what makes it look that way rather than like a blank row
-    /// that ignores clicks.
-    private func stripItem(cells: [GraphCell]) -> NSMenuItem {
-        let item = NSMenuItem(title: "", action: nil, keyEquivalent: "")
-        item.isEnabled = false
-        item.view = GraphStripView(cells: cells)
-        return item
     }
 
     /// A course's assignment submenu, or nil when the model gave it no rows.
@@ -190,6 +195,27 @@ enum RowTitle {
         switch command {
         case .refresh: "Refresh"
         case .quit: "Quit"
+        }
+    }
+}
+
+/// Turns AppKit's one highlight signal into the flag every component draws from.
+///
+/// It sets the flag on EVERY component, not just the hovered one: `willHighlight`
+/// fires once per change, so a delegate that only lights the new row leaves every
+/// row the pointer passed over still lit. `item` is nil when the pointer leaves
+/// the rows entirely, and is a native row (a command) when it lands on one —
+/// both mean "no component is highlighted", which is what `item === row` says
+/// without a special case.
+@MainActor
+private final class MenuHighlightDelegate: NSObject, NSMenuDelegate {
+    /// Address-as-key for the association that keeps this object alive.
+    nonisolated(unsafe) static var associationKey = 0
+
+    func menu(_ menu: NSMenu, willHighlight item: NSMenuItem?) {
+        for row in menu.items {
+            guard let component = row.view as? MenuItemHostingView else { continue }
+            component.isHighlightedForMenu = (row === item)
         }
     }
 }
