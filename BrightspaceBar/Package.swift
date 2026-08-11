@@ -162,7 +162,14 @@ let package = Package(
         ),
         .testTarget(
             name: "BrightspaceBarTests",
-            dependencies: ["BrightspaceBar", "CourseMenu"],
+            // The backend modules are for GraphEndToEndTests ONLY, which drives
+            // fixture bytes through the real parser → store → translation →
+            // assembler chain. View files still cannot import them —
+            // ArchitectureTests polices Sources/, and this is a test target.
+            dependencies: [
+                "BrightspaceBar", "CourseMenu", "MenuAdapter",
+                "CoursePipeline", "AssignmentPipeline", "QuizPipeline",
+            ],
             path: "Modules/BrightspaceBar/Tests"
         ),
     ]
