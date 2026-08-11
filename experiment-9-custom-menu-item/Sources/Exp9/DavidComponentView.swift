@@ -33,7 +33,7 @@ final class DavidComponentView: NSView {
         self.cells = cells
         // A native menu row's height. Grows as you add the graph, hairlines,
         // and spacing — the frame is what NSMenuItem honors.
-        super.init(frame: CGRect(x: 0, y: 0, width: 340, height: 22))
+        super.init(frame: CGRect(x: 0, y: 0, width: 340, height: 66))
         // Stretch to the menu's final width, so a highlight capsule can span the
         // row like a native item's does.
         self.autoresizingMask = [.width]
@@ -70,9 +70,16 @@ final class DavidComponentView: NSView {
                 ? NSColor.selectedMenuItemTextColor
                 : NSColor.labelColor,
         ]
+        // Top-anchored: measure down from the top edge by the padding, so the
+        // title stays put as the row grows and everything below it is free
+        // space for the graph.
+        //
+        //   topPad ─┬─ (gap between the grey line above and the title)
+        //           └─ title ── then: the rest of bounds, yours for cells
+        let topPad: CGFloat = 6
         let textHeight = text.size(withAttributes: attributes).height
         text.draw(
-            at: NSPoint(x: 14, y: (self.bounds.height - textHeight) / 2),
+            at: NSPoint(x: 14, y: self.bounds.height - topPad - textHeight),
             withAttributes: attributes
         )
     }

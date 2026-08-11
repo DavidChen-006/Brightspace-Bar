@@ -90,6 +90,30 @@ func header(_ title: String) -> NSMenuItem {
     return item
 }
 
+/// The ChatGPT-style boundary: a thin INERT row owning nothing but a 1pt grey
+/// line, inset 14pt from each edge, centered so it carries its own breathing
+/// room. A dedicated row (RepoBar's approach) rather than a line drawn at a
+/// component's top pixel — padding around a line needs height, and height
+/// belongs to a row.
+final class HairlineRowView: NSView {
+    override func draw(_ dirtyRect: NSRect) {
+        // A fixed mid-grey rather than .separatorColor: the system color is
+        // near-white at low alpha in dark menus, which read as white lines.
+        // Tune the two numbers to taste: white (0=black…1=white), alpha.
+        NSColor(white: 0.5, alpha: 0.6).setFill()
+        NSRect(x: 14, y: self.bounds.midY, width: self.bounds.width - 28, height: 1).fill()
+    }
+}
+
+func hairlineRow() -> NSMenuItem {
+    let item = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+    item.isEnabled = false
+    let view = HairlineRowView(frame: NSRect(x: 0, y: 0, width: 340, height: 10))
+    view.autoresizingMask = [.width]
+    item.view = view
+    return item
+}
+
 func componentItem(view: NSView, submenu: NSMenu?) -> NSMenuItem {
     let item = NSMenuItem(title: "", action: #selector(ClickTarget.open(_:)), keyEquivalent: "")
     item.target = target
@@ -126,7 +150,8 @@ let civicsRow = componentItem(
         title: "Purdue Civics Knowledge Test",
         cells: stripCells(),
         shape: .strip,
-        showsChevron: true
+        showsChevron: true,
+        hairlines: false  // boundaries are hairlineRow() items now
     ),
     submenu: civicsSubmenu
 )
@@ -137,7 +162,8 @@ let sclaRow = componentItem(
         title: "SCLA 10100 — Transformative Texts",
         cells: gridCells(columns: 16),
         shape: .grid(columns: 16),
-        showsChevron: false
+        showsChevron: false,
+        hairlines: false  // boundaries are hairlineRow() items now
     ),
     submenu: nil
 )
@@ -146,15 +172,21 @@ let quitRow = NSMenuItem(title: "Quit", action: #selector(ClickTarget.quit(_:)),
 quitRow.target = target
 
 // ── The diagram: the whole menu, at a glance ────────────────────────────────
+// No native .separator()s: every boundary is a hairlineRow() — a thin inert
+// item carrying an inset grey line with its own vertical breathing room.
 let rows: [NSMenuItem] = [
     header("Fall 2026"),
+    hairlineRow(),
     nativeRow("CS 17600 — Data Engineering"),
+    hairlineRow(),
     nativeRow("MA 26100 — Multivariate Calculus"),
+    hairlineRow(),
     davidRow,          // ← your component
-    .separator(),
+    hairlineRow(),
     civicsRow,
+    hairlineRow(),
     sclaRow,
-    .separator(),
+    hairlineRow(),
     quitRow,
 ]
 

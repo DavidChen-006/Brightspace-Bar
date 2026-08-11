@@ -153,12 +153,13 @@ final class CourseComponentView: NSView {
             NSBezierPath(roundedRect: capsule, xRadius: Self.highlightRadius, yRadius: Self.highlightRadius).fill()
         }
 
-        // 2. Hairlines above and below (David: "lines above and below each
-        //    class"). Suppressed while highlighted so the capsule reads clean.
-        if self.hairlines && !highlighted {
+        // 2. One hairline at the TOP edge only — each component owns the line
+        //    above itself, so stacked components never double their lines.
+        //    Drawn even while highlighted: the capsule is inset 2pt vertically,
+        //    so the topmost pixel row is outside it and the two never overlap.
+        if self.hairlines {
             NSColor.separatorColor.setFill()
             self.bounds.divided(atDistance: 1, from: .maxYEdge).slice.fill()
-            self.bounds.divided(atDistance: 1, from: .minYEdge).slice.fill()
         }
 
         // 3. Title, menu-native font and colors.
