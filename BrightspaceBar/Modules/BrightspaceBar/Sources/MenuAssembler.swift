@@ -46,12 +46,17 @@ public struct MenuAssembler {
             menu.addItem(item)
         }
         for row in rows {
-            menu.addItem(self.item(for: row))
+            for item in self.items(for: row) {
+                menu.addItem(item)
+            }
         }
         return menu
     }
 
-    private func item(for row: MenuRow) -> NSMenuItem {
+    /// A list, not a single item, because a graphed course occupies two menu
+    /// rows: the clickable course and the strip beneath it. Keeping that here
+    /// rather than in the loop above is what keeps the loop free of row kinds.
+    private func items(for row: MenuRow) -> [NSMenuItem] {
         switch row {
         case .course(let course):
             let item = self.linkItem(title: RowTitle.course(course), url: course.url)
@@ -60,10 +65,11 @@ public struct MenuAssembler {
             // this item non-actionable — silently killing the plain click that
             // every course row shipping today depends on.
             item.submenu = self.submenu(for: course)
-            return item
+            guard !course.graph.isEmpty else { return [item] }
+            return [item, self.stripItem(cells: course.graph)]
 
         case .assignment(let assignment):
-            return self.linkItem(title: RowTitle.assignment(assignment), url: assignment.url)
+            return [self.linkItem(title: RowTitle.assignment(assignment), url: assignment.url)]
 
         case .command(let command):
             let item = NSMenuItem(
@@ -73,17 +79,32 @@ public struct MenuAssembler {
             )
             item.target = self.target
             item.representedObject = command
-            return item
+            return [item]
 
         case .sectionHeader(let text), .message(let text), .status(let text):
             // No action (can never be activated) and disabled (looks inert).
             let item = NSMenuItem(title: text, action: nil, keyEquivalent: "")
             item.isEnabled = false
-            return item
+            return [item]
 
         case .separator:
-            return NSMenuItem.separator()
+            return [NSMenuItem.separator()]
         }
+    }
+
+    /// The course's activity graph, on a line of its own directly under the
+    /// course name. It cannot ride on the course item itself: an `NSMenuItem`
+    /// draws either its `view` or its title, so hosting the strip there would
+    /// erase the course name and its click along with it.
+    ///
+    /// Inert by both halves — no action means it can never be activated, and
+    /// disabled is what makes it look that way rather than like a blank row
+    /// that ignores clicks.
+    private func stripItem(cells: [GraphCell]) -> NSMenuItem {
+        let item = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        item.isEnabled = false
+        item.view = GraphStripView(cells: cells)
+        return item
     }
 
     /// A course's assignment submenu, or nil when the model gave it no rows.
