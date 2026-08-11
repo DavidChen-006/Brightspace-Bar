@@ -80,9 +80,27 @@ private struct FixtureSource: AssignmentSource {
 struct GraphEndToEndTests {
 
     // 2026-02-24T17:00:00Z — noon on Tuesday Feb 24 in America/Indianapolis.
-    // Chosen so the fixtures' shared deadline (Feb 28 local) sits at cell 4,
-    // inside the window, and every dated Fall-2024 enrollment is long ended.
+    // Chosen so the fixtures' shared deadline (Feb 28 local) sits inside the
+    // window and every dated Fall-2024 enrollment is long ended.
+    //
+    // The window is week-aligned (NewVertical-3 §4), so it opens on the SUNDAY of
+    // this week — Feb 22 — and runs 112 days. Transcribed by hand from the
+    // calendar, not computed the way the code computes it:
+    //
+    //   cell 0 → Sun Feb 22 (window start)   cell 2 → Tue Feb 24 (today)
+    //   cell 6 → Sat Feb 28 (the shared deadline, 23:59 local)
+    //
+    // Note that today is cell 2, not cell 0. That is the alignment change, and
+    // this suite is where it is observed end to end.
     private static let now = Date(timeIntervalSince1970: 1_771_952_400)
+
+    /// Today's cell — third day of a Sunday-first week, because Feb 24 is a
+    /// Tuesday.
+    private static let todayIndex = 2
+
+    /// The cell both fixtures' `2026-03-01T04:59:00.000Z` lands on: Sat Feb 28
+    /// local, six days after the window opened.
+    private static let deadlineIndex = 6
     private static let zone = TimeZone(identifier: "America/Indianapolis")!
     private static let baseURL = URL(string: "https://purdue.brightspace.com")!
 
@@ -152,24 +170,31 @@ struct GraphEndToEndTests {
         // Arrange / Act — the full chain.
         let model = try await self.translatedModel()
 
-        // Assert — Scholarly: assignment + quiz share Feb 28 local, so cell 4
-        // carries the higher tier. Cell 0 is today: outlined, honestly empty.
+        // Assert — the window is 16 whole weeks, stated as a literal so the
+        // production constant cannot be resized and re-blessed in one edit.
         let scholarly = try #require(model.courses.first { $0.id == Self.scholarly })
-        try #require(scholarly.graph.count == GraphTranslation.windowDays)
-        #expect(scholarly.graph[0] == GraphCell(tier: nil, isToday: true))
-        #expect(scholarly.graph[4].tier == .quiz)
+        try #require(scholarly.graph.count == 112)
+        #expect(GraphTranslation.windowDays == 112)
+
+        // Scholarly: assignment + quiz share Feb 28 local, so cell 6 carries the
+        // higher tier. Cell 2 is today: outlined, honestly empty — and it is cell
+        // 2 rather than cell 0 only because the window opens on Sunday.
+        #expect(scholarly.graph[Self.todayIndex] == GraphCell(tier: nil, isToday: true))
+        #expect(scholarly.graph[Self.deadlineIndex].tier == .quiz)
 
         // The hidden Sep-15 item, the broken-date items, and the out-of-window
-        // deadline left every other cell empty — nothing leaked.
-        for (index, cell) in scholarly.graph.enumerated() where index != 0 && index != 4 {
+        // deadline left every other cell empty — nothing leaked, and nothing
+        // else claims to be today.
+        for (index, cell) in scholarly.graph.enumerated()
+        where index != Self.todayIndex && index != Self.deadlineIndex {
             #expect(cell == GraphCell(tier: nil, isToday: false), "cell \(index) should be empty")
         }
 
         // Civics: same payload, no quiz route — the same day stays an assignment,
         // so both tiers are provably distinguishable end to end.
         let civics = try #require(model.courses.first { $0.id == Self.civics })
-        #expect(civics.graph.count == GraphTranslation.windowDays)
-        #expect(civics.graph[4].tier == .assignment)
+        #expect(civics.graph.count == 112)
+        #expect(civics.graph[Self.deadlineIndex].tier == .assignment)
     }
 
     @Test("the translated model assembles into course components carrying their cells")
@@ -194,9 +219,10 @@ struct GraphEndToEndTests {
             #expect(component.cells == expected.graph)
         }
 
-        // One component per course, and every fetched course carries cells.
-        // All seven visible courses were fetched (five to empty), so all seven
-        // components have a full window; a `neverFetched` course would not.
+        // One component per course, and EVERY course carries cells — which under
+        // always-emit is now unconditional rather than a consequence of all seven
+        // having been fetched. Five of them fetched to empty and still get a full
+        // window, and a `neverFetched` course would too.
         let graphed = menu.items.count {
             (($0.view as? MenuItemHostingView)?.cells.isEmpty == false)
         }

@@ -11,19 +11,32 @@ import CourseMenu
 // renderer against it, which means the seeds are not decoration: they are the
 // only inputs the renderer will be exercised with until the mapping layer lands.
 //
-// The strip is POSITIONAL — 28 cells, index is the day offset, cell 0 is today —
-// and the stub carries FINISHED `GraphCell` values. Any "both kinds on one day"
-// has already been resolved to the higher tier upstream; the stub demonstrates the
-// OUTCOME, not the resolution.
+// The window is POSITIONAL — 112 cells, index is the day offset from WINDOW
+// START, and window start is the Sunday of today's week — and the stub carries
+// FINISHED `GraphCell` values. Any "both kinds on one day" has already been
+// resolved to the higher tier upstream; the stub demonstrates the OUTCOME, not
+// the resolution.
+//
+// RE-PINNED for NewVertical-3 §4. Three things moved:
+//   • 28 cells → 112 (16 weeks, the multiple of 7 §3.3 promises the grid).
+//   • `isToday` is no longer index 0. The window opens on Sunday, so today sits
+//     somewhere in cells 0–6. The seeds pick index 2 (a Tuesday), matching the
+//     mapping suite's and the E2E suite's pinned instants.
+//   • "A course with no strip at all" CEASED TO EXIST. Always-emit (§2 item 2)
+//     makes `[]` unreachable from `GraphTranslation`, so no seed may demonstrate
+//     it — a renderer developed against a `[]` seed would be developed against a
+//     state the backend can no longer produce.
 //
 // PRIORITIES:
 //
 //   1. VISUAL COVERAGE. Every state the renderer can be in must be reachable by
 //      launching the stub: a filled cell, an empty cell, a today cell that also
-//      carries work, a today cell that does not, work on the window's last index,
-//      an entirely empty strip, and a course with no strip at all. A seed set that
-//      drifts silently loses one of those states, and the renderer bug it was
-//      hiding ships — the human verification step is only as good as the seeds.
+//      carries work, a today cell that does not, work on a day of the current
+//      week that has ALREADY PASSED (new — the window now reaches behind today),
+//      work on the window's last index, and an entirely empty window. A seed set
+//      that drifts silently loses one of those states, and the renderer bug it
+//      was hiding ships — the human verification step is only as good as the
+//      seeds.
 //
 //   2. DETERMINISM. The seeds are literals, not clock-derived, so a screenshot
 //      taken today and one taken next month show the same strip. These tests pin
@@ -42,37 +55,47 @@ import CourseMenu
 // ─────────────────────────────────────────────────────────────────────────────
 // PINNED POLICY — the builder seeds exactly this, in `StubMenuDataSource.seeded`.
 //
-// 28 cells per strip. `isToday` true at index 0 only, never elsewhere.
+// 112 cells per window, for EVERY seeded course without exception. `isToday`
+// true at index 2 only, never elsewhere — index 2 because a Sunday-aligned
+// window puts a Tuesday there, which is where the mapping suite's and the E2E
+// suite's pinned instants land too.
 //
 //   Data Engineering (1_498_777) — a today cell that ALSO carries work, proving
 //     the outline does not obscure the fill:
-//       0: .assignment (and isToday)   1: .quiz   3: .assignment   5: .quiz
+//       2: .assignment (and isToday)   3: .quiz   5: .assignment   7: .quiz
 //
 //   Multivariate Calculus (1_415_558) — a today cell that is EMPTY, proving the
 //     outline renders on an empty cell, plus work on the window's last index so
-//     the trailing edge is visible:
-//       0: nil (and isToday)   2: .quiz   6: .assignment
-//       9: .quiz  ← the seeded "assignment + quiz same day", already resolved
-//      27: .assignment  ← last cell of the window
+//     the trailing edge of a 16-week grid is visible:
+//       2: nil (and isToday)   4: .quiz   8: .assignment
+//      11: .quiz  ← the seeded "assignment + quiz same day", already resolved
+//     111: .assignment  ← last cell of the window
 //
-//   Computer Graphics Technology (1_452_301) — the honest "nothing due" strip:
-//       28 cells, every tier nil, isToday at index 0.
+//   Transformative Texts (1_460_912) — the state the old window could not have:
+//     work on days of the CURRENT week that have already passed, one on either
+//     side of the window's opening Sunday:
+//       0: .assignment   1: .quiz
 //
-//   Transformative Texts (1_460_912) and Purdue Civics (412_690) — `graph == []`.
-//     No strip at all; the renderer must skip these rows entirely rather than
-//     drawing 28 empty cells.
+//   Computer Graphics Technology (1_452_301) and Purdue Civics (412_690) — the
+//     honest "nothing due" window: 112 cells, every tier nil, isToday at 2.
+//     Two of them, because under always-emit this is the common case and a
+//     stub with only one would under-represent how the menu usually looks.
 //
 // Seeds are literals. Nothing here derives from `Date()`.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// The window's width, stated once so the expectations below read as the spec.
-private let stripLength = 28
+private let windowLength = 112
 
-/// A full 28-cell tier expectation written the way the policy states it: sparse,
-/// by index, everything else empty. Built from the policy block above rather than
-/// from the stub, so it is an independent source of truth.
-private func strip(_ seeded: [Int: CellTier]) -> [CellTier?] {
-    (0..<stripLength).map { seeded[$0] }
+/// Where the seeds put today. Deliberately NOT 0: a stub that stamped cell 0
+/// would let a renderer that assumes "today is the first cell" look correct.
+private let todayIndex = 2
+
+/// A full 112-cell tier expectation written the way the window is actually read:
+/// sparse, by index, everything else empty. Built from the policy block above
+/// rather than from the stub, so it is an independent source of truth.
+private func window(_ seeded: [Int: CellTier]) -> [CellTier?] {
+    (0..<windowLength).map { seeded[$0] }
 }
 
 private func seededCourse(_ id: Int) throws -> CourseRow {
@@ -82,62 +105,100 @@ private func seededCourse(_ id: Int) throws -> CourseRow {
     )
 }
 
+/// Every course the stub seeds. Named once so the "all of them" claims below
+/// cannot quietly stop covering a course someone adds.
+private let seededIDs = [1_498_777, 1_415_558, 1_452_301, 1_460_912, 412_690]
+
 @Suite("The stub seeds every state the renderer can draw")
 struct StubGraphSeedTests {
 
-    @Test("Data Engineering's strip fills today, tomorrow, +3 and +5")
-    func dataEngineeringStrip() throws {
+    @Test("every seeded course carries a full 112-cell window")
+    func everyCourseCarriesTheWholeWindow() throws {
+        // Arrange / Act — the always-emit rule (§2 item 2) as it reaches the
+        // renderer. This is the claim that makes course rows uniform in height:
+        // if any seed were short or empty, one row would draw differently and the
+        // stub would demo a menu the backend can no longer produce.
+        for id in seededIDs {
+            let course = try seededCourse(id)
+
+            // Assert
+            #expect(course.graph.count == windowLength, "course \(id) has \(course.graph.count) cells")
+        }
+    }
+
+    @Test("Data Engineering's window fills today and three days after it")
+    func dataEngineeringWindow() throws {
         // Arrange / Act
         let course = try seededCourse(1_498_777)
 
-        // Assert — the full 28-cell tier sequence, so the count and the gaps are
+        // Assert — the full 112-cell tier sequence, so the count and the gaps are
         // pinned alongside the fills.
-        #expect(course.graph.map(\.tier) == strip([
-            0: .assignment,
-            1: .quiz,
-            3: .assignment,
-            5: .quiz,
+        #expect(course.graph.map(\.tier) == window([
+            2: .assignment,
+            3: .quiz,
+            5: .assignment,
+            7: .quiz,
         ]))
     }
 
-    @Test("Multivariate Calculus's strip reaches the window's last cell")
-    func multivariateCalculusStrip() throws {
+    @Test("Multivariate Calculus's window reaches its last cell, 16 weeks out")
+    func multivariateCalculusWindow() throws {
         // Arrange / Act
         let course = try seededCourse(1_415_558)
 
-        // Assert — index 9 is the seeded "an assignment AND a quiz were due that
+        // Assert — index 11 is the seeded "an assignment AND a quiz were due that
         // day", already resolved to `.quiz` upstream; the stub shows the outcome.
-        // Index 27 is the window's final cell, seeded so the trailing edge of the
-        // strip is visible rather than being cropped without anyone noticing.
-        #expect(course.graph.map(\.tier) == strip([
-            2: .quiz,
-            6: .assignment,
-            9: .quiz,
-            27: .assignment,
+        // Index 111 is the window's final cell, seeded so the trailing edge of the
+        // grid is visible rather than being cropped without anyone noticing —
+        // which matters far more at 16 weeks than it did at four.
+        #expect(course.graph.map(\.tier) == window([
+            4: .quiz,
+            8: .assignment,
+            11: .quiz,
+            111: .assignment,
         ]))
     }
 
-    @Test("Computer Graphics Technology's strip is 28 empty days")
-    func computerGraphicsStrip() throws {
-        // Arrange / Act — the honest "nothing due" state. Distinct from having no
-        // strip: the row still draws a full-width strip, just with no fills.
-        let course = try seededCourse(1_452_301)
+    @Test("Transformative Texts carries work on days of this week already past")
+    func workBehindTodayIsSeeded() throws {
+        // Arrange / Act — the state the old today-anchored window could not hold
+        // and no seed therefore covered. The window now opens on Sunday, so cells
+        // 0 and 1 are days that have already gone by; the renderer must draw them
+        // like any other filled cell, and only a seed makes that visible.
+        let course = try seededCourse(1_460_912)
 
         // Assert
-        #expect(course.graph.map(\.tier) == strip([:]))
+        #expect(course.graph.map(\.tier) == window([
+            0: .assignment,
+            1: .quiz,
+        ]))
     }
 
-    @Test("today is stamped on exactly one cell, and it is index 0")
-    func todayIsStampedOnceAtIndexZero() throws {
-        for id in [1_498_777, 1_415_558, 1_452_301] {
+    @Test("the courses with nothing due carry 112 empty days")
+    func emptyWindowsAreStillFullLength() throws {
+        // Arrange / Act — the honest "nothing due" state, and under always-emit
+        // the only kind of empty there is: a full-width grid with no fills, never
+        // an absent one.
+        for id in [1_452_301, 412_690] {
+            let course = try seededCourse(id)
+
+            // Assert
+            #expect(course.graph.map(\.tier) == window([:]), "course \(id) is not empty")
+        }
+    }
+
+    @Test("today is stamped on exactly one cell of every course, and it is not cell 0")
+    func todayIsStampedOnceAndNotAtIndexZero() throws {
+        for id in seededIDs {
             // Arrange / Act
             let graph = try seededCourse(id).graph
 
-            // Assert — cell 0 is today by definition of the positional strip. A
-            // second stamp, or a stamp further along, means the seed and the
-            // contract disagree about which end of the strip is now.
+            // Assert — a second stamp, or a stamp elsewhere, means the seed and
+            // the week-aligned window disagree about where now sits. Index 2 and
+            // not 0 is the point: a seed at cell 0 would let a renderer that
+            // assumes today leads the window look perfectly correct.
             let stamped = graph.indices.filter { graph[$0].isToday }
-            #expect(stamped == [0], "course \(id) stamps today at \(stamped)")
+            #expect(stamped == [todayIndex], "course \(id) stamps today at \(stamped)")
         }
     }
 
@@ -145,7 +206,7 @@ struct StubGraphSeedTests {
     func todayCanCarryATier() throws {
         // Arrange / Act — the outline-over-fill case. Without a seed like this the
         // renderer could draw the today outline as a fill and nobody would see it.
-        let today = try #require(seededCourse(1_498_777).graph.first)
+        let today = try seededCourse(1_498_777).graph[todayIndex]
 
         // Assert
         #expect(today.isToday)
@@ -156,23 +217,11 @@ struct StubGraphSeedTests {
     func todayCanBeEmpty() throws {
         // Arrange / Act — the mirror: the outline has to render on a cell with no
         // fill behind it, which is the case a fill-based today indicator loses.
-        let today = try #require(seededCourse(1_415_558).graph.first)
+        let today = try seededCourse(1_415_558).graph[todayIndex]
 
         // Assert
         #expect(today.isToday)
         #expect(today.tier == nil)
-    }
-
-    @Test("the two courses with no upcoming work carry no strip at all")
-    func someCoursesHaveNoStrip() throws {
-        // Arrange / Act — empty means "draw nothing", not "draw 28 empty cells".
-        // Computer Graphics covers the latter; these two cover the former.
-        let transformativeTexts = try seededCourse(1_460_912)
-        let civics = try seededCourse(412_690)
-
-        // Assert
-        #expect(transformativeTexts.graph == [])
-        #expect(civics.graph == [])
     }
 
     @Test("both tiers appear somewhere in the seeds")
@@ -195,9 +244,11 @@ struct StubGraphSeedTests {
         // `currentMenu()` answers with a different model than the static one.
         let courses = await source.currentMenu().courses
 
-        // Assert
+        // Assert — every course arrives with its window, not just the ones
+        // carrying work.
         #expect(courses.map(\.graph) == StubMenuDataSource.seeded.courses.map(\.graph))
-        #expect(courses.filter { !$0.graph.isEmpty }.count == 3)
+        #expect(courses.count == seededIDs.count)
+        #expect(courses.allSatisfy { $0.graph.count == windowLength })
     }
 }
 
