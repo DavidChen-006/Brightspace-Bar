@@ -434,17 +434,19 @@ struct SectionedStateTests {
         #expect(messages(rows) == [Pinned.refreshFailed])
     }
 
-    @Test("neverFetched still yields no submenu at all, with either kind possible")
-    func neverFetchedIsStillEmpty() {
-        // Arrange / Act — assignments are not persisted, so this is every course's
-        // state at launch; the course must stay directly clickable.
+    @Test("neverFetched says No assignments and names neither kind")
+    func neverFetchedNamesNoKind() {
+        // Arrange / Act — with either kind possible but nothing fetched, the row
+        // must not imply a section. A "Quizzes" or "Assignments" header here would
+        // claim knowledge of what the course holds.
         let rows = AssignmentTranslation.submenu(
             state: .neverFetched, courseId: Real.civicsID,
             now: Pinned.now, baseURL: Pinned.baseURL, timeZone: Pinned.utc
         )
 
         // Assert
-        #expect(rows.isEmpty)
+        #expect(rows == [.message(Pinned.noAssignments)])
+        #expect(headers(rows).isEmpty)
     }
 
     @Test("shuffled input yields an identical model, so the GUI can skip rebuilding")

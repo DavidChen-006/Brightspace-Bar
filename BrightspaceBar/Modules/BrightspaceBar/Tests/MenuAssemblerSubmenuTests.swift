@@ -2,8 +2,10 @@ import AppKit
 import Foundation
 import Testing
 
+import AssignmentPipeline
 import BrightspaceBar
 import CourseMenu
+import MenuAdapter
 
 // ═════════════════════════════════════════════════════════════════════════════
 // MenuAssembler — the assignment submenu.
@@ -65,7 +67,10 @@ import CourseMenu
 //   [2…] one item per row in CourseRow.submenu, in model order
 //
 // A course whose `submenu` is EMPTY gets no NSMenu at all — it stays a plain,
-// directly clickable row exactly as before this feature existed.
+// directly clickable row. Since slice 5 that branch is unreachable in practice:
+// `AssignmentTranslation` emits rows for every state, so every real course row
+// leads with the escape hatch (NewVertical-3 §2.3). The mechanism is unchanged;
+// only the set of models that reach it is.
 // ─────────────────────────────────────────────────────────────────────────────
 
 private enum Expected {
@@ -244,10 +249,15 @@ struct MenuAssemblerSubmenuStructureTests {
         #expect(row.submenu != nil, "assignments were in the model but no submenu was built")
     }
 
-    /// Legacy protection, and the reason `submenu` defaults to empty. An empty
-    /// NSMenu renders as a hover arrow onto a blank box AND makes the parent item
-    /// non-actionable — so this would silently break every course row shipping today.
-    @Test("a course with no assignments has no submenu and stays directly clickable")
+    /// The assembler's guard on an empty submenu. An empty NSMenu renders as a
+    /// hover arrow onto a blank box AND makes the parent item non-actionable, so
+    /// the guard must stay.
+    ///
+    /// Since slice 5 no course REACHES this branch: `AssignmentTranslation` emits
+    /// rows for every state including `neverFetched`, so the model never carries a
+    /// bare course. This is now a defence of the mechanism, not of a live state —
+    /// the uniform outcome is pinned by `everyCourseGetsTheCourseHomeEscapeHatch`.
+    @Test("a course with an empty submenu gets no NSMenu and stays directly clickable")
     func courseWithoutAssignmentsHasNoSubmenu() throws {
         // Arrange
         let assembler = Build.assembler()
@@ -262,6 +272,62 @@ struct MenuAssemblerSubmenuStructureTests {
         let row = try #require(menu.items.first)
         #expect(row.submenu == nil, "an empty submenu was attached, which kills the course's own click")
         #expect(row.action != nil, "a course without assignments must remain directly clickable")
+    }
+
+    /// NewVertical-3 §2.3, as an outcome rather than a mechanism: a course that has
+    /// never been fetched — every course at launch — must still hover open onto the
+    /// escape hatch. Fed the real `neverFetched` translation rather than a literal,
+    /// so retiring the "no rows" policy is what makes this pass.
+    @Test("a never-fetched course still gets the Open Course Home escape hatch")
+    func neverFetchedCourseStillGetsTheEscapeHatch() throws {
+        // Arrange
+        let assembler = Build.assembler()
+        let rows = AssignmentTranslation.submenu(
+            state: .neverFetched, courseId: Build.civicsID,
+            now: Date(timeIntervalSince1970: 0),
+            baseURL: URL(string: "https://purdue.brightspace.com")!,
+            timeZone: TimeZone(identifier: "UTC")!
+        )
+        let course = Build.course(id: Build.civicsID, title: Build.civicsTitle, submenu: rows)
+
+        // Act
+        let menu = assembler.assemble(MenuModel(rows: [.course(course)]))
+
+        // Assert
+        let sub = try submenu(ofCourseTitled: Build.civicsTitle, in: menu)
+        #expect(sub.items.first?.title == Expected.courseHome)
+    }
+
+    /// The uniformity claim itself, swept over the seeded menu the app actually
+    /// launches with under `BRIGHTSPACEBAR_STUB=1`. One course lacking the hatch is
+    /// one course the user can no longer open at all, since a submenu-bearing item
+    /// is not itself clickable.
+    @Test("every assembled course opens onto Open Course Home")
+    func everyCourseGetsTheCourseHomeEscapeHatch() throws {
+        // Arrange
+        let assembler = Build.assembler()
+        let model = StubMenuDataSource.seeded
+        try #require(!model.courses.isEmpty)
+
+        // Act
+        let menu = assembler.assemble(model)
+
+        // Assert
+        // Matched on `contains` rather than equality, because an item's title also
+        // carries the course code when the row has a subtitle.
+        for course in model.courses {
+            let item = try #require(
+                menu.items.first { $0.title.contains(course.title) },
+                "no assembled item for course '\(course.title)'"
+            )
+            let sub = try #require(
+                item.submenu, "course '\(course.title)' assembled with no submenu at all"
+            )
+            #expect(
+                sub.items.first?.title == Expected.courseHome,
+                "course '\(course.title)' does not lead with the escape hatch"
+            )
+        }
     }
 
     @Test("every assignment renders one submenu item, in model order, after the course-home row")

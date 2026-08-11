@@ -405,6 +405,18 @@ struct StubHairlineSeedTests {
         }
     }
 
+    @Test("every seeded course has a non-empty submenu")
+    func everySeededCourseHasASubmenu() {
+        // Arrange / Act — the stub demos what the translation layer produces, and
+        // since slice 5 that layer emits rows for every state including
+        // `neverFetched`. A seeded course with no submenu would demo the plain
+        // directly-clickable row, which is a state the app can no longer reach.
+        let bare = StubMenuDataSource.seeded.courses.filter(\.submenu.isEmpty).map(\.title)
+
+        // Assert
+        #expect(bare.isEmpty, "these seeded courses still demo the retired plain row: \(bare)")
+    }
+
     @Test("no course submenu carries a hairline")
     func submenusHaveNoBoundaries() {
         // Arrange / Act — §3.1's rule is a TOP-LEVEL one. A submenu's rows are

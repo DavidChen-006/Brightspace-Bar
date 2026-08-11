@@ -51,8 +51,9 @@ import MenuAdapter
 //     timeZone: TimeZone = .current
 //   Both defaulted, and appended AFTER the existing four, so every one of the 227
 //   existing call sites compiles untouched. A course absent from `assignments` is
-//   `neverFetched`, which is why the default `[:]` reproduces today's output
-//   exactly.
+//   `neverFetched` — which, since slice 5, still yields a submenu ("No
+//   assignments"), so the default `[:]` no longer reproduces the pre-assignment
+//   output. See the submenu-uniformity note below.
 //
 //   `timeZone` is a parameter for the same reason `now` is: a pure function may
 //   not read ambient state. It is load-bearing rather than pedantic — D2L states
@@ -63,8 +64,7 @@ import MenuAdapter
 // ── AssignmentTranslation.submenu(state:courseId:now:baseURL:timeZone:) ─────
 //   Returns the submenu rows for ONE course.
 //
-//     .neverFetched              →  []                (no submenu; course stays
-//                                                      directly clickable)
+//     .neverFetched              →  [.message("No assignments")]
 //     .loaded([])                →  [.message("No assignments")]
 //     .loaded(visible)           →  [.assignment...]  sorted, no message
 //     .loaded(all hidden)        →  [.message("No assignments")]
@@ -72,12 +72,23 @@ import MenuAdapter
 //     .failed(lastKnown: rows)   →  [.assignment...] + .separator
 //                                   + .message("Couldn't refresh — may be out of date")
 //
-//   `neverFetched` is `[]`, NOT a "Loading…" row, and the distinction is real:
-//   assignments are deliberately not persisted, so at launch a course has never
-//   been asked about and nothing is necessarily in flight. "Loading…" would be a
-//   claim we cannot support. An empty list means the GUI attaches no submenu and
-//   the course behaves exactly as it did before this feature existed — the
-//   honest rendering of "we know nothing yet".
+//   `neverFetched` is still NOT a "Loading…" row: assignments are deliberately
+//   not persisted, so at launch a course has never been asked about and nothing
+//   is necessarily in flight, and "Loading…" would be a claim we cannot support.
+//
+//   What DID change in slice 5 is that it is no longer `[]`. The old policy — no
+//   rows, therefore no NSMenu, therefore a plain directly-clickable course — gave
+//   the menu two interaction models for rows that look identical, and which model
+//   a row got depended on whether a fetch had happened yet. NewVertical-3 §2.3
+//   retires it: every course gets at least `[Open Course Home]` + "No
+//   assignments", so hovering any course does the same thing.
+//
+//   The cost is admitted rather than hidden: `neverFetched` and `loaded([])` now
+//   render identically, so the submenu alone no longer distinguishes "not asked
+//   yet" from "asked, and there are none". The states stay distinct in the store
+//   (`AssignmentStoreTests` pins that), and the graph strip — emitted for every
+//   state — is what carries the difference visually. Uniformity of interaction
+//   was judged worth more than a distinction the user could not act on.
 //
 //   The separator appears ONLY when assignment rows precede the note. With no
 //   rows it would abut the separator `MenuAssembler` already prepends.
@@ -371,25 +382,28 @@ struct AssignmentSubmenuStateTests {
         )
     }
 
-    @Test("neverFetched yields no rows, so the course keeps its plain click")
-    func neverFetchedYieldsNoRows() {
+    @Test("neverFetched still yields a submenu, so every course hovers the same way")
+    func neverFetchedYieldsTheEmptyMessage() {
         // Arrange / Act — assignments are not persisted, so this is every course's
-        // state at launch. An empty list means the GUI attaches no NSMenu and the
-        // course behaves exactly as it did before this feature existed.
+        // state at launch. It must NOT be `[]`: an empty list makes the GUI attach
+        // no NSMenu, which leaves the menu with two interaction models for rows
+        // that look identical (NewVertical-3 §2.3).
         let rows = self.submenu(.neverFetched)
 
         // Assert
-        #expect(rows.isEmpty)
+        #expect(rows == [.message(Pinned.noAssignments)])
     }
 
-    @Test("neverFetched does not claim the course has no assignments")
-    func neverFetchedIsNotTheEmptyMessage() {
-        // Arrange / Act — the distinction that must not collapse: "not asked yet"
-        // is not "asked, and there are none".
-        let rows = self.submenu(.neverFetched)
+    @Test("neverFetched and a successful empty fetch are deliberately indistinguishable")
+    func neverFetchedRendersAsLoadedEmpty() {
+        // Arrange / Act — the collapse slice 5 accepts on purpose. "Not asked yet"
+        // and "asked, and there are none" are still distinct in the store; they are
+        // no longer distinct in the submenu, because the user cannot act on the
+        // difference and uniform hover behaviour is worth more.
+        let unfetched = self.submenu(.neverFetched)
 
         // Assert
-        #expect(messages(rows).isEmpty)
+        #expect(unfetched == self.submenu(.loaded([])))
     }
 
     @Test("a successful empty fetch says so, rather than producing no submenu")
@@ -755,20 +769,22 @@ struct AssignmentWiringEndToEndTests {
         #expect(messages(civics.submenu) == [Pinned.loadFailed])
     }
 
-    @Test("a course with no assignment state renders exactly as it did before this feature")
-    func absentStateIsIndistinguishableFromToday() throws {
-        // Arrange / Act — the guarantee that keeps all 227 pre-existing tests
-        // valid: no entry means `neverFetched`, which means no submenu.
+    @Test("with no assignment state at all, every course still gets a submenu")
+    func absentStateStillYieldsASubmenuEverywhere() throws {
+        // Arrange / Act — the launch shape: nothing fetched yet, so every course is
+        // `neverFetched`. The old guarantee here was "no entry means no submenu";
+        // slice 5 retires it, because that was what made a course's interaction
+        // model depend on whether a fetch had happened.
         let model = try self.realMenu(assignments: [:])
 
-        // Assert — the currentness expectations are unchanged, and not one course
-        // sprouted a submenu.
+        // Assert — the currentness expectations are unchanged, and no course is
+        // left as a bare row.
         #expect(Set(model.courses.map(\.id)) == RealData.visibleIDsAtMidFall2025)
-        #expect(model.courses.allSatisfy { $0.submenu.isEmpty })
+        #expect(model.courses.allSatisfy { $0.submenu == [.message(Pinned.noAssignments)] })
     }
 
-    @Test("supplying assignments changes only the courses that have them")
-    func onlyTheNamedCourseGainsASubmenu() async throws {
+    @Test("supplying assignments adds rows only to the courses that have them")
+    func onlyTheNamedCourseGainsAssignmentRows() async throws {
         // Arrange
         let store = AssignmentStore(clock: ManualClock(RealData.midFall2025))
         _ = await store.apply(
@@ -779,10 +795,13 @@ struct AssignmentWiringEndToEndTests {
         // Act
         let model = try self.realMenu(assignments: [RealAssignments.scholarlyID: state])
 
-        // Assert — nine courses visible, exactly one of them with a submenu.
+        // Assert — nine courses visible, all with submenus, exactly one of which
+        // holds real assignment rows. The others say "No assignments" rather than
+        // vanishing as a submenu.
         #expect(Set(model.courses.map(\.id)) == RealData.visibleIDsAtMidFall2025)
-        let withSubmenus = model.courses.filter { !$0.submenu.isEmpty }.map(\.id)
-        #expect(withSubmenus == [RealAssignments.scholarlyID])
+        #expect(model.courses.allSatisfy { !$0.submenu.isEmpty })
+        let withAssignments = model.courses.filter { !$0.submenu.assignments.isEmpty }.map(\.id)
+        #expect(withAssignments == [RealAssignments.scholarlyID])
     }
 
     @Test("translation is deterministic even when the assignments arrive shuffled")
