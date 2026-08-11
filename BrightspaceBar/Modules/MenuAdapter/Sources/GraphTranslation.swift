@@ -22,24 +22,25 @@ import CourseMenu
 // ─────────────────────────────────────────────────────────────────────────────
 public enum GraphTranslation {
 
-    /// How many days the strip covers, starting at today. Four weeks: far enough
-    /// ahead to be worth planning against, short enough to stay legible beside a
-    /// course name.
-    public static let windowDays = 28
+    /// How many days the strip covers, starting at the Sunday of today's week.
+    /// Sixteen weeks: a semester's worth of planning. A whole number of weeks is
+    /// load-bearing rather than tidy — the renderer derives `row = i % 7` from it
+    /// (§3.3), and a ragged final column is something it cannot detect.
+    public static let windowDays = 112
 
     /// The strip for ONE course. Pinned by `GraphTranslationTests`; every rule
     /// below is specified there, not here.
     ///
     /// - Parameters:
-    ///   - state: what the store knows about this course. `neverFetched` is the
-    ///     only state that yields no strip — assignments are deliberately not
-    ///     persisted, so that is every course's state at launch and the course
-    ///     renders exactly as it did before this feature existed. A `loaded([])`
-    ///     or a `failed` course keeps its full window: an empty list is data, and
-    ///     blanking a failed refresh would claim work vanished, the same lie the
-    ///     submenu refuses to tell.
-    ///   - now: decides where the window starts. Cell 0 is the local day `now`
-    ///     falls on.
+    ///   - state: what the store knows about this course. Every state yields the
+    ///     full window, `neverFetched` included: a missing grid is
+    ///     indistinguishable from a rendering failure, where an empty grid
+    ///     honestly says "nothing known to be due" (§2 item 2). An empty list is
+    ///     data, and blanking a failed refresh would claim work vanished, the
+    ///     same lie the submenu refuses to tell.
+    ///   - now: decides where the window starts. Cell 0 is the local SUNDAY of
+    ///     the week `now` falls in, so `now` itself lands in cells 0–6 and the
+    ///     already-passed days of this week are drawn rather than dropped.
     ///   - timeZone: decides which calendar day an instant belongs to. Deadlines
     ///     arrive as UTC instants, and `2026-02-13T04:30:00Z` is 23:30 on
     ///     **February 12** in Indiana — drawn a day late, a student reads the
@@ -49,15 +50,16 @@ public enum GraphTranslation {
         now: Date,
         timeZone: TimeZone
     ) -> [GraphCell] {
-        guard state != .neverFetched else { return [] }
-
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = timeZone
         // Pinned for the same reason `AssignmentTranslation.dueLabel` pins it: no
         // ambient locale may reach the calendar's own behaviour.
         calendar.locale = Locale(identifier: "en_US_POSIX")
 
-        let windowStart = calendar.startOfDay(for: now)
+        let today = calendar.startOfDay(for: now)
+        let windowStart = Self.sundayOfWeek(containing: today, in: calendar)
+        // 0...6 by construction — `windowStart` is the Sunday of this very day's week.
+        let todayOffset = Self.dayOffset(from: windowStart, to: today, in: calendar) ?? 0
 
         // Highest tier wins, accumulated per day: `itemsDueThatDay.map(\.tier).max()`
         // expressed as a fold, so the winner cannot depend on the order items
@@ -76,7 +78,21 @@ public enum GraphTranslation {
         // Always the full window: an exclusion empties a cell, it never shortens
         // the strip. `isToday` is set positionally and never as a fill, so the
         // indicator cannot obscure the activity state (decision §2).
-        return (0..<Self.windowDays).map { GraphCell(tier: tiers[$0], isToday: $0 == 0) }
+        return (0..<Self.windowDays).map { GraphCell(tier: tiers[$0], isToday: $0 == todayOffset) }
+    }
+
+    /// The local start of the SUNDAY on or before `day`.
+    ///
+    /// Sunday explicitly, from the Gregorian weekday number (1 = Sunday), rather
+    /// than from `calendar.firstWeekday` — that is locale-dependent, and the grid
+    /// labels row 0 "Sunday" for every student regardless of where the machine
+    /// thinks it is. Stepping back by `.day` components rather than by seconds for
+    /// the same reason `dayOffset` does: a week containing a DST transition is not
+    /// 7 × 86_400 seconds long.
+    private static func sundayOfWeek(containing day: Date, in calendar: Calendar) -> Date {
+        let daysSinceSunday = calendar.component(.weekday, from: day) - 1
+        let sunday = calendar.date(byAdding: .day, value: -daysSinceSunday, to: day) ?? day
+        return calendar.startOfDay(for: sunday)
     }
 
     /// Whole calendar days between two instants' local days — the cell index.
@@ -84,8 +100,8 @@ public enum GraphTranslation {
     /// Both ends are collapsed to their local start of day first, which is what
     /// makes the answer day-granular in both directions: an instant at 23:30 lands
     /// on its own local day rather than its UTC one, and work due at 08:00 this
-    /// morning still counts as day 0 when `now` is 10:00. An instant comparison
-    /// would blank today's square as the day wore on.
+    /// morning still counts as today's day when `now` is 10:00. An instant
+    /// comparison would blank today's square as the day wore on.
     ///
     /// `dateComponents` rather than elapsed seconds ÷ 86_400: a day across a DST
     /// transition is 23 or 25 hours, so step-counting files 00:30 on the morning
