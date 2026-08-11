@@ -1,634 +1,266 @@
 # Next Vertical Slice: Course Activity Graph
 
-The next obvious vertical slice created by adding quizzes is the **graph**.
+The next vertical slice created by adding quizzes is the **graph**.
 
-If you look at RepoBar, it has a GitHub-style activity graph. Brightspace Bar needs something similar.
-
-The reason quizzes specifically force this next step is that students need some kind of calendar-like representation of upcoming work.
-
-In this case, the calendar is essentially a **commit-history-style heatmap**:
-
-- GitHub uses cells to represent commits.
-- Brightspace Bar will use cells to represent assignments and quizzes.
-
-This is important to build now because the code can already distinguish between:
-
-- assignments
-- quizzes
-
-That distinction now needs to exist both:
-
-1. in the code
-2. visually in the GUI
-
-That is exactly what the graph should represent.
+RepoBar has a GitHub-style activity graph; BrightspaceBar needs the same idea
+pointed at the future instead of the past: cells represent upcoming assignments
+and quizzes rather than past commits. The quiz slice (shipped, `2c1e598`) is what
+makes this possible — the code now distinguishes the two kinds via `ItemKind`,
+and that distinction needs to exist visually in the GUI.
 
 ---
 
 # Core Goal
 
-For every course in the main menu, display a GitHub-style activity graph underneath the course name.
-
-The graph should visually represent upcoming course work based on:
+For every course in the main menu, display an activity graph underneath the
+course name, representing upcoming course work based on:
 
 - due date
-- activity type
+- activity type (assignment vs quiz, extensible to tests later)
 - current date
 
-At minimum, we need to distinguish:
-
-- assignments
-- quizzes
-
-For example:
-
-- assignments → lighter cells
-- quizzes → darker cells because they are more important
-
-We also need to visually indicate **today's cell**.
+Today's cell must be clearly indicated without obscuring its activity state.
 
 ---
 
-# Initial Problem Decomposition
+# Locked-In Design Decisions
 
-At first, this looks like two major problems:
+These came out of the design review. They are decided; the stages below build on
+them.
 
-```text
-Frontend / GUI
-Backend / Logic
+## 1. The cell data structure — highest tier wins
+
+A day with both an assignment and a quiz renders as the more important kind.
+This is a ranked enum, not an intensity scale:
+
+```swift
+// Lives in CourseMenu (the contract cannot import AssignmentPipeline;
+// MenuAdapter maps ItemKind → CellTier, like every other contract value).
+public enum CellTier: Int, Comparable, Equatable, Sendable {
+    case assignment = 1
+    case quiz = 2
+    // a future `case test = 3` slots in with no other change
+
+    public static func < (lhs: Self, rhs: Self) -> Bool { lhs.rawValue < rhs.rawValue }
+}
+
+public struct GraphCell: Equatable, Sendable {
+    public let tier: CellTier?    // nil = empty day
+    public let isToday: Bool      // orthogonal — see below
+}
 ```
 
-However, they should **not** be developed in parallel yet.
-
-The frontend implementation determines what data representation the graph actually needs.
-
-Therefore, the dependency structure is sequential.
-
----
-
-# RepoBar as the Reference Implementation
-
-RepoBar already contains the custom graph-rendering code.
-
-The GUI problem is therefore not primarily inventing a new graph.
-
-The challenge is:
-
-> How do we copy or adapt only the thinnest amount of RepoBar's graph code into Brightspace Bar?
-
-Do **not** blindly copy the entire implementation.
-
-We want the minimum amount of code required to reproduce the graph behavior.
-
-If we copy or adapt unnecessary RepoBar functionality, we create unnecessary complexity and waste.
-
-The goal is to determine:
-
-- what rendering code is essential
-- what supporting code is essential
-- what RepoBar-specific behavior can be discarded
-
----
-
-# Important Development Philosophy
-
-Normally, I like to develop this way:
+The fill rule is one expression in the mapping:
 
 ```text
-API Contract
-     ↓
- ┌───┴───┐
-Frontend Backend
-     ↓
-   Wiring
+itemsDueThatDay.map(\.tier).max()
 ```
 
-The frontend can then use stubs and seams while the backend is being developed.
+Assignment + quiz on the same day → `.quiz` because `2 > 1`. Nothing due → `nil`.
 
-However, **this feature is different**.
+## 2. Today's cell — an outline, orthogonal to the fill
 
-We cannot design the API/interface intelligently until we understand exactly what the graph renderer expects.
+`isToday` is a separate field, never a fill value. The renderer draws fill from
+`tier` and the outline from `isToday` independently, so the invariant
 
-Therefore, the GUI investigation has to happen first.
+> the today indicator must not destroy or obscure the underlying activity state
 
----
-
-# Correct Dependency Graph
-
-After working through the dependencies, the correct order is:
+holds by construction and is trivially testable in the pure layer.
 
 ```text
-1. Fake Course / Fake Data Environment
-              ↓
-2. Frontend Graph
-              ↓
-3. Interface / Schema
-              ↓
-4. Backend Mapping Logic
-              ↓
-5. Final Wiring + End-to-End Verification
+normal cell:      today:
+                  ╔═╗
+[■]               ║■║
+                  ╚═╝
 ```
 
-This is a dependency graph that does **not** fan out.
+## 3. The window — borrow RepoBar's shape, flipped forward
 
-Each step unlocks the next one.
+RepoBar's window logic (`HeatmapSpan.swift` / `HeatmapFilter`) is the right
+structure to take: a pure function `range(span:now:calendar:)` returning a
+`{start, end}` pair, plus a one-liner `filter(cells, range)`. The window "shifts"
+with the date automatically because the range is recomputed from `now` on every
+translation — there is no stored state to move.
 
----
+Two mandatory adaptations:
 
-# Dependency 1 — Build Accurate Fake Course Data
+- **Flip the direction.** RepoBar looks backward (trailing contributions); ours
+  looks forward (today → +N, upcoming work). One sign change.
+- **Map onto this codebase's style.** RepoBar writes `now: Date = Date()` as a
+  defaulted parameter. That defaulted `Date()` is illegal here — nothing calls
+  `Date()` except `SystemClock`. The port takes `now` and `timeZone` as required
+  parameters, which `MenuTranslation` already receives and threads through. That
+  is what makes the window logic testable with `TestClock` like everything else.
 
-This is actually the first bottleneck.
+Timezone rule: due dates arrive as UTC instants; cells are **local calendar
+days**, bucketed via the injected `timeZone`. Test the 11 PM-due-date boundary —
+it is the classic off-by-one.
 
-My real Brightspace assignments and quizzes currently have `null` end dates.
+## 4. The fake boundary — the seam already exists
 
-Because of that, I cannot visually verify whether the graph is rendering assignments and quizzes correctly.
+The feared problem — "jam fake data between the endpoint returning and the
+parser, with test scaffolding polluting production" — does not exist in this
+codebase. Nothing downstream of the fetch knows HTTP exists: `Poller`,
+`CourseCache`, `AssignmentFetcher`, `AssignmentStore`, and `MenuTranslation` all
+consume the `CourseSource` / `AssignmentSource` **protocols** and receive plain
+`[Course]` / `[Assignment]` values. `BrightspaceCourseSource` is just one
+conformance; the entire network path lives inside it.
 
-Therefore, we need a **fake course** with fake assignments and quizzes.
+So: no interception, no fake server, no transport seam. Fakes are additional
+conformances of production protocols, chosen once in `main.swift` (the
+composition root, the one file allowed to see everything) under a dev flag —
+exactly how `BRIGHTSPACEBAR_STUB=1` already picks `StubMenuDataSource` today.
+Production code never branches on them. Proof the seam is load-bearing
+architecture rather than test scaffolding: `CompositeAssignmentSource` shipped
+through it as a production feature, and the future WKWebView login is another
+planned swap at the same kind of seam (`SessionProviding`).
 
-This fake data should include realistic examples with:
+Two fakes at two existing boundaries, for two different jobs:
 
-- course information
-- assignment names
-- quiz names
-- due dates
-- activity types
-- URLs
-- whatever additional fields the real Brightspace responses contain and the current parser depends on
+| Fake | Boundary | Used for |
+|---|---|---|
+| `StubMenuDataSource` (exists) seeded with `GraphCell`s | contract level — hands the GUI a finished `MenuModel` | Stage 2: iterating on the renderer |
+| `SeededCourseSource` / `SeededAssignmentSource` (new, ~40 lines each) | source level — plain values, dates relative to the injected now | Stage 5: E2E — real store, real fetcher, real mapping, fake network only |
 
-The fake dataset should contain enough variety to visually verify the graph.
+**Shape fidelity is owned elsewhere and already solved**: the parsers are tested
+against real captured bytes (`dropbox-folders-440703.json`,
+`quizzes-412690.json`, and the `*-with-due-date.json` variants), and `BS_LIVE=1`
+contract tests catch drift if Brightspace changes shape. The seeded fakes do not
+go through the parser, and that is fine — every line of new graph code sits
+downstream of the values boundary, so the seeded source exercises 100% of the
+new feature. Rebuilding the server, a local HTTP fake, or a mock client would
+all fake a boundary the existing seams make unnecessary.
 
-For example, it should include:
+Fixture dates drifting out of the window over time is solved by the injected
+clock: tests pin `TestClock` to the fixtures' era; only the live stub seeds
+dates relative to real today.
 
-- multiple assignments
-- multiple quizzes
-- different due dates
-- multiple events on different days
-- possibly multiple events on the same day
-- dates around today so the current-date indicator can be verified
+## 5. The RepoBar port — much thinner than it looks
 
----
+`HeatmapRasterNSView` is ~540 lines and roughly 450 of them are performance
+machinery (async CGImage rendering, `NSCache`, render-key memoization, pixel
+snapping, generation counters) for redrawing 371-cell year grids across many
+repos. BrightspaceBar has ~6 courses × a few dozen cells. **Do not port the
+raster engine.** A plain `draw(_:)` filling rects is sufficient.
 
-# The Important Question: What Kind of Fake Is This?
+Worth taking:
 
-We probably do **not** need a full fake database.
+- The `NSMenuItem.view` hosting technique (`MenuItemHostingView`) — the real new
+  GUI capability BrightspaceBar lacks; `MenuAssembler` currently builds plain
+  text items, and highlight-state handling inside menu item views is the fiddly
+  part RepoBar already solved.
+- The window/range logic shape (decision 3 above).
+- The layout math *ideas* (`HeatmapLayout`, ~80 pure testable lines) — as
+  structure, not code, and only the parts the chosen orientation needs.
+- The palette-per-appearance *structure* (light/dark/highlighted) — not the
+  palette itself, because RepoBar maps a scalar count into 5 intensity buckets
+  and ours maps a category (`CellTier`), a fundamentally different function.
 
-We are not testing persistence-heavy behavior.
+Everything taken from RepoBar gets mapped onto this codebase's style: pure
+decision functions, injected clock and timezone, plain `Equatable` contract
+values, effects at the edges.
 
-This is mostly an **accuracy-of-input-data problem**.
+## 6. Where the pieces live
 
-We need to emulate the Brightspace data that the application consumes.
-
-Therefore, the real question is:
-
-> At what boundary should Brightspace be faked?
-
-Possible approaches need to be evaluated.
-
-This might be:
-
-- fixture data
-- a fake API response
-- a network stub
-- a mock Brightspace client
-- a local HTTP fake
-- another form of test double
-
-Do **not** automatically introduce Docker, a database container, or other heavyweight infrastructure unless the architecture actually requires it.
-
-Determine how a professional software engineer would fake this dependency while preserving the actual shape and behavior of Brightspace data.
-
-Accuracy here matters enormously.
-
-If the fake accurately represents the real Brightspace responses, everything downstream becomes much easier to trust.
-
-If the fake is wrong or missing important details, the entire vertical slice can appear correct while actually being broken.
-
-So treat this as the first major design problem.
-
----
-
-# Dependency 2 — Frontend Graph
-
-Once reliable fake course data exists, implement the graph underneath every course in the main menu.
-
-Use RepoBar as the reference implementation.
-
-The goal is initially to reproduce the graph visually with fake/stubbed information.
-
-At this stage, we do **not** need real backend mapping yet.
-
-We need to understand:
-
-- how RepoBar's graph is rendered
-- what data the renderer consumes
-- how cells are indexed
-- how dates correspond to cells
-- how intensity/color is determined
-- what the smallest reusable subset of RepoBar code is
-
-Then create the Brightspace Bar version.
+- `CourseMenu`: `MenuModel` gains a per-course `[GraphCell]` — plain `Equatable`
+  values like everything else there (which also preserves the
+  skip-rebuild-on-unchanged behavior for free).
+- `MenuAdapter` / `MenuTranslation`: the pure date→cell mapping. No new module —
+  this is the same shape of responsibility `MenuTranslation` already owns
+  ([Course] + items + now + timeZone → menu values), and it is small. A new
+  module only if it visibly outgrows that.
+- `BrightspaceBar`: the cell-drawing view and `NSMenuItem.view` wiring.
 
 ---
 
-# Graph Placement
+# The One Decision Still Open: Orientation
 
-The graph should appear underneath each course name in the main menu.
-
-Conceptually:
+The mockups show a single-row strip:
 
 ```text
 Course A
 [ ][ ][■][ ][□][ ][ ][...]
-
-Course B
-[ ][□][ ][ ][■][ ][ ][...]
 ```
 
-The exact visual treatment should follow the existing RepoBar graph implementation as closely as makes sense while staying consistent with Brightspace Bar's existing GUI architecture.
+GitHub uses a 7-row week grid. For "upcoming few weeks" in a narrow menu item
+the strip is probably right, and it makes RepoBar's 7×53 grid math mostly
+irrelevant. Decide this consciously during the stage-2 renderer investigation —
+it determines which RepoBar layout code even applies, and whether the window's
+start should be week-aligned.
 
 ---
 
-# Today's Cell
+# Dependency Graph (updated)
 
-The graph must clearly indicate **today**.
-
-We need to know exactly which cell corresponds to the current date.
-
-Do not use a filled dot or another marker that covers the cell's existing meaning.
-
-For example, if today contains an assignment, a black dot could obscure the assignment state.
-
-Instead, use something like an **outline / selection border** around the current day's cell.
-
-Conceptually:
+Still sequential — each step unlocks the next. But stage 1 shrank: it is no
+longer "design a Brightspace test double" (that question is answered above), it
+is "seed the existing stub."
 
 ```text
-normal cell:
-[■]
-
-today:
-╔═╗
-║■║
-╚═╝
-```
-
-The important invariant is:
-
-> The today indicator must not destroy or obscure the underlying activity state.
-
-This means we need logic that reliably determines:
-
-- today's date
-- the graph's date range
-- the cell corresponding to today
-
----
-
-# Dependency 3 — Design the Interface / Schema
-
-After the frontend graph exists, we will understand what the renderer actually needs.
-
-Only then should we design the interface between backend and frontend.
-
-This is probably the biggest architectural design problem.
-
-The backend already knows things such as:
-
-- assignment name
-- due date
-- assignment URL
-- assignment vs quiz
-
-Now we need a schema that maps those backend concepts efficiently onto the graph.
-
-The interface should make it very easy for the frontend to answer:
-
-```text
-Which cell?
-What activity?
-How should it render?
-```
-
-The graph renderer and backend schema must coordinate cleanly.
-
-We want the mapping to be simple and efficient rather than forcing the frontend to reconstruct complicated backend concepts.
-
----
-
-# Activity Type / Tagging
-
-Assignments and quizzes must be distinguishable.
-
-The backend therefore needs some kind of tag or explicit type.
-
-Conceptually:
-
-```text
-type = assignment
-```
-
-or:
-
-```text
-type = quiz
-```
-
-Then the renderer can decide how that type should appear.
-
-For example:
-
-```text
-assignment → lighter intensity
-quiz       → darker intensity
-```
-
-The important point is that the semantic distinction should exist in the data model rather than being inferred indirectly by the GUI.
-
----
-
-# Backend Responsibility
-
-The backend problem should remain relatively small.
-
-We already know:
-
-- the activity
-- its date
-- its type
-
-Therefore, the backend mostly needs to derive the representation that the GUI needs.
-
-This is primarily a **schema / mapping problem**.
-
-The backend likely needs to produce enough information for the GUI to derive:
-
-```text
-date → graph location
-type → visual treatment
-```
-
-Potentially the backend itself should derive some of this.
-
-That architecture should be decided after understanding the frontend renderer.
-
----
-
-# Pure Logic
-
-This mapping should probably live in a focused pure-logic module.
-
-At a conceptual level:
-
-```text
-Brightspace Activity
-        ↓
-   Pure Mapping
-        ↓
- Graph Representation
-```
-
-Inputs might include:
-
-- due date
-- activity type
-- graph date range
-
-Outputs might include:
-
-- cell/date location
-- normalized activity type
-- intensity/category
-
-The exact boundary should follow the existing architecture.
-
-Do not force this into an unrelated module.
-
-If a new module gives the functionality a clearer responsibility, prefer a new module.
-
----
-
-# Main Backend Question
-
-The main backend problem is not simply implementing the mapping.
-
-The important question is:
-
-> How do we prove that the schema maps backend activity data correctly onto the frontend graph?
-
-That means we need tests around the interface itself.
-
-The important properties probably include:
-
-- correct date maps to correct graph cell
-- assignments map to assignment representation
-- quizzes map to quiz representation
-- today maps to the correct cell
-- activity rendering does not interfere with today's indicator
-- multiple dates map consistently
-- whatever date boundaries RepoBar's graph uses are handled correctly
-
-The exact test architecture should be designed after inspecting the graph renderer.
-
----
-
-# Dependency 4 — Backend Mapping Logic
-
-After the graph and interface are understood, implement the backend mapping.
-
-The backend should take the parsed Brightspace activity information and generate whatever graph representation the interface specifies.
-
-At minimum, the source information already includes:
-
-```text
-assignment / quiz
-due date
-name
-URL
-```
-
-The graph-specific transformation is mostly about:
-
-```text
-date + type
-      ↓
-graph representation
-```
-
-Keep this logic as pure as practical.
-
-Side effects should remain at the edges according to the architecture already established in the codebase.
-
----
-
-# Dependency 5 — Wire Everything Together
-
-Once:
-
-- fake Brightspace data exists
-- graph rendering works
-- interface is defined
-- backend mapping works
-
-then replace the frontend seams/stubs with real mapped data.
-
-The complete path becomes:
-
-```text
-Fake Brightspace Course Data
-            ↓
-Existing Brightspace Parsing
-            ↓
-Assignment / Quiz Domain Data
-            ↓
-Graph Mapping Logic
-            ↓
-Frontend Interface
-            ↓
-Graph Renderer
-            ↓
-Visible Course Activity Graph
+0. QUIZ SLICE — DONE (2c1e598; ItemKind, CompositeAssignmentSource, QuizPipeline)
+                    ↓
+1. SEED THE STUB
+   StubMenuDataSource gets deterministic today-relative items
+   (today → assignment, tomorrow → quiz, +3 → assignment, +5 → quiz,
+   one day with BOTH kinds to prove highest-tier-wins visually).
+                    ↓
+2. FRONTEND RENDERER
+   Port the NSMenuItem.view hosting technique from RepoBar; plain
+   draw(_:) cells; fill from tier, outline from isToday.
+   Decide strip vs grid here. Verify visually via BRIGHTSPACEBAR_STUB=1.
+                    ↓
+3. INTERFACE / SCHEMA
+   Mostly decided already (GraphCell, CellTier, window shape).
+   What remains: span length, cell count, and whatever the renderer
+   investigation revealed about layout needs.
+                    ↓
+4. BACKEND MAPPING
+   Pure logic in MenuTranslation: items + now + timeZone → [GraphCell].
+   Window range computed fresh each translation (RepoBar's shape, flipped
+   forward, injected clock). Local-day bucketing; highest-tier-wins;
+   isToday stamped.
+                    ↓
+5. FINAL WIRING + E2E
+   SeededCourseSource / SeededAssignmentSource behind a dev flag in
+   main.swift. Extend the existing MenuAdapter EndToEndTests pattern
+   (fixtures → parser → store → translation) to assert graph cells at the
+   MenuModel boundary, with TestClock pinned. The last visual inch is
+   human-verified via the seeded modes, consistent with how the app has
+   been verified so far.
 ```
 
 ---
 
 # End-to-End Test
 
-Somewhere during this sequence, create the end-to-end test.
-
-The exact point should be chosen based on where it provides the most useful red → green development loop.
-
-By the final stage, the end-to-end test needs to verify the complete vertical slice using the fake course data.
-
-The final test should prove:
+The E2E lands at the `MenuModel` boundary by extending
+`MenuAdapter/Tests/EndToEndTests`, which already runs fixtures → parser → store
+→ translation. It begins red at stage 3–4 and goes green at stage 5. It proves:
 
 ```text
-Fake course data
+seeded/fixture course data
       ↓
-assignments + quizzes are parsed
+assignments + quizzes parsed (fixtures) or seeded (values)
       ↓
-correct dates are derived
+correct local-day bucketing under the injected timeZone
       ↓
-correct activity types are retained
+highest tier wins on multi-kind days
       ↓
-activities map to correct graph cells
+window range is correct for the pinned TestClock date
       ↓
-assignment and quiz cells render differently
+today's cell carries isToday without losing its tier
       ↓
-today's cell is correctly outlined
-      ↓
-graph appears underneath the correct course
+the course's MenuModel carries the expected [GraphCell]
 ```
 
-The test begins red.
-
-After final wiring, it should become green.
+Rendering itself (strip drawing, outline, palette) is verified visually with
+the deterministic stub seeds, where the expected picture is known in advance.
 
 ---
 
-# Verification Must Include Visual Verification
+# Honest Caveat
 
-Because this is primarily a GUI feature, the test infrastructure should allow us to visually confirm the result.
-
-The fake dataset should deliberately put events on known dates so we can know in advance what the graph should look like.
-
-For example:
-
-```text
-Today              → Assignment
-Tomorrow           → Quiz
-Today + 3 days      → Assignment
-Today + 5 days      → Quiz
-```
-
-Then the expected visual representation is deterministic.
-
-This allows us to inspect the GUI and immediately know whether:
-
-- today is positioned correctly
-- assignments are positioned correctly
-- quizzes are positioned correctly
-- visual distinctions are correct
-
----
-
-# Why the Fake Data Is the First Bottleneck
-
-The fake course data is the foundation for the entire feature.
-
-If the fake accurately models Brightspace, then:
-
-```text
-accurate fake
-    ↓
-reliable frontend development
-    ↓
-reliable interface design
-    ↓
-reliable backend mapping
-    ↓
-reliable E2E verification
-```
-
-If the fake is inaccurate:
-
-```text
-bad fake
-   ↓
-incorrect assumptions
-   ↓
-incorrect schema
-   ↓
-incorrect backend mapping
-   ↓
-tests can pass while production is broken
-```
-
-Therefore, spend real effort deciding the correct test-double boundary.
-
-Do not simply invent an arbitrary JSON object that happens to make the GUI work.
-
-It should accurately reflect the real Brightspace dependency that the application consumes.
-
----
-
-# Final Dependency Graph
-
-The locked-in sequence is:
-
-```text
-1. FAKE DATA / BRIGHTSPACE TEST DOUBLE
-   Determine the professional, minimal way to emulate
-   accurate Brightspace course/activity data.
-                    ↓
-
-2. FRONTEND GRAPH
-   Port only the thinnest necessary graph-rendering
-   functionality from RepoBar.
-   Render stub/fake activities under every course.
-                    ↓
-
-3. INTERFACE / SCHEMA
-   Determine the cleanest representation connecting
-   Brightspace activity data to the graph renderer.
-   Spend significant design attention here.
-                    ↓
-
-4. BACKEND MAPPING
-   Convert assignments/quizzes + dates into the graph
-   representation defined by the interface.
-                    ↓
-
-5. FINAL WIRING + E2E
-   Replace seams with real mapped data and verify the
-   entire fake-course → visible-graph vertical slice.
-```
-
-The dependency graph does **not fan out** for this feature.
-
-Understanding each layer reduces uncertainty for the next one.
-
-The central architectural bottleneck is ultimately the **frontend/backend graph interface**, but we cannot intelligently design that interface until we first understand the RepoBar renderer.
-
-And we cannot reliably develop or visually verify the renderer without accurate fake course data.
-
-Therefore, **fake data is the first dependency**.
+Real courses currently have `null` due dates, so in production this graph will
+render empty until instructors set deadlines. That does not argue against
+building it now — but it means the seeded modes remain the only way to *see* it
+working for a while, so the stub seeding is worth keeping good.
