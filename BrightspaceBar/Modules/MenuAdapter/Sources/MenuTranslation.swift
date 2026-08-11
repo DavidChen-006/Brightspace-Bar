@@ -187,7 +187,11 @@ public enum MenuTranslation {
             submenu: AssignmentTranslation.submenu(
                 state: assignments, courseId: course.id,
                 now: now, baseURL: baseURL, timeZone: timeZone
-            )
+            ),
+            // SEAM: the graph join, over the same state the submenu reads.
+            // `neverFetched` yields `[]`, so a course absent from the map keeps
+            // the pre-graph row it had before this feature existed.
+            graph: GraphTranslation.strip(state: assignments, now: now, timeZone: timeZone)
         )
     }
 
