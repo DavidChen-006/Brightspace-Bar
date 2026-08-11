@@ -253,6 +253,95 @@ struct StubGraphSeedTests {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
+// THE SEEDED MONTH HEADINGS (NewVertical-3.md §5, slice 4).
+//
+// Same two priorities as the strips above. VISUAL COVERAGE: the stub is the only
+// input the grid renderer is exercised with, so an unseeded `graphMonths` would
+// mean the heading row is developed against `[]` — a state the translation layer
+// can no longer produce — and it would go unreviewed until it shipped.
+// DETERMINISM: literals, never `Date()`, so today's screenshot and next month's
+// show the same headings.
+//
+// PINNED: every seeded course carries the SAME 16 headings, and they are the ones
+// the window the rest of the stub is seeded against implies. That window opens on
+// Sun Feb 8 2026 — the mapping and E2E suites' pinned `now` is 10:00 Tue Feb 10,
+// which is why `isToday` sits at index 2 — and runs to Sat May 30:
+//
+//    col  0  Feb  8 – Feb 14  ← the window start's month
+//    col  3  Mar  1 – Mar  7  ← holds Mar 1
+//    col  7  Mar 29 – Apr  4  ← holds Apr 1
+//    col 11  Apr 26 – May  2  ← holds May 1
+//    col 15  May 24 – May 30    (the window's last column; June is out)
+//
+// The same headings on every course, because they are a property of the WINDOW
+// and not of a course — a stub that varied them per course would demo a menu
+// whose grids disagree about what month it is.
+//
+// CULLED: the arithmetic that derives them, which is `GraphMonthLabelTests`'s
+// with an injected clock, and the drawing, which is the renderer's.
+// ═════════════════════════════════════════════════════════════════════════════
+
+/// Transcribed from the calendar above, not read back from the stub.
+private let seededMonths: [String?] = [
+    "Feb", nil, nil, "Mar", nil, nil, nil, "Apr", nil, nil, nil, "May", nil, nil, nil, nil,
+]
+
+@Suite("The stub seeds the headings the grid is drawn under")
+struct StubGraphMonthSeedTests {
+
+    @Test("every seeded course carries one heading entry per column")
+    func everyCourseIsHeaded() throws {
+        // Arrange / Act — the renderer indexes these BY COLUMN, so the count is
+        // the claim: 16 entries for 112 cells, on every course without exception.
+        for id in seededIDs {
+            let course = try seededCourse(id)
+
+            // Assert
+            #expect(course.graphMonths.count == course.graph.count / 7, "course \(id)")
+            #expect(course.graphMonths.count == 16, "course \(id) has \(course.graphMonths.count) headings")
+        }
+    }
+
+    @Test("the seeded headings name the months the seeded window spans")
+    func headingsMatchTheSeededWindow() throws {
+        // Arrange / Act — a course carrying work, so the headings and the fills
+        // are demonstrably seeded against one window.
+        let course = try seededCourse(1_498_777)
+
+        // Assert
+        #expect(course.graphMonths == seededMonths)
+    }
+
+    @Test("every course is headed identically, because the window is one window")
+    func allSeededCoursesShareOneCalendar() throws {
+        // Arrange / Act — including the two empty courses: under always-emit they
+        // are the common case, and an empty grid with no scale over it is exactly
+        // the state that reads as a bug.
+        var headings: Set<[String?]> = []
+        for id in seededIDs {
+            headings.insert(try seededCourse(id).graphMonths)
+        }
+
+        // Assert
+        #expect(headings == [seededMonths])
+    }
+
+    @Test("the headings arrive through the MenuDataSource protocol")
+    func headingsReachTheGUIThroughTheProtocol() async {
+        // Arrange
+        let source = StubMenuDataSource()
+
+        // Act — the seeds are worthless if `currentMenu()` answers differently
+        // from the static model, exactly as for the cells.
+        let courses = await source.currentMenu().courses
+
+        // Assert
+        #expect(courses.allSatisfy { $0.graphMonths == seededMonths })
+        #expect(courses.count == seededIDs.count)
+    }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
 // The stub seeds BOUNDARIES too (NewVertical-3.md §3.1).
 //
 // Same priority as the strips above — VISUAL COVERAGE. The stub is what the
