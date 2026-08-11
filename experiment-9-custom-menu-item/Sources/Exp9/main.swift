@@ -54,8 +54,12 @@ func gridCells(columns: Int) -> [DayCell] {
 final class MenuController: NSObject, @preconcurrency NSMenuDelegate {
     func menu(_ menu: NSMenu, willHighlight item: NSMenuItem?) {
         for menuItem in menu.items {
-            guard let component = menuItem.view as? CourseComponentView else { continue }
-            component.isHighlightedForMenu = (menuItem === item)
+            if let component = menuItem.view as? CourseComponentView {
+                component.isHighlightedForMenu = (menuItem === item)
+            }
+            if let david = menuItem.view as? DavidComponentView {
+                david.isHighlightedForMenu = (menuItem === item)
+            }
         }
     }
 }
@@ -86,7 +90,7 @@ func header(_ title: String) -> NSMenuItem {
     return item
 }
 
-func componentItem(view: CourseComponentView, submenu: NSMenu?) -> NSMenuItem {
+func componentItem(view: NSView, submenu: NSMenu?) -> NSMenuItem {
     let item = NSMenuItem(title: "", action: #selector(ClickTarget.open(_:)), keyEquivalent: "")
     item.target = target
     item.representedObject = URL(string: "https://purdue.brightspace.com/d2l/home/412690")!
@@ -95,14 +99,18 @@ func componentItem(view: CourseComponentView, submenu: NSMenu?) -> NSMenuItem {
     return item
 }
 
-let menu = NSMenu()
-menu.autoenablesItems = false
-menu.delegate = controller
+// ── The legos: each row built and named, chemistry kept out of the diagram ──
 
-menu.addItem(header("Fall 2026"))
-menu.addItem(nativeRow("CS 17600 — Data Engineering"))
-menu.addItem(nativeRow("MA 26100 — Multivariate Calculus"))
-menu.addItem(.separator())
+// David's playground: directly under the native rows it must match, so parity
+// is judged against adjacent neighbours. SAME cells as the SCLA grid below,
+// so the graph rendering (once drawn) is a direct A/B of rendering alone.
+let davidRow = componentItem(
+    view: DavidComponentView(
+        title: "DAVID 10000 — Rendering Playground",
+        cells: gridCells(columns: 16)
+    ),
+    submenu: nil
+)
 
 // The star of the experiment: Civics as ONE component with a submenu attached,
 // probing highlight, click, arrow, and submenu coexistence at once (S1).
@@ -113,7 +121,7 @@ let noAssignments = NSMenuItem(title: "No assignments", action: nil, keyEquivale
 noAssignments.isEnabled = false
 civicsSubmenu.addItem(noAssignments)
 
-menu.addItem(componentItem(
+let civicsRow = componentItem(
     view: CourseComponentView(
         title: "Purdue Civics Knowledge Test",
         cells: stripCells(),
@@ -121,10 +129,10 @@ menu.addItem(componentItem(
         showsChevron: true
     ),
     submenu: civicsSubmenu
-))
+)
 
 // The S5 probe: same component, GitHub-shaped semester grid, no submenu.
-menu.addItem(componentItem(
+let sclaRow = componentItem(
     view: CourseComponentView(
         title: "SCLA 10100 — Transformative Texts",
         cells: gridCells(columns: 16),
@@ -132,12 +140,28 @@ menu.addItem(componentItem(
         showsChevron: false
     ),
     submenu: nil
-))
+)
 
-menu.addItem(.separator())
-let quit = NSMenuItem(title: "Quit", action: #selector(ClickTarget.quit(_:)), keyEquivalent: "q")
-quit.target = target
-menu.addItem(quit)
+let quitRow = NSMenuItem(title: "Quit", action: #selector(ClickTarget.quit(_:)), keyEquivalent: "q")
+quitRow.target = target
+
+// ── The diagram: the whole menu, at a glance ────────────────────────────────
+let rows: [NSMenuItem] = [
+    header("Fall 2026"),
+    nativeRow("CS 17600 — Data Engineering"),
+    nativeRow("MA 26100 — Multivariate Calculus"),
+    davidRow,          // ← your component
+    .separator(),
+    civicsRow,
+    sclaRow,
+    .separator(),
+    quitRow,
+]
+
+let menu = NSMenu()
+menu.autoenablesItems = false
+menu.delegate = controller
+rows.forEach(menu.addItem)
 
 let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 statusItem.button?.image = NSImage(systemSymbolName: "square.grid.3x3", accessibilityDescription: "Experiment 9")
