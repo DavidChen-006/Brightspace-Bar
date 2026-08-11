@@ -6,112 +6,90 @@ import BrightspaceBar
 import CourseMenu
 
 // ═════════════════════════════════════════════════════════════════════════════
-// MenuAssembler — the course activity graph strip.
+// MenuAssembler — the course COMPONENT item (NewVertical-3.md §3.5, build step 1).
+//
+// This file used to pin "course item + a separate inert strip item beneath it".
+// That shape is gone. A course now assembles to ONE view-backed item whose view
+// — `MenuItemHostingView` — carries the title and the cells together, which is
+// the entire point of the slice: AppKit can highlight one item, so title and
+// graph must BE one item to highlight together (§1, the bottleneck).
 //
 // PRIORITIES (the 1–2 carrying 80% of the value):
 //
-//   1. THE STRIP IS PURELY ADDITIVE. It is one extra menu item wedged in after a
-//      course row, which is exactly the change that breaks everything around it:
-//      every course now occupies TWO item slots, so an implementation that maps
-//      clicks or structure by position sends the user to the wrong class, and a
-//      course that gains a graph must not lose its title, its click, or its
-//      submenu. A course with no graph must reproduce the pre-graph menu shape
-//      byte for byte — 355 tests currently depend on that, and they build
-//      `CourseRow`s that default to `graph == []`.
+//   1. THE COMPONENT IS THE ROW, AND IT IS COMPLETE. Every `.course` row — graphed
+//      or not — becomes exactly one item carrying a hosting view with that
+//      course's own title and own cells. Uniformity is the assertion, not an
+//      aesthetic: a course whose component is missing looks identical to a course
+//      with nothing due, and the two-items-per-course shape that this replaces is
+//      what made positional bugs possible in the first place.
 //
-//   2. THE STRIP IS INERT AND CANNOT BE ACTIVATED. A view-bearing item is the
-//      first item in this menu that is not a plain label, and it sits directly
-//      under a course. If it carries an action it is wired to the course action
-//      with no course behind it — it opens garbage — and if it is merely enabled
-//      it looks like a clickable row that does nothing. `action == nil` is the
-//      load-bearing half; `isEnabled == false` is the half that makes it look
-//      inert, and it only survives because `MenuAssembler` sets
-//      `autoenablesItems = false` (AppKit would otherwise re-enable it at display
-//      time, which no headless test can observe).
+//   2. GOING VIEW-BACKED COSTS NOTHING ELSE. A view-backed item replaces native
+//      rendering wholesale (§1, "all or nothing"), so everything AppKit used to do
+//      for free is now something that can silently disappear: the click
+//      (`representedObject` + action), the submenu, enablement, the title other
+//      suites look rows up by, and — the failure with no visual tell — a frame
+//      left at `.zero`, which renders an invisible row. Hover unity itself lands
+//      here too, because the highlight signal is now ours to deliver:
+//      `NSMenuDelegate.menu(_:willHighlight:)` → a flag on each view.
 //
-// CULLED, deliberately: everything about how the strip LOOKS. Fill colour per
-// `CellTier`, the today outline, palette-per-appearance, and the invariant that
-// the outline must not obscure the fill are all verified VISUALLY under
-// `BRIGHTSPACEBAR_STUB=1`, where the expected picture is known in advance
-// (NewVertical-2.md, decisions §2 and §5). They are unassertable here: this
+// CULLED, deliberately: everything about how the component LOOKS. The capsule
+// metrics, the hand-drawn chevron's glyph, the highlighted palette swap, the
+// cell fills, and the SwiftUI sandwich inside the hosting view (CourseCardView →
+// CourseGraphView → GraphRasterView → GraphRasterNSView) are verified VISUALLY
+// under `BRIGHTSPACEBAR_STUB=1`, and were MEASURED live in experiment 9. This
 // process has no window, never displays a menu, and never calls `draw(_:)`.
-// What IS testable headless — and therefore what is tested — is the geometry,
-// because it lives in a pure layout enum with no drawing in it. Also culled:
-// hover/highlight state (AppKit's), performance (~6 courses × 28 cells is
-// nothing — see §5 on why the RepoBar raster engine is not ported), and the
-// date→cell mapping (that is MenuAdapter's, tested there).
+// These tests therefore touch only the hosting view's observable surface —
+// class, `cells`, `title`, `isHighlightedForMenu`, `showsChevron`, `frame` — and
+// never reach into the SwiftUI layers, so the sandwich can be rearranged without
+// rewriting this file. Also culled: the strip's pure geometry suite, which went
+// with `GraphStripView`; grid geometry is slice 4's and will be pinned against
+// whatever replaces it, not against a layout the design has retired.
 //
-// SCOPE: all Google-small. In-process AppKit object graphs and pure arithmetic;
-// no I/O, no network, no clock, no window, no display.
+// SCOPE: all Google-small. In-process AppKit object graphs; no I/O, no network,
+// no clock, no window, no display.
 // ═════════════════════════════════════════════════════════════════════════════
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PINNED STRUCTURE AND GEOMETRY — the builder implements exactly this.
+// PINNED STRUCTURE — the builder implements exactly this.
 //
-// A `.course` row whose `graph` is NON-EMPTY produces TWO items at the same menu
-// level, in this order:
+// In `Modules/BrightspaceBar/Sources`, the §3.5 layering:
 //
-//   [n]   the course item, entirely unchanged — same title, action,
-//         representedObject, and submenu as it would have with no graph
-//   [n+1] the strip item: title "", action nil, isEnabled false,
-//         representedObject nil, `view` = GraphStripView(cells: course.graph)
-//
-// A `.course` row whose `graph` is EMPTY produces ONE item and nothing else.
-// The strip never appears inside a submenu (§ "Graph Placement": the strip is a
-// line of its own under the course name, at the course's level).
-//
-// Both types must be `public`: this target does a plain `import BrightspaceBar`,
-// not `@testable import`, matching the rest of the suite.
-//
-//     public final class GraphStripView: NSView {
+//     public final class MenuItemHostingView: NSView {
 //         public let cells: [GraphCell]
-//         public init(cells: [GraphCell])
+//         public let title: String
+//         public var isHighlightedForMenu: Bool   // didSet → needsDisplay
+//         public var showsChevron: Bool
 //     }
 //
-//     public enum GraphStripLayout {
-//         public static let cellSide: CGFloat = 8
-//         public static let spacing: CGFloat = 2
-//         public static let padding: CGFloat = 14   // menu item text inset
-//         public static func rects(count: Int, in bounds: CGRect) -> [CGRect]
-//         public static func size(count: Int) -> CGSize
-//     }
+// `public`, because this target does a plain `import BrightspaceBar`, not a
+// `@testable import`, matching the rest of the suite.
 //
-// Cell `i` sits at x = padding + i × (cellSide + spacing), is cellSide square,
-// and shares its y with every other cell — it is one strip, not a grid.
+// EVERY `.course` row produces exactly ONE `NSMenuItem`:
 //
-// ONE ADDITION to the handed-down policy, flagged as such: the strip view's
-// `frame.size` must equal `GraphStripLayout.size(count:)`. An `NSMenuItem.view`
-// is not laid out for you the way a subview of a window is; left at `.zero` the
-// strip is simply invisible, which is a shipping bug that looks identical to
-// "the graph is empty". Pinning the frame is the only headless way to catch it.
+//   • `view` is a `MenuItemHostingView` whose `cells == course.graph` (empty for
+//     an ungraphed course — a title-only card, NOT a missing view) and whose
+//     `title` is the course's display title.
+//   • `title` — the item's own — stays the display title as well. The view draws
+//     it, so AppKit never renders it, but it is how `MenuAssemblerTests` and
+//     `MenuAssemblerSubmenuTests` find rows, and dropping it would break ~16
+//     lookups in suites this slice is not allowed to touch.
+//   • `representedObject`, `action`, `target`, `isEnabled` and `submenu` are
+//     exactly what they were before the view existed.
+//   • `showsChevron` is true iff the item owns a submenu — AppKit draws no
+//     submenu arrow for a view-backed item, so the view must draw its own.
+//   • `frame.size` is nonzero, and taller for a graphed course than an ungraphed
+//     one. An `NSMenuItem.view` is not laid out for you; at `.zero` it is simply
+//     invisible, which is a shipping bug that looks exactly like "nothing due".
+//
+// No item anywhere carries a `GraphStripView` — the class is deleted.
+//
+// HIGHLIGHT: the assembled `NSMenu` gets a delegate implementing
+// `menu(_:willHighlight:)`, which sets `isHighlightedForMenu = (item === row)` on
+// every hosting view in the menu. `NSMenu.delegate` is WEAK, so the assembler
+// must retain the delegate object itself — otherwise it deallocates immediately
+// and hover unity silently never happens in the real app. The method is plain and
+// is called directly here, headless.
 // ─────────────────────────────────────────────────────────────────────────────
-
-/// The expected geometry, written out as literals rather than read from
-/// `GraphStripLayout`, so a wrong constant in the implementation cannot define
-/// its own expected value. The first test asserts the two copies agree; the rest
-/// derive from this one.
-///
-/// Every value here is a small integer, so the `CGFloat` arithmetic below is
-/// exact in binary floating point and `==` is the right comparison.
-private enum Pinned {
-    static let cellSide: CGFloat = 8
-    static let spacing: CGFloat = 2
-    static let padding: CGFloat = 14
-
-    /// Four weeks of upcoming days — the span the strip is sized for, and enough
-    /// cells that an accumulated-offset bug diverges visibly from a multiplied one.
-    static let cellCount = 28
-
-    /// Where cell `index` starts, stated the way the spec states it.
-    static func x(_ index: Int) -> CGFloat {
-        self.padding + CGFloat(index) * (self.cellSide + self.spacing)
-    }
-
-    /// A menu-item-shaped canvas: wide enough for 28 cells, and the height of a
-    /// real menu row rather than a snug fit, so vertical placement has somewhere
-    /// to go wrong.
-    static let bounds = CGRect(x: 0, y: 0, width: 400, height: 22)
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Builders. Local to this file: SPM test targets are separate modules, so the
@@ -164,12 +142,25 @@ private enum Graphed {
     static let plainID = 412_690
     static let plainTitle = "Purdue Civics Knowledge Test"
 
-    /// A course that never gets a strip. Its presence in every mixed model is what
-    /// proves the extra item is attached to the graphed course specifically, and
-    /// not simply appended after every course.
+    /// A course that never gets cells. Its presence in every mixed model is what
+    /// proves the cells are attached to the graphed course specifically, and not
+    /// simply handed to every component.
     static var plain: CourseRow {
         CourseRow(id: Self.plainID, title: Self.plainTitle, url: Self.courseURL(Self.plainID))
     }
+
+    /// A course with a subtitle, so "the view's title is the DISPLAY title" is
+    /// distinguishable from "the view's title is `CourseRow.title`" — for every
+    /// course above they are the same string.
+    static let codedID = 176_001
+    static var coded: CourseRow {
+        CourseRow(
+            id: Self.codedID, title: "Data Engineering", subtitle: "CS 17600",
+            url: Self.courseURL(Self.codedID), graph: Self.strip
+        )
+    }
+
+    static let codedDisplayTitle = "CS 17600 — Data Engineering"
 
     static let assignments: [AssignmentRow] = [
         AssignmentRow(
@@ -182,8 +173,7 @@ private enum Graphed {
         ),
     ]
 
-    /// The full shape: a course that has BOTH a submenu and a graph. The strip
-    /// belongs beside it at the top level; the submenu keeps its own contents.
+    /// The full shape: a course that has BOTH a submenu and a graph.
     static var graphedWithSubmenu: CourseRow {
         CourseRow(
             id: Self.graphedID, title: Self.graphedTitle, url: Self.courseURL(Self.graphedID),
@@ -192,8 +182,9 @@ private enum Graphed {
         )
     }
 
-    /// The real model shape, with every course ungraphed — byte for byte the menu
-    /// that shipped before this feature existed.
+    /// The real model shape, with every course ungraphed. Every `CourseRow` built
+    /// by hand in the other suites defaults to `graph == []`, so this is also the
+    /// shape those ~384 tests assemble.
     static var interleavedUngraphed: MenuModel {
         MenuModel(rows: [
             .sectionHeader("Fall 2026"),
@@ -216,24 +207,53 @@ private enum Graphed {
     }
 }
 
-/// Every strip view in a menu, in item order. Deliberately reads `view` rather
-/// than looking for an empty title or a disabled row: carrying the strip is the
-/// item's whole purpose, so that is how a strip is identified.
+/// Every component view in a menu, in item order.
 @MainActor
-private func strips(in menu: NSMenu) -> [GraphStripView] {
-    menu.items.compactMap { $0.view as? GraphStripView }
+private func components(in menu: NSMenu) -> [MenuItemHostingView] {
+    menu.items.compactMap { $0.view as? MenuItemHostingView }
+}
+
+/// The component belonging to the row a user would read as `title`.
+@MainActor
+private func component(
+    titled title: String, in menu: NSMenu, _ sourceLocation: SourceLocation = #_sourceLocation
+) throws -> MenuItemHostingView {
+    let row = try item(titled: title, in: menu, sourceLocation)
+    return try #require(
+        row.view as? MenuItemHostingView,
+        "the row '\(title)' carries no MenuItemHostingView, so it renders as an empty menu row",
+        sourceLocation: sourceLocation
+    )
+}
+
+/// Delivers the highlight signal the way AppKit does — through the delegate the
+/// assembler installed, not through a delegate the test supplies — so a menu
+/// assembled with no delegate, or with one that was not retained, fails here.
+@MainActor
+private func highlight(
+    _ item: NSMenuItem?, in menu: NSMenu, _ sourceLocation: SourceLocation = #_sourceLocation
+) throws {
+    let delegate = try #require(
+        menu.delegate,
+        "the assembled menu has no delegate, so nothing ever tells a component it is hovered (NSMenu.delegate is weak — the assembler must retain it)",
+        sourceLocation: sourceLocation
+    )
+    delegate.menu?(menu, willHighlight: item)
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// PRIORITY 1 — The strip is additive: placement, ordering, and no collateral damage
+// PRIORITY 1 — One component per course, carrying that course's own content
 // ═════════════════════════════════════════════════════════════════════════════
 
 @MainActor
-@Suite("MenuAssembler — graph strip placement")
-struct MenuAssemblerGraphPlacementTests {
+@Suite("MenuAssembler — the course component item")
+struct MenuAssemblerComponentTests {
 
-    @Test("a graphed course is followed by an item carrying its cells")
-    func graphedCourseIsFollowedByItsStrip() throws {
+    /// The relocated core of the old "course item + strip item" assertion: the
+    /// cells are still there, but they are now ON the course's own item, and there
+    /// is no second item at all.
+    @Test("a graphed course is ONE item whose view carries its cells")
+    func graphedCourseIsOneItemCarryingItsCells() throws {
         // Arrange
         let assembler = Graphed.assembler()
         let course = Graphed.graphed
@@ -244,20 +264,19 @@ struct MenuAssemblerGraphPlacementTests {
         // Assert — `#require` before positional access: indexing NSMenu.items past
         // the end raises an NSException that aborts the whole run rather than
         // failing this one test.
-        try #require(menu.items.count == 2)
-        #expect(menu.items[0].title == Graphed.graphedTitle)
-        let strip = try #require(
-            menu.items[1].view as? GraphStripView,
-            "the item after the course carries no GraphStripView, so the graph is invisible"
+        try #require(menu.items.count == 1, "a graphed course still produces a second, separate item")
+        let view = try #require(
+            menu.items[0].view as? MenuItemHostingView,
+            "the course item carries no MenuItemHostingView, so its graph is nowhere"
         )
-        #expect(strip.cells == course.graph)
+        #expect(view.cells == course.graph)
     }
 
-    /// The strip renders the model's cells verbatim — it does not re-derive,
-    /// re-order, or truncate them. Today's cell keeps its tier, which is the
-    /// data-side half of "the today indicator must not obscure the activity state".
-    @Test("the strip carries every cell, in model order, with tier and isToday intact")
-    func stripCarriesCellsVerbatim() throws {
+    /// The cells travel verbatim — not re-derived, re-ordered, or truncated.
+    /// Today's cell keeps its tier, which is the data-side half of "the today
+    /// indicator must not obscure the activity state".
+    @Test("the component carries every cell, in model order, with tier and isToday intact")
+    func componentCarriesCellsVerbatim() throws {
         // Arrange
         let assembler = Graphed.assembler()
 
@@ -265,9 +284,8 @@ struct MenuAssemblerGraphPlacementTests {
         let menu = assembler.assemble(MenuModel(rows: [.course(Graphed.graphed)]))
 
         // Assert — the literal strip, written independently of any mapping code.
-        let strip = try #require(strips(in: menu).first)
-        #expect(strip.cells.count == 5)
-        #expect(strip.cells == [
+        let view = try #require(components(in: menu).first)
+        #expect(view.cells == [
             GraphCell(tier: .assignment, isToday: true),
             GraphCell(tier: nil),
             GraphCell(tier: .quiz),
@@ -276,56 +294,47 @@ struct MenuAssemblerGraphPlacementTests {
         ])
     }
 
-    /// The legacy guarantee. Every `CourseRow` built by hand — in the other 355
-    /// tests, in the stub, in the translation layer's existing output — defaults to
-    /// `graph == []`, so an implementation that appends a strip unconditionally
-    /// would shift every one of those menus by one item per course.
-    @Test("a course with an empty graph adds no item")
-    func emptyGraphAddsNoItem() throws {
+    /// The uniformity rule, and the inversion of the assertion this file used to
+    /// make. An ungraphed course is not a native row any more: it is the same
+    /// component with an empty graph. Anything else means two rendering paths for
+    /// rows that must look identical.
+    @Test("an ungraphed course also gets a component, carrying no cells")
+    func ungraphedCourseAlsoGetsAComponent() throws {
         // Arrange
         let assembler = Graphed.assembler()
-        let model = Graphed.interleavedUngraphed
 
         // Act
-        let menu = assembler.assemble(model)
+        let menu = assembler.assemble(MenuModel(rows: [.course(Graphed.plain)]))
 
-        // Assert — the pre-graph shape: exactly one item per model row, and not a
-        // single view-bearing item anywhere.
-        #expect(menu.items.count == model.rows.count)
-        #expect(strips(in: menu).isEmpty, "a strip was added to a course whose graph is empty")
+        // Assert
+        try #require(menu.items.count == 1)
+        let view = try #require(
+            menu.items[0].view as? MenuItemHostingView,
+            "an ungraphed course is still a plain native row, so it renders unlike its neighbours"
+        )
+        #expect(view.cells.isEmpty, "a course with no graph was given cells from somewhere")
     }
 
-    /// The ordering hazard in one model: with a graphed course, an ungraphed one, a
-    /// separator and a command, item index and row index diverge from item 1 onward.
-    @Test("the strip lands directly after its own course and nowhere else")
-    func stripLandsAfterItsOwnCourse() throws {
+    /// The display title, not `CourseRow.title`: the component draws its own text,
+    /// so a component that took the raw field would silently drop every course code.
+    @Test("the component's title is the course's display title, subtitle included")
+    func componentTitleIsTheDisplayTitle() throws {
         // Arrange
         let assembler = Graphed.assembler()
-        let model = MenuModel(rows: [
-            .course(Graphed.graphed),
-            .course(Graphed.plain),
-            .separator,
-            .command(.refresh),
-        ])
 
         // Act
-        let menu = assembler.assemble(model)
+        let menu = assembler.assemble(MenuModel(rows: [.course(Graphed.coded)]))
 
-        // Assert — one extra item, in the one right place.
-        try #require(menu.items.count == model.rows.count + 1)
-        #expect(menu.items[0].title == Graphed.graphedTitle)
-        #expect(menu.items[1].view is GraphStripView)
-        #expect(menu.items[2].title == Graphed.plainTitle)
-        #expect(menu.items[3].isSeparatorItem)
-        #expect(menu.items[4].title == "Refresh")
-        #expect(strips(in: menu).count == 1, "expected exactly one strip for one graphed course")
+        // Assert
+        let view = try #require(components(in: menu).first)
+        #expect(view.title == Graphed.codedDisplayTitle)
     }
 
-    /// Two graphed courses: each gets its own strip carrying its OWN cells. An
-    /// implementation that builds one strip per menu, or reuses the first course's
-    /// cells, passes every single-course test above and fails here.
-    @Test("each graphed course gets its own strip carrying its own cells")
-    func eachGraphedCourseGetsItsOwnStrip() throws {
+    /// Two graphed courses: each component carries its OWN cells and OWN title. An
+    /// implementation that builds one component per menu, or reuses the first
+    /// course's content, passes every single-course test above and fails here.
+    @Test("each course's component carries its own title and its own cells")
+    func eachCourseGetsItsOwnComponent() throws {
         // Arrange
         let assembler = Graphed.assembler()
         let second = CourseRow(
@@ -338,40 +347,40 @@ struct MenuAssemblerGraphPlacementTests {
         let menu = assembler.assemble(MenuModel(rows: [.course(Graphed.graphed), .course(second)]))
 
         // Assert
-        let found = strips(in: menu)
+        let found = components(in: menu)
         try #require(found.count == 2)
+        #expect(found[0].title == Graphed.graphedTitle)
         #expect(found[0].cells == Graphed.strip)
+        #expect(found[1].title == "MA 26100 — Multivariate Calculus")
         #expect(found[1].cells == second.graph)
     }
 
-    /// The strip is a line of its own UNDER the course name, at the course's own
-    /// level — never a row inside the hover submenu, where it would be unreachable
-    /// without hovering and would collide with the assignment rows.
-    @Test("the strip does not appear inside the course's submenu")
-    func stripIsNotInsideTheSubmenu() throws {
+    /// The component belongs to the course row itself, at the course's own level —
+    /// never inside the hover submenu, where the graph would be unreachable without
+    /// hovering and would collide with the assignment rows.
+    @Test("no component is rendered inside the course's submenu")
+    func componentIsNotInsideTheSubmenu() throws {
         // Arrange
         let assembler = Graphed.assembler()
-        let menu = assembler.assemble(MenuModel(rows: [.course(Graphed.graphedWithSubmenu)]))
 
         // Act
+        let menu = assembler.assemble(MenuModel(rows: [.course(Graphed.graphedWithSubmenu)]))
+
+        // Assert
         let sub = try #require(
             menu.items.first?.submenu,
             "the graphed course lost its submenu, so its assignments are unreachable"
         )
-
-        // Assert — the submenu holds exactly what it held before graphs existed:
-        // course-home, separator, one item per assignment. No view-bearing row.
-        #expect(strips(in: sub).isEmpty, "the strip was rendered inside the submenu")
-        #expect(sub.items.count == 2 + Graphed.assignments.count)
-        #expect(strips(in: menu).count == 1, "the strip is missing from the top level")
+        #expect(components(in: sub).isEmpty, "a component was rendered inside the submenu")
+        #expect(components(in: menu).count == 1)
     }
 
     /// Assembling twice must not depend on hidden mutable state, and — because an
     /// `NSView` can have only one superview just as an `NSMenuItem` can belong to
-    /// only one `NSMenu` — a reused strip view would silently detach from the
+    /// only one `NSMenu` — a reused component view would silently detach from the
     /// previously built menu.
-    @Test("a rebuilt menu does not share strip view instances with the previous one")
-    func rebuildDoesNotShareStripViews() throws {
+    @Test("a rebuilt menu does not share component view instances with the previous one")
+    func rebuildDoesNotShareComponentViews() throws {
         // Arrange
         let assembler = Graphed.assembler()
         let model = MenuModel(rows: [.course(Graphed.graphed)])
@@ -381,25 +390,26 @@ struct MenuAssemblerGraphPlacementTests {
         let second = assembler.assemble(model)
 
         // Assert — count guards first, else the comparison is satisfied trivially.
-        let firstStrip = try #require(strips(in: first).first)
-        let secondStrip = try #require(strips(in: second).first)
-        #expect(firstStrip !== secondStrip, "the same GraphStripView instance is in both menus")
-        #expect(firstStrip.cells == secondStrip.cells)
+        let firstView = try #require(components(in: first).first)
+        let secondView = try #require(components(in: second).first)
+        #expect(firstView !== secondView, "the same MenuItemHostingView instance is in both menus")
+        #expect(firstView.cells == secondView.cells)
     }
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// PRIORITY 1 — The course item itself survives having a graph
+// PRIORITY 2 — Going view-backed costs nothing else: item semantics and counts
 // ═════════════════════════════════════════════════════════════════════════════
 
 @MainActor
-@Suite("MenuAssembler — graphed courses stay themselves")
-struct MenuAssemblerGraphedCourseTests {
+@Suite("MenuAssembler — the component item stays a course row")
+struct MenuAssemblerComponentSemanticsTests {
 
     /// Checked against a CONTROL — the same course assembled without a graph —
     /// rather than against a re-stated expectation, so this cannot drift away from
-    /// whatever the pre-graph behaviour actually is.
-    @Test("the course item is byte-for-byte what it would be without a graph")
+    /// whatever the course-row behaviour actually is. `view` is deliberately NOT
+    /// compared: having one is now the point.
+    @Test("a graphed course item matches its ungraphed twin in every menu-item field")
     func courseItemIsUnchangedByItsGraph() throws {
         // Arrange
         let assembler = Graphed.assembler()
@@ -415,7 +425,36 @@ struct MenuAssemblerGraphedCourseTests {
         #expect(item.action == controlItem.action)
         #expect(item.isEnabled == controlItem.isEnabled)
         #expect(item.representedObject as? URL == controlItem.representedObject as? URL)
-        #expect(item.view == nil, "the strip was attached to the course item instead of its own row")
+    }
+
+    /// The item keeps a real title even though the view draws the text. Two suites
+    /// this slice must not touch look their rows up by title, and a view-backed
+    /// item with an empty title is invisible to them.
+    @Test("the component item keeps its display title on the menu item itself")
+    func componentItemKeepsItsTitle() throws {
+        // Arrange
+        let assembler = Graphed.assembler()
+
+        // Act
+        let menu = assembler.assemble(MenuModel(rows: [.course(Graphed.coded)]))
+
+        // Assert
+        let item = try #require(menu.items.first)
+        #expect(item.title == Graphed.codedDisplayTitle)
+    }
+
+    @Test("the component item carries its course URL and is enabled")
+    func componentItemCarriesItsURLAndIsEnabled() throws {
+        // Arrange
+        let assembler = Graphed.assembler()
+
+        // Act
+        let menu = assembler.assemble(MenuModel(rows: [.course(Graphed.graphed)]))
+
+        // Assert
+        let item = try #require(menu.items.first)
+        #expect(item.representedObject as? URL == Graphed.courseURL(Graphed.graphedID))
+        #expect(item.isEnabled, "the component row is disabled, so it cannot be hovered or clicked")
     }
 
     @Test("a graphed course still opens its own URL when clicked")
@@ -433,10 +472,11 @@ struct MenuAssemblerGraphedCourseTests {
         #expect(opener.opened == [Graphed.courseURL(Graphed.graphedID)])
     }
 
-    /// The strip sits between two courses, so a click resolved by item position
-    /// rather than by the item's own `representedObject` opens the neighbour.
-    @Test("a course after a strip still opens its own URL, not its neighbour's")
-    func courseAfterAStripRoutesCorrectly() throws {
+    /// Click identity must still travel with the item, not with a position: the
+    /// component rows are the only rows now, so a positional resolver opens the
+    /// neighbouring class.
+    @Test("a course after a graphed course still opens its own URL, not its neighbour's")
+    func courseAfterAComponentRoutesCorrectly() throws {
         // Arrange
         let opener = FakeURLOpener()
         let assembler = Graphed.assembler(opener: opener)
@@ -466,88 +506,78 @@ struct MenuAssemblerGraphedCourseTests {
         #expect(sub.items.dropFirst(2).map(\.title) == Graphed.assignments.map(\.title))
     }
 
-    /// The strip must not become a second, invisible submenu anchor. An item that
-    /// owns a submenu is non-actionable and grows a hover arrow — on a blank row
-    /// that reads as a rendering glitch.
-    @Test("the strip item owns no submenu")
-    func stripItemHasNoSubmenu() throws {
+    /// AppKit draws no submenu arrow for a view-backed item, so a row that owns a
+    /// submenu now has to say so itself — otherwise the hover submenu exists with
+    /// nothing on screen suggesting it does.
+    @Test("the component shows a chevron exactly when its item owns a submenu")
+    func chevronTracksSubmenuOwnership() throws {
         // Arrange
         let assembler = Graphed.assembler()
 
         // Act
-        let menu = assembler.assemble(MenuModel(rows: [.course(Graphed.graphedWithSubmenu)]))
+        let menu = assembler.assemble(MenuModel(rows: [
+            .course(Graphed.graphedWithSubmenu),
+            .course(Graphed.plain),
+        ]))
 
         // Assert
         try #require(menu.items.count == 2)
-        #expect(menu.items[1].submenu == nil)
+        try #require(menu.items[0].submenu != nil)
+        try #require(menu.items[1].submenu == nil)
+        #expect(try component(titled: Graphed.graphedTitle, in: menu).showsChevron == true)
+        #expect(try component(titled: Graphed.plainTitle, in: menu).showsChevron == false)
     }
-}
 
-// ═════════════════════════════════════════════════════════════════════════════
-// PRIORITY 2 — The strip item is inert
-// ═════════════════════════════════════════════════════════════════════════════
-
-@MainActor
-@Suite("MenuAssembler — the strip is inert")
-struct MenuAssemblerGraphInertTests {
-
-    /// `action == nil` is the load-bearing assertion: an item with no action can
-    /// never be activated whatever `isEnabled` says. `isEnabled == false` is
-    /// asserted too because it is what makes the row *look* inert, and it only
-    /// holds in the real app because `MenuAssembler` turns `autoenablesItems` off —
-    /// with autoenabling on, AppKit recomputes enablement at display time and this
-    /// headless suite, which never displays a menu, would never notice.
-    @Test("the strip item is neither enabled nor actionable")
-    func stripItemIsNotSelectable() throws {
+    /// The count invariant, in the model shape that used to grow an extra item per
+    /// graphed course: one item per row, no matter which courses have cells.
+    @Test("a mixed model assembles to exactly one item per row")
+    func mixedModelAssemblesOneItemPerRow() throws {
         // Arrange
         let assembler = Graphed.assembler()
+        let model = MenuModel(rows: [
+            .sectionHeader("Fall 2026"),
+            .course(Graphed.graphed),
+            .course(Graphed.plain),
+            .separator,
+            .status("Updated just now"),
+            .command(.refresh),
+            .command(.quit),
+        ])
 
         // Act
-        let menu = assembler.assemble(MenuModel(rows: [.course(Graphed.graphed)]))
+        let menu = assembler.assemble(model)
 
-        // Assert
-        try #require(menu.items.count == 2)
-        let strip = menu.items[1]
-        #expect(strip.action == nil, "the strip carries an action and can be activated")
-        #expect(strip.isEnabled == false, "the strip is enabled and looks clickable")
+        // Assert — the row-for-row shape, and the components only where courses are.
+        try #require(menu.items.count == model.rows.count, "an extra item was added somewhere")
+        #expect(menu.items[0].title == "Fall 2026")
+        #expect(menu.items[1].title == Graphed.graphedTitle)
+        #expect(menu.items[2].title == Graphed.plainTitle)
+        #expect(menu.items[3].isSeparatorItem)
+        #expect(menu.items[5].title == "Refresh")
+        #expect(components(in: menu).count == 2, "components appeared on rows that are not courses")
     }
 
-    /// An empty title, not a placeholder. Anything else prints text next to the
-    /// cells; a reused course title prints the course name twice.
-    @Test("the strip item has no title")
-    func stripItemHasNoTitle() throws {
+    /// The all-ungraphed model is what the other ~384 tests assemble. Item count
+    /// must be untouched by this slice — and every course must still be a component.
+    @Test("an all-ungraphed model keeps one item per row and still components its courses")
+    func ungraphedModelKeepsItsShape() throws {
         // Arrange
         let assembler = Graphed.assembler()
+        let model = Graphed.interleavedUngraphed
 
         // Act
-        let menu = assembler.assemble(MenuModel(rows: [.course(Graphed.graphed)]))
+        let menu = assembler.assemble(model)
 
         // Assert
-        try #require(menu.items.count == 2)
-        #expect(menu.items[1].title.isEmpty, "the strip item renders the text '\(menu.items[1].title)'")
+        #expect(menu.items.count == model.rows.count)
+        #expect(components(in: menu).count == 2)
     }
 
-    /// The specific disaster: a strip wired to the course action but carrying no
-    /// course would open garbage. Carrying no `representedObject` at all is what
-    /// makes that unreachable even if an action were added by mistake later.
-    @Test("the strip item carries no represented object")
-    func stripItemCarriesNoRepresentedObject() throws {
-        // Arrange
-        let assembler = Graphed.assembler()
-
-        // Act
-        let menu = assembler.assemble(MenuModel(rows: [.course(Graphed.graphed)]))
-
-        // Assert
-        try #require(menu.items.count == 2)
-        #expect(menu.items[1].representedObject == nil)
-    }
-
-    /// The whole-menu form of priority 2, and the one that would catch a strip
-    /// wired up by a future edit: in a realistic model, the only actionable rows
-    /// are still the courses and the commands.
-    @Test("adding graphs does not make anything new actionable")
-    func graphsAddNoActionableRows() throws {
+    /// The whole-menu form of priority 2: the actionable rows are still exactly the
+    /// courses and the commands. Nothing new became clickable, and — the risk that
+    /// replaces the old inert strip — no course quietly stopped being clickable.
+    @Test("the component rows do not change which rows are actionable")
+    func componentsChangeNothingActionable() throws {
         // Arrange
         let assembler = Graphed.assembler()
         let expectedActionable: Set<String> = [
@@ -570,12 +600,40 @@ struct MenuAssemblerGraphInertTests {
         #expect(actuallyActionable == expectedActionable)
     }
 
-    /// A strip left at `.zero` is invisible, and an invisible strip is
-    /// indistinguishable from a course with no work due — the failure this whole
-    /// feature exists to make visible. `NSMenuItem.view` is not laid out for you,
-    /// so the size has to be set at construction.
-    @Test("the strip view is sized to hold its cells")
-    func stripViewIsSizedForItsCells() throws {
+    /// The retired shape, asserted as absent rather than merely unmentioned: the
+    /// separate strip item and the class behind it are gone, so a half-done port
+    /// that adds the component AND keeps the strip fails here instead of shipping
+    /// a duplicated graph.
+    @Test("no menu item carries a stray view that is not a component")
+    func noStrayViewBearingItems() throws {
+        // Arrange
+        let assembler = Graphed.assembler()
+
+        // Act
+        let menu = assembler.assemble(MenuModel(rows: [
+            .course(Graphed.graphed), .course(Graphed.plain), .command(.quit),
+        ]))
+
+        // Assert
+        let viewBearing = menu.items.filter { $0.view != nil }
+        #expect(viewBearing.count == 2, "a view-backed item exists that is not one of the two courses")
+        #expect(viewBearing.allSatisfy { $0.view is MenuItemHostingView })
+    }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// PRIORITY 2 — Hover unity: the highlight signal the assembler now owns
+// ═════════════════════════════════════════════════════════════════════════════
+
+@MainActor
+@Suite("MenuAssembler — highlight plumbing")
+struct MenuAssemblerHighlightTests {
+
+    /// `NSMenu.delegate` is a WEAK reference. If the assembler builds a delegate
+    /// and lets it go, this is nil by the time anyone hovers — and the app shows a
+    /// menu whose rows never highlight, with nothing in any log to say why.
+    @Test("the assembled menu keeps a delegate alive")
+    func assembledMenuRetainsItsDelegate() throws {
         // Arrange
         let assembler = Graphed.assembler()
 
@@ -583,153 +641,143 @@ struct MenuAssemblerGraphInertTests {
         let menu = assembler.assemble(MenuModel(rows: [.course(Graphed.graphed)]))
 
         // Assert
-        let strip = try #require(strips(in: menu).first)
-        #expect(strip.frame.size == GraphStripLayout.size(count: Graphed.strip.count))
-        #expect(strip.frame.width > 0, "the strip view has zero width and cannot be seen")
-        #expect(strip.frame.height > 0, "the strip view has zero height and cannot be seen")
+        #expect(menu.delegate != nil, "NSMenu.delegate is weak — the assembler must retain the delegate")
+    }
+
+    /// Hover unity itself, headless: the hovered row's component knows it is
+    /// highlighted, so title and cells draw their highlighted selves together.
+    @Test("highlighting a course tells that course's component it is highlighted")
+    func highlightingACourseFlagsItsComponent() throws {
+        // Arrange
+        let assembler = Graphed.assembler()
+        let menu = assembler.assemble(MenuModel(rows: [.course(Graphed.graphed), .course(Graphed.plain)]))
+        let hovered = try item(titled: Graphed.graphedTitle, in: menu)
+
+        // Act
+        try highlight(hovered, in: menu)
+
+        // Assert
+        #expect(try component(titled: Graphed.graphedTitle, in: menu).isHighlightedForMenu == true)
+    }
+
+    /// The other half, and the one that produces the visible bug when it is missed:
+    /// `willHighlight` fires once per CHANGE, so a delegate that only ever sets the
+    /// new row true leaves every previously hovered row lit as the pointer travels.
+    @Test("highlighting one course clears the highlight on every other component")
+    func highlightingOneCourseClearsTheRest() throws {
+        // Arrange
+        let assembler = Graphed.assembler()
+        let menu = assembler.assemble(MenuModel(rows: [.course(Graphed.graphed), .course(Graphed.plain)]))
+        try highlight(try item(titled: Graphed.graphedTitle, in: menu), in: menu)
+
+        // Act — the pointer moves on to the next course.
+        try highlight(try item(titled: Graphed.plainTitle, in: menu), in: menu)
+
+        // Assert
+        #expect(try component(titled: Graphed.plainTitle, in: menu).isHighlightedForMenu == true)
+        #expect(
+            try component(titled: Graphed.graphedTitle, in: menu).isHighlightedForMenu == false,
+            "the previously hovered course is still lit, so two rows look selected at once"
+        )
+    }
+
+    /// The pointer leaves the menu's rows entirely. AppKit signals that with a nil
+    /// item, and a delegate that force-unwraps or early-returns leaves the last row
+    /// stuck highlighted.
+    @Test("highlighting nothing clears every component")
+    func highlightingNilClearsEveryComponent() throws {
+        // Arrange
+        let assembler = Graphed.assembler()
+        let menu = assembler.assemble(MenuModel(rows: [.course(Graphed.graphed), .course(Graphed.plain)]))
+        try highlight(try item(titled: Graphed.graphedTitle, in: menu), in: menu)
+
+        // Act
+        try highlight(nil, in: menu)
+
+        // Assert
+        #expect(components(in: menu).allSatisfy { !$0.isHighlightedForMenu })
+    }
+
+    /// Hovering a native row — a command — must also clear the components. The
+    /// native row highlights itself; nobody tells the components to stand down
+    /// unless the delegate handles every item, not just the ones with views.
+    @Test("highlighting a native row clears every component")
+    func highlightingANativeRowClearsComponents() throws {
+        // Arrange
+        let assembler = Graphed.assembler()
+        let menu = assembler.assemble(MenuModel(rows: [.course(Graphed.graphed), .command(.quit)]))
+        try highlight(try item(titled: Graphed.graphedTitle, in: menu), in: menu)
+
+        // Act
+        try highlight(try item(titled: "Quit", in: menu), in: menu)
+
+        // Assert
+        #expect(components(in: menu).allSatisfy { !$0.isHighlightedForMenu })
+    }
+
+    /// Components start unhighlighted. A component built already lit renders a menu
+    /// that opens with a row selected under no pointer.
+    @Test("a freshly assembled menu has no highlighted component")
+    func freshMenuHasNoHighlight() throws {
+        // Arrange / Act
+        let assembler = Graphed.assembler()
+        let menu = assembler.assemble(MenuModel(rows: [.course(Graphed.graphed), .course(Graphed.plain)]))
+
+        // Assert
+        try #require(components(in: menu).count == 2)
+        #expect(components(in: menu).allSatisfy { !$0.isHighlightedForMenu })
     }
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// GraphStripLayout — the pure geometry, which is the only drawing-adjacent thing
-// this headless process can make a claim about
+// PRIORITY 2 — The row is actually visible: frame, the failure with no tell
 // ═════════════════════════════════════════════════════════════════════════════
 
 @MainActor
-@Suite("GraphStripLayout")
-struct GraphStripLayoutTests {
+@Suite("MenuAssembler — the component is visible")
+struct MenuAssemblerComponentFrameTests {
 
-    /// Pins the constants themselves. Every other test in this suite derives its
-    /// expected values from `Pinned`, so without this one an implementation could
-    /// satisfy them all with a self-consistent but wrong pitch. `padding` is 14
-    /// because that is the menu item text inset — the strip has to line up with the
-    /// course name above it.
-    @Test("the layout constants are the pinned values")
-    func layoutConstantsArePinned() {
-        // Arrange / Act — the constants are the subject.
-        // Assert
-        #expect(GraphStripLayout.cellSide == Pinned.cellSide)
-        #expect(GraphStripLayout.spacing == Pinned.spacing)
-        #expect(GraphStripLayout.padding == Pinned.padding)
-    }
-
-    @Test("one rect per cell")
-    func onePerCell() {
-        // Arrange / Act
-        let rects = GraphStripLayout.rects(count: Pinned.cellCount, in: Pinned.bounds)
-
-        // Assert
-        #expect(rects.count == Pinned.cellCount)
-    }
-
-    /// The arithmetic, stated independently: cell `i` starts one pitch further
-    /// right than cell `i-1`, and the first starts at the text inset.
-    @Test("cells run left to right at the pinned pitch, starting at the padding")
-    func cellsRunLeftToRightAtThePinnedPitch() throws {
-        // Arrange / Act
-        let rects = GraphStripLayout.rects(count: Pinned.cellCount, in: Pinned.bounds)
-
-        // Assert — count guard first, else the loop passes vacuously.
-        try #require(rects.count == Pinned.cellCount)
-        for (index, rect) in rects.enumerated() {
-            #expect(rect.minX == Pinned.x(index), "cell \(index) starts at \(rect.minX)")
-        }
-        #expect(rects.first?.minX == Pinned.padding)
-        #expect(rects.last?.minX == Pinned.padding + 27 * (Pinned.cellSide + Pinned.spacing))
-    }
-
-    @Test("every cell is a cellSide square")
-    func everyCellIsASquare() throws {
-        // Arrange / Act
-        let rects = GraphStripLayout.rects(count: Pinned.cellCount, in: Pinned.bounds)
-
-        // Assert
-        try #require(rects.count == Pinned.cellCount)
-        for (index, rect) in rects.enumerated() {
-            #expect(rect.width == Pinned.cellSide, "cell \(index) is \(rect.width) wide")
-            #expect(rect.height == Pinned.cellSide, "cell \(index) is \(rect.height) tall")
-        }
-    }
-
-    /// Overlapping cells read as a solid bar with no day boundaries — the graph
-    /// stops carrying information. The gap between neighbours is exactly `spacing`.
-    @Test("neighbouring cells never overlap")
-    func cellsNeverOverlap() throws {
-        // Arrange / Act
-        let rects = GraphStripLayout.rects(count: Pinned.cellCount, in: Pinned.bounds)
-
-        // Assert
-        try #require(rects.count == Pinned.cellCount)
-        for index in 1..<rects.count {
-            let gap = rects[index].minX - rects[index - 1].maxX
-            #expect(gap == Pinned.spacing, "cells \(index - 1) and \(index) are \(gap) apart")
-        }
-    }
-
-    /// A strip, not a grid: the whole point of the chosen orientation is one row,
-    /// so a layout that wraps onto a second line is a different feature.
-    @Test("every cell shares one baseline")
-    func everyCellSharesOneBaseline() throws {
-        // Arrange / Act
-        let rects = GraphStripLayout.rects(count: Pinned.cellCount, in: Pinned.bounds)
-
-        // Assert
-        try #require(!rects.isEmpty)
-        #expect(Set(rects.map(\.origin.y)).count == 1, "the cells are on more than one row")
-    }
-
-    @Test("every cell sits inside the bounds it was laid out in")
-    func cellsStayInsideTheBounds() throws {
-        // Arrange / Act
-        let rects = GraphStripLayout.rects(count: Pinned.cellCount, in: Pinned.bounds)
-
-        // Assert
-        try #require(rects.count == Pinned.cellCount)
-        for (index, rect) in rects.enumerated() {
-            #expect(Pinned.bounds.contains(rect), "cell \(index) at \(rect) escapes \(Pinned.bounds)")
-        }
-    }
-
-    /// `size(count:)` is what the view's frame is set from, so a size that does not
-    /// reach the last cell clips the far end of the strip — the days furthest out,
-    /// silently.
-    @Test("the fitting size reaches past the last cell")
-    func fittingSizeContainsTheLastCell() throws {
+    /// A component left at `.zero` is an invisible row: the course silently
+    /// vanishes from the menu, which is indistinguishable from "that course was
+    /// never fetched". `NSMenuItem.view` is not laid out for you, so the size has
+    /// to be set at construction.
+    @Test("every component has a nonzero frame")
+    func everyComponentHasANonzeroFrame() throws {
         // Arrange
-        let size = GraphStripLayout.size(count: Pinned.cellCount)
+        let assembler = Graphed.assembler()
 
         // Act
-        let rects = GraphStripLayout.rects(count: Pinned.cellCount, in: CGRect(origin: .zero, size: size))
+        let menu = assembler.assemble(MenuModel(rows: [
+            .course(Graphed.graphed), .course(Graphed.plain), .course(Graphed.coded),
+        ]))
 
         // Assert
-        let last = try #require(rects.last)
-        #expect(size.width >= last.maxX, "the strip is \(size.width) wide but ends at \(last.maxX)")
-        #expect(size.width >= Pinned.x(Pinned.cellCount - 1) + Pinned.cellSide)
-        #expect(size.height >= Pinned.cellSide)
+        let found = components(in: menu)
+        try #require(found.count == 3)
+        for view in found {
+            #expect(view.frame.width > 0, "'\(view.title)' has zero width and cannot be seen")
+            #expect(view.frame.height > 0, "'\(view.title)' has zero height and cannot be seen")
+        }
     }
 
-    /// The degenerate input, and a real one: a course with no upcoming work has an
-    /// empty graph, and `MenuAssembler` is free to ask for its layout anyway.
-    /// Anything that divides by, or indexes with, the count must survive zero.
-    @Test("zero cells produce no rects")
-    func zeroCellsProduceNoRects() {
-        // Arrange / Act
-        let rects = GraphStripLayout.rects(count: 0, in: Pinned.bounds)
+    /// The component GROWS for its cells rather than overlaying them on the title
+    /// row. Compared against the same course without a graph, so this holds
+    /// whatever the chosen metrics are.
+    @Test("a graphed component is taller than its ungraphed twin")
+    func graphedComponentIsTallerThanUngraphed() throws {
+        // Arrange
+        let assembler = Graphed.assembler()
+        let control = assembler.assemble(MenuModel(rows: [.course(Graphed.ungraphedTwin)]))
+        let controlView = try #require(components(in: control).first)
+
+        // Act
+        let menu = assembler.assemble(MenuModel(rows: [.course(Graphed.graphed)]))
 
         // Assert
-        #expect(rects.isEmpty)
-    }
-
-    /// One cell is the other end of the same edge: no neighbours means no pitch to
-    /// apply, and an implementation that subtracts a trailing gap can land wrong.
-    @Test("a single cell sits at the padding")
-    func singleCellSitsAtThePadding() throws {
-        // Arrange / Act
-        let rects = GraphStripLayout.rects(count: 1, in: Pinned.bounds)
-
-        // Assert
-        try #require(rects.count == 1)
-        #expect(rects[0].minX == Pinned.padding)
-        #expect(rects[0].width == Pinned.cellSide)
+        let view = try #require(components(in: menu).first)
+        #expect(
+            view.frame.height > controlView.frame.height,
+            "the graphed component is \(view.frame.height)pt, the same as a title-only row — the cells have nowhere to draw"
+        )
     }
 }
