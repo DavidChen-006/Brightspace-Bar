@@ -1,0 +1,34 @@
+{
+  "Objects": [
+    {
+      "QuizId": 900101,
+      "Name": "Midterm Exam",
+      "IsActive": true,
+      "DueDate": "2026-03-01T04:59:00.000Z",
+      "StartDate": null,
+      "EndDate": null,
+      "Description": null,
+      "AttemptsAllowed": { "IsUnlimited": false, "NumberOfAttemptsAllowed": 1 },
+      "SubmissionTimeLimit": { "IsEnforced": true, "ShowClock": true, "TimeLimitValue": 50 },
+      "SortOrder": 1
+    },
+    {
+      "QuizId": 900102,
+      "Name": "Final Exam",
+      "IsActive": true,
+      "DueDate": "2026-09-15T23:59:00Z",
+      "StartDate": null,
+      "EndDate": null,
+      "Description": null,
+      "SortOrder": 2
+    },
+    {
+      "QuizId": 900103,
+      "Name": "Quiz With A Broken Date",
+      "IsActive": true,
+      "DueDate": "not-a-date",
+      "SortOrder": 3
+    }
+  ],
+  "Next": null
+}

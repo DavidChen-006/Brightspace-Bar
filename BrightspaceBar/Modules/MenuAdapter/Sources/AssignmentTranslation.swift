@@ -2,6 +2,7 @@ import Foundation
 import AssignmentPipeline
 import CourseMenu
 import CoursePipeline
+import QuizPipeline
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SEAM: [Assignment] → CourseRow.submenu. The join between the two spikes.
@@ -34,6 +35,19 @@ public enum AssignmentTranslation {
     /// A failure over assignments we already hold. The rows stay; this admits they
     /// may have moved on.
     static let refreshFailed = "Couldn't refresh — may be out of date"
+
+    // MARK: - Sections
+
+    /// The order kinds appear in, and the label each gets.
+    ///
+    /// A list rather than a switch so the order is stated once, in one place, and
+    /// cannot drift from the labels. Assignments come first: they are the kind that
+    /// shipped, they are what a dropbox deadline usually means, and a stable order
+    /// matters more than which order.
+    private static let sections: [(kind: ItemKind, header: String)] = [
+        (.assignment, "Assignments"),
+        (.quiz, "Quizzes"),
+    ]
 
     // MARK: - The submenu
 
@@ -83,46 +97,96 @@ public enum AssignmentTranslation {
         }
     }
 
-    /// Visible assignments, in menu order, as rows.
+    /// Visible items, grouped by kind into optionally-labelled sections, each in
+    /// menu order.
+    ///
+    /// Headers appear **only when both kinds have visible rows**. A header exists to
+    /// disambiguate, and with one kind present there is nothing to disambiguate — so
+    /// a lone "Quizzes" label would be noise, and a lone "Assignments" label would
+    /// add a row to every submenu that shipped without one. A kind whose only items
+    /// are hidden therefore contributes no header either: labelling it would imply
+    /// the student is missing something.
+    ///
+    /// Sections are the OUTER sort key. A quiz due sooner than an assignment stays
+    /// under Quizzes rather than jumping the boundary; cross-kind deadline ordering
+    /// is what a future "what's due this week" view is for, and that would read the
+    /// unified item list directly rather than the submenu.
     private static func rows(
-        for assignments: [Assignment],
+        for items: [Assignment],
         courseId: Int,
         now: Date,
         baseURL: URL,
         timeZone: TimeZone
     ) -> [MenuRow] {
-        assignments
-            // `IsHidden` is D2L's own "not visible to students" flag. Respecting
-            // the source of truth beats second-guessing it, and a hidden folder is
-            // also the case most likely to answer its deep link with an
-            // access-denied page — the same wrong-destination failure the click
-            // target rules exist to prevent.
-            .filter { !$0.isHidden }
-            .sorted(by: Self.precedes)
-            .map { .assignment(self.row(for: $0, courseId: courseId, now: now,
-                                        baseURL: baseURL, timeZone: timeZone)) }
+        // `isHidden` is D2L's own "not visible to students" flag — `IsHidden` on a
+        // dropbox folder, `IsActive: false` on a quiz, which `QuizParser` maps onto
+        // this same field so one policy covers both kinds. Respecting the source of
+        // truth beats second-guessing it, and a hidden item is also the case most
+        // likely to answer its deep link with an access-denied page.
+        let visible = items.filter { !$0.isHidden }
+
+        let populated = Self.sections.compactMap { section -> (header: String, items: [Assignment])? in
+            let group = visible.filter { $0.kind == section.kind }.sorted(by: Self.precedes)
+            return group.isEmpty ? nil : (section.header, group)
+        }
+        let labelled = populated.count > 1
+
+        return populated.flatMap { section in
+            (labelled ? [MenuRow.sectionHeader(section.header)] : [])
+                + section.items.map {
+                    .assignment(self.row(for: $0, courseId: courseId, now: now,
+                                         baseURL: baseURL, timeZone: timeZone))
+                }
+        }
     }
 
     private static func row(
-        for assignment: Assignment,
+        for item: Assignment,
         courseId: Int,
         now: Date,
         baseURL: URL,
         timeZone: TimeZone
     ) -> AssignmentRow {
         AssignmentRow(
-            id: assignment.id,
-            title: assignment.name,
+            id: item.id,
+            title: item.name,
             // Pre-formatted, because the view renders `subtitle` verbatim: date
             // formatting is policy (which zone, which wording) and policy lives
             // here. Nil, never "", so the GUI's "title — subtitle" join cannot
             // produce a dangling separator.
-            subtitle: self.dueLabel(assignment.dueDate, now: now, timeZone: timeZone),
+            subtitle: self.dueLabel(item.dueDate, now: now, timeZone: timeZone),
             // The raw value travels alongside the rendered one: sorting and any
             // future "due soon" filter need the instant, not the text.
-            dueDate: assignment.dueDate,
-            url: AssignmentLink.url(courseId: courseId, assignmentId: assignment.id, baseURL: baseURL)
+            dueDate: item.dueDate,
+            url: Self.clickTarget(for: item, courseId: courseId, baseURL: baseURL)
         )
+    }
+
+    /// The one place the two deep-link templates are chosen between.
+    ///
+    ///     .assignment  →  …/dropbox/user/folder_submit_files.d2l?db={id}&grpid=0&ou={courseId}
+    ///     .quiz        →  …/quizzing/user/quiz_summary.d2l?qi={id}&ou={courseId}
+    ///
+    /// Both browser-verified. Every way of choosing wrong yields a *real* Brightspace
+    /// page that is the wrong one, and nothing downstream can catch it because
+    /// `MenuAssembler` opens whatever URL it is handed. Two structural defences:
+    ///
+    /// - The switch is exhaustive with no `default`, so adding a third `ItemKind` is a
+    ///   compile error here rather than a silently mistemplated row.
+    /// - Neither builder can produce the other's parameters: `AssignmentLink` names no
+    ///   quizzing path and `QuizLink` names no `db` or `grpid`. `grpid` on a quiz is
+    ///   unreachable rather than merely untested.
+    ///
+    /// `ou` comes from `courseId` — the course whose submenu this is — never from
+    /// `item.courseId`, so a row structurally cannot carry another course's id even if
+    /// a fan-out bug stamped one.
+    private static func clickTarget(for item: Assignment, courseId: Int, baseURL: URL) -> URL {
+        switch item.kind {
+        case .assignment:
+            AssignmentLink.url(courseId: courseId, assignmentId: item.id, baseURL: baseURL)
+        case .quiz:
+            QuizLink.url(courseId: courseId, quizId: item.id, baseURL: baseURL)
+        }
     }
 
     // MARK: - Order

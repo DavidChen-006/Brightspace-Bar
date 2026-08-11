@@ -10,16 +10,36 @@ import CoursePipeline
 // the translation layer would have to speak both.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// One assignment, already parsed out of D2L's `dropbox/folders` payload.
+/// Which D2L entity an item is.
+///
+/// The two kinds share everything the pipeline does — fan-out, folding,
+/// success-replaces/failure-preserves, orphan cleanup — and differ only in three
+/// places: the route they are fetched from, the decoder that reads them, and the
+/// deep-link template they open. So the kind travels as a *field* rather than as a
+/// second type, and the only code that switches on it is the link builder.
+///
+/// `CaseIterable` so a future third kind (a graded discussion, a checklist) is
+/// discoverable rather than hidden inside a switch.
+public enum ItemKind: Equatable, Sendable, CaseIterable {
+    case assignment
+    case quiz
+}
+
+/// One piece of work the student owes in a course — a dropbox assignment or a quiz.
 ///
 /// Faithful preservation, matching the `Course` precedent: fields arrive as D2L
 /// sent them and nothing here is interpreted. In particular `isHidden` and
 /// `groupTypeId` are carried but never acted on — whether a hidden assignment
 /// should appear in a menu is a display policy, and burying it in a parser would
 /// put it where no test thinks to look.
+///
+/// The name is now slightly historical: this type holds quizzes too. Renaming it
+/// (along with `AssignmentsState`, `AssignmentStore` and `AssignmentFetcher`) would
+/// churn every existing call site for no behavioural gain, so the debt is noted
+/// rather than paid.
 public struct Assignment: Equatable, Sendable, Identifiable {
-    /// D2L dropbox folder id. Unique within a course, and the `db=` half of the
-    /// deep link.
+    /// D2L dropbox folder id, or quiz id. Unique within a course *and kind*, and
+    /// the id half of the deep link — `db=` for an assignment, `qi=` for a quiz.
     public let id: Int
     /// The org unit this was fetched for — the `ou=` half of the deep link.
     ///
@@ -40,16 +60,28 @@ public struct Assignment: Equatable, Sendable, Identifiable {
     public let isHidden: Bool
     /// `GroupTypeId`, non-nil for a group assignment. Preserved, not acted on —
     /// and worth watching, because `AssignmentLink`'s hardcoded `grpid=0` is
-    /// unverified for exactly these.
+    /// unverified for exactly these. Always nil for a quiz: quizzes have no group
+    /// concept and their deep link has no group parameter.
     public let groupTypeId: Int?
+    /// Which entity this is. Decides the deep-link template and which section of a
+    /// submenu the row lands in.
+    ///
+    /// Part of `Equatable`, deliberately: `AssignmentStore` decides `.unchanged` by
+    /// comparing lists, so a same-id assignment replaced by a quiz has to register
+    /// as a change or the menu would never rebuild.
+    public let kind: ItemKind
 
+    /// `kind` comes last and defaults to `.assignment` so every call site written
+    /// before quizzes existed still compiles, and so the common case reads the way
+    /// it always did.
     public init(
         id: Int,
         courseId: Int,
         name: String,
         dueDate: Date?,
         isHidden: Bool,
-        groupTypeId: Int?
+        groupTypeId: Int?,
+        kind: ItemKind = .assignment
     ) {
         self.id = id
         self.courseId = courseId
@@ -57,6 +89,7 @@ public struct Assignment: Equatable, Sendable, Identifiable {
         self.dueDate = dueDate
         self.isHidden = isHidden
         self.groupTypeId = groupTypeId
+        self.kind = kind
     }
 }
 

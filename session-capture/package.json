@@ -1,0 +1,13 @@
+{
+  "name": "session-capture",
+  "private": true,
+  "type": "module",
+  "description": "Capture a live Brightspace session without handling a password",
+  "scripts": {
+    "capture": "node src/manual-capture.mjs",
+    "xsrf": "node src/refresh-xsrf.mjs"
+  },
+  "devDependencies": {
+    "playwright": "1.58.2"
+  }
+}

@@ -4,6 +4,7 @@ import BrightspaceSession
 import CourseMenu
 import CoursePipeline
 import MenuAdapter
+import QuizPipeline
 
 // ═════════════════════════════════════════════════════════════════════════════
 // COMPOSITION ROOT — the one file allowed to see both sides of the contract.
@@ -54,9 +55,10 @@ if ProcessInfo.processInfo.environment["BRIGHTSPACEBAR_STUB"] == "1" {
     // ── The backend stack, assembled bottom-up ────────────────────────────────
     //
     //   BrightspaceCourseSource     → Poller ⇄ CourseCache      ─┐
-    //                                 (PollPolicy decides)       ├→ MenuAdapter
-    //   BrightspaceAssignmentSource → AssignmentFetcher ⇄ Store ─┘
-    //                                 (one request per visible course)
+    //                                 (PollPolicy decides)       │
+    //   BrightspaceAssignmentSource ┐                            ├→ MenuAdapter
+    //   BrightspaceQuizSource       ┴→ Composite → Fetcher ⇄ Store ┘
+    //                                 (two requests per visible course)
     //
     // Every constructor here is synchronous by design, which is what lets this
     // file stay a sync main. The only async steps (load + tick + fan-out) run in
@@ -85,8 +87,9 @@ if ProcessInfo.processInfo.environment["BRIGHTSPACEBAR_STUB"] == "1" {
     // `.transport`, dead cookie → `.sessionExpired` — both of which the cache
     // folds into `.preservedStale`, so cached courses still render with an honest
     // staleness line instead of the app dying at launch.
-    // One provider serves both sources, so courses and assignments always
-    // authenticate with the same session and a refreshed cookie reaches both.
+    // One provider serves all three sources, so courses, assignments and quizzes
+    // always authenticate with the same session and a refreshed cookie reaches all
+    // of them.
     let sessionProvider = FileSessionProvider.standard
     let source = BrightspaceCourseSource(provider: sessionProvider)
 
@@ -97,6 +100,22 @@ if ProcessInfo.processInfo.environment["BRIGHTSPACEBAR_STUB"] == "1" {
         clock: clock
     )
 
+    // SEAM: the two routes a course's work arrives on. Assignments come from
+    // `dropbox/folders`, quizzes from `quizzes/` — a separate D2L entity with a
+    // separate envelope and a separate deep-link template, and one the app used to
+    // omit silently: on this tenant it showed 4 assignments while hiding 4 quizzes.
+    //
+    // The composite hides that two-ness BELOW the store, so `AssignmentFetcher`,
+    // `AssignmentStore` and every submenu see one list per course. It also decides
+    // what a half-failure means: a quiz route answering 403 returns the assignments
+    // anyway rather than throwing, which would have discarded data just fetched
+    // successfully. Both sources share `sessionProvider`, so a refreshed cookie
+    // reaches both on the next fetch.
+    let workSource = CompositeAssignmentSource(sources: [
+        BrightspaceAssignmentSource(provider: sessionProvider),
+        BrightspaceQuizSource(provider: sessionProvider),
+    ])
+
     // SEAM: the assignments half. `AssignmentFeed` builds the fetcher and its
     // store together — passing them separately would allow a fetcher wired to a
     // different store than the adapter reads, which fails silently as
@@ -106,10 +125,7 @@ if ProcessInfo.processInfo.environment["BRIGHTSPACEBAR_STUB"] == "1" {
     // assignments are cheap to refetch once the course list is known. A dead
     // session surfaces as `.failed(lastKnown:)`, which still renders the last
     // known assignments plus an honest staleness note.
-    let assignmentFeed = AssignmentFeed(
-        source: BrightspaceAssignmentSource(provider: sessionProvider),
-        clock: clock
-    )
+    let assignmentFeed = AssignmentFeed(source: workSource, clock: clock)
 
     // SEAM: from here down the stack is only ever seen as `MenuDataSource`.
     // `timeZone` is `.current` — read once here, in the shell, because

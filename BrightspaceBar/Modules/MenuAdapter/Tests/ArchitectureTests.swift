@@ -71,7 +71,8 @@ struct ArchitectureTests {
     /// included: a view file holding a credential type is exactly the leak this
     /// suite exists to prevent.
     private static let backendModules: Set<String> = [
-        "MenuAdapter", "CoursePipeline", "AssignmentPipeline", "BrightspaceSession",
+        "MenuAdapter", "CoursePipeline", "AssignmentPipeline", "QuizPipeline",
+        "BrightspaceSession",
     ]
 
     /// The single exemption: the composition root exists precisely to know both

@@ -18,7 +18,11 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 REPO_DIR="$(cd "${ROOT_DIR}/.." && pwd -P)"
-CAPTURE_DIR="${REPO_DIR}/experiment-1-fresh-cookie"
+# ../session-capture is the live capture tool: a headed browser the human signs in
+# to, so no password is ever handled. (experiment-1-fresh-cookie automates the
+# login and therefore needs BS_PASSWORD in the environment — kept as a frozen
+# experiment record, deliberately not used here.)
+CAPTURE_DIR="${REPO_DIR}/session-capture"
 DEFAULT_SRC="${CAPTURE_DIR}/artifacts/session.json"
 DEST_DIR="${HOME}/Library/Application Support/BrightspaceBar"
 DEST="${DEST_DIR}/session.json"
@@ -27,24 +31,16 @@ log() { printf '==> %s\n' "$*"; }
 
 SRC="${DEFAULT_SRC}"
 if [ "${1:-}" = "--capture" ]; then
-    # Experiment 1 is the proven interactive path: headed Chromium, Purdue SSO,
-    # Duo MFA. Its e2e test drives the capture and writes artifacts/session.json;
-    # we only copy the result.
-    #
-    # Credentials: prompted here, exported to the child only — never an argument
-    # (would land in `ps`), never echoed (read -s), never written anywhere.
-    if [ -z "${BS_EMAIL:-}" ]; then
-        printf 'Purdue email: ' >&2
-        read -r BS_EMAIL
-    fi
-    if [ -z "${BS_PASSWORD:-}" ]; then
-        printf 'Purdue password (not echoed): ' >&2
-        read -rs BS_PASSWORD
-        printf '\n' >&2
-    fi
-    export BS_EMAIL BS_PASSWORD
-    log "Opening the login browser — approve MFA on your phone when it appears"
-    (cd "${CAPTURE_DIR}" && npm test)
+    # A headed browser opens and waits; YOU type everything, including MFA. This
+    # script asks for no credentials and stores none — there is no password here
+    # to end up in shell history or in an agent's transcript.
+    log "Opening the login browser — sign in yourself, then approve MFA on your phone"
+    (cd "${CAPTURE_DIR}" && npm run --silent capture)
+    # A cookie without a CSRF token is useless: the mint answers 403 without the
+    # x-csrf-token header, and the token is often unreadable on the page an SSO
+    # redirect lands on. Cheap to re-derive from the cookie we just captured.
+    log "Deriving the CSRF token"
+    (cd "${CAPTURE_DIR}" && npm run --silent xsrf)
 elif [ -n "${1:-}" ]; then
     SRC="$1"
 fi

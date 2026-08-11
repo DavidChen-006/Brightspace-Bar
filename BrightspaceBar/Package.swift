@@ -1,12 +1,14 @@
 // swift-tools-version: 6.2
 import PackageDescription
 
-// One package, five modules, each self-contained under Modules/<Name>/ with its
+// One package, six modules, each self-contained under Modules/<Name>/ with its
 // own Sources/, Tests/, and Makefile. The dependency arrows that matter:
 //
 //   BrightspaceSession   (the cookie seam: how credentials are obtained)
 //        ↑                            ↑
-//   CoursePipeline  ←──  AssignmentPipeline  (backend: per-course assignments)
+//   CoursePipeline  ←──  AssignmentPipeline  (backend: per-course work items)
+//        ↑                            ↑
+//        └──────────────────  QuizPipeline   (the second route for those items)
 //        ↑
 //   MenuAdapter ──→ CourseMenu   (the contract: pure values, no AppKit, no network)
 //                       ↑
@@ -26,6 +28,7 @@ let package = Package(
         .library(name: "BrightspaceSession", targets: ["BrightspaceSession"]),
         .library(name: "CoursePipeline", targets: ["CoursePipeline"]),
         .library(name: "AssignmentPipeline", targets: ["AssignmentPipeline"]),
+        .library(name: "QuizPipeline", targets: ["QuizPipeline"]),
         .library(name: "CourseMenu", targets: ["CourseMenu"]),
         .library(name: "MenuAdapter", targets: ["MenuAdapter"]),
         .executable(name: "BrightspaceBar", targets: ["BrightspaceBar"]),
@@ -78,6 +81,30 @@ let package = Package(
             exclude: ["Fixtures"]
         ),
 
+        // ── The backend: the same items, from the quizzes route ───────────────
+        //
+        // Depends on AssignmentPipeline rather than paralleling it: `QuizParser`
+        // produces `Assignment` values stamped `kind: .quiz`, and
+        // `BrightspaceQuizSource` conforms to `AssignmentSource`, so
+        // `CompositeAssignmentSource` can merge the two routes below the store.
+        .target(
+            name: "QuizPipeline",
+            dependencies: ["AssignmentPipeline", "CoursePipeline", "BrightspaceSession"],
+            path: "Modules/QuizPipeline/Sources"
+        ),
+        .testTarget(
+            name: "QuizPipelineTests",
+            dependencies: [
+                "QuizPipeline", "AssignmentPipeline", "CoursePipeline", "BrightspaceSession",
+            ],
+            path: "Modules/QuizPipeline/Tests",
+            // Fixtures are read via #filePath (see TestSupport.QuizFixture), not as
+            // bundle resources. Excluding the whole directory also covers the README
+            // documenting them, which SPM would otherwise reject as an unhandled
+            // resource.
+            exclude: ["Fixtures"]
+        ),
+
         // ── The contract between backend and GUI ─────────────────────────────
         .target(
             name: "CourseMenu",
@@ -95,15 +122,17 @@ let package = Package(
             // AssignmentPipeline is a genuine Sources dependency, not a test-only
             // one: `AssignmentsState` appears in `MenuTranslation.menu`'s public
             // signature, and `AssignmentTranslation` builds deep links with
-            // `AssignmentLink`.
-            dependencies: ["CourseMenu", "CoursePipeline", "AssignmentPipeline"],
+            // `AssignmentLink`. QuizPipeline is here for the same reason — the
+            // translation layer is the one place that chooses between the two
+            // deep-link templates, so it needs `QuizLink`.
+            dependencies: ["CourseMenu", "CoursePipeline", "AssignmentPipeline", "QuizPipeline"],
             path: "Modules/MenuAdapter/Sources"
         ),
         .testTarget(
             name: "MenuAdapterTests",
             dependencies: [
                 "MenuAdapter", "CourseMenu", "CoursePipeline",
-                "AssignmentPipeline", "BrightspaceSession",
+                "AssignmentPipeline", "QuizPipeline", "BrightspaceSession",
             ],
             path: "Modules/MenuAdapter/Tests"
         ),
@@ -115,7 +144,7 @@ let package = Package(
             // fails the suite if any view file imports them.
             dependencies: [
                 "CourseMenu", "MenuAdapter", "CoursePipeline",
-                "AssignmentPipeline", "BrightspaceSession",
+                "AssignmentPipeline", "QuizPipeline", "BrightspaceSession",
             ],
             path: "Modules/BrightspaceBar/Sources",
             exclude: ["Info.plist"],
