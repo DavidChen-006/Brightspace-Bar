@@ -172,39 +172,37 @@ struct GraphEndToEndTests {
         #expect(civics.graph[4].tier == .assignment)
     }
 
-    @Test("the translated model assembles into strip items under their courses")
+    @Test("the translated model assembles into course components carrying their cells")
     @MainActor
-    func cellsBecomeStripItems() async throws {
+    func cellsBecomeComponents() async throws {
         // Arrange — the same finished model.
         let model = try await self.translatedModel()
 
         // Act — the real assembler, as `StatusBarController` drives it.
         let menu = MenuAssembler(opener: FakeURLOpener(), onCommand: { _ in }).assemble(model)
 
-        // Assert — each graphed course is followed, at top level, by an inert
-        // item whose view is the strip carrying EXACTLY that course's cells.
+        // Assert — each course is ONE item whose hosted component carries
+        // EXACTLY that course's cells (the slice-1 shape: no strip items).
         for expected in model.courses {
-            let index = try #require(
-                menu.items.firstIndex { ($0.representedObject as? URL) == expected.url },
+            let item = try #require(
+                menu.items.first { ($0.representedObject as? URL) == expected.url },
                 "no menu item for course \(expected.id)"
             )
-            let stripItem = try #require(menu.items[safe: index + 1], "nothing follows course \(expected.id)")
-            let strip = try #require(stripItem.view as? GraphStripView, "course \(expected.id) has no strip")
-            #expect(strip.cells == expected.graph)
-            #expect(!stripItem.isEnabled)
+            let component = try #require(
+                item.view as? MenuItemHostingView, "course \(expected.id) has no component view"
+            )
+            #expect(component.cells == expected.graph)
         }
 
-        // Exactly one strip per graphed course — none duplicated, none orphaned.
+        // One component per course, and every fetched course carries cells.
         // All seven visible courses were fetched (five to empty), so all seven
-        // carry a strip; a `neverFetched` course would not.
-        let stripCount = menu.items.count { $0.view is GraphStripView }
-        #expect(stripCount == model.courses.count { !$0.graph.isEmpty })
-        #expect(stripCount == 7)
-    }
-}
-
-private extension Array {
-    subscript(safe index: Int) -> Element? {
-        self.indices.contains(index) ? self[index] : nil
+        // components have a full window; a `neverFetched` course would not.
+        let graphed = menu.items.count {
+            (($0.view as? MenuItemHostingView)?.cells.isEmpty == false)
+        }
+        #expect(graphed == model.courses.count { !$0.graph.isEmpty })
+        #expect(graphed == 7)
+        // And the item count matches the model exactly — nothing extra anywhere.
+        #expect(menu.items.count == model.rows.count)
     }
 }
