@@ -200,3 +200,78 @@ struct StubGraphSeedTests {
         #expect(courses.filter { !$0.graph.isEmpty }.count == 3)
     }
 }
+
+// ═════════════════════════════════════════════════════════════════════════════
+// The stub seeds BOUNDARIES too (NewVertical-3.md §3.1).
+//
+// Same priority as the strips above — VISUAL COVERAGE. The stub is what the
+// renderer is developed and demoed against, so a boundary rule that lives only in
+// `MenuTranslation` would never appear under `BRIGHTSPACEBAR_STUB=1`, and the
+// hairline's real look (inset, height, dynamic grey) would go unreviewed until it
+// shipped. The stub therefore mirrors the translation layer's rule exactly.
+//
+// PINNED: a `.hairline` immediately BEFORE every `.course` row — after the section
+// header for the first course, between consecutive courses for the rest. The
+// footer `.separator` above the status row is UNCHANGED: this slice deliberately
+// leaves the native separator where it is.
+//
+// CULLED: colour and geometry, which are the view's and are pinned as structure in
+// `Modules/BrightspaceBar/Tests/HairlineRenderingTests.swift`.
+// ═════════════════════════════════════════════════════════════════════════════
+
+@Suite("The stub seeds the boundaries the renderer draws")
+struct StubHairlineSeedTests {
+
+    @Test("every seeded course is immediately preceded by a hairline")
+    func everyCourseHasABoundaryAboveIt() {
+        // Arrange / Act — walk the seeded rows and read what sits above each
+        // course. Written as "the row before each course", not as an index list,
+        // so re-seeding a course does not require rewriting the expectation.
+        let rows = StubMenuDataSource.seeded.rows
+        let coursesWithoutABoundaryAbove = rows.indices.filter { index in
+            guard case .course = rows[index] else { return false }
+            return index == 0 || rows[index - 1] != .hairline
+        }
+
+        // Assert
+        #expect(coursesWithoutABoundaryAbove.isEmpty, "courses at \(coursesWithoutABoundaryAbove) have no boundary above them")
+    }
+
+    @Test("the stub seeds exactly one hairline per course and no more")
+    func hairlineCountMatchesCourseCount() {
+        // Arrange / Act — a stray hairline elsewhere (before the status row, say)
+        // would demo a look the translation layer never produces.
+        let rows = StubMenuDataSource.seeded.rows
+        let hairlines = rows.count { $0 == .hairline }
+
+        // Assert
+        #expect(hairlines == StubMenuDataSource.seeded.courses.count)
+    }
+
+    @Test("the footer keeps its native separator")
+    func footerSeparatorIsUntouched() throws {
+        // Arrange — the deliberate scope limit of this slice: the boundary above
+        // the status row stays a native `.separator`, and swapping it for a
+        // hairline is NOT part of the change.
+        let rows = StubMenuDataSource.seeded.rows
+
+        // Act
+        let separatorIndex = try #require(rows.firstIndex(of: .separator), "the footer separator is gone")
+
+        // Assert
+        guard case .status = rows[separatorIndex + 1] else {
+            Issue.record("the row after the footer separator is not the status row")
+            return
+        }
+    }
+
+    @Test("no course submenu carries a hairline")
+    func submenusHaveNoBoundaries() {
+        // Arrange / Act — §3.1's rule is a TOP-LEVEL one. A submenu's rows are
+        // assignments under one course, with no boundaries to draw between them.
+        let seededSubmenuRows = StubMenuDataSource.seeded.courses.flatMap(\.submenu)
+
+        // Assert
+        #expect(!seededSubmenuRows.contains(.hairline))
+    }
+}
