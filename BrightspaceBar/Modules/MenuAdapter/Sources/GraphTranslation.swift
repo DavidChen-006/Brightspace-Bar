@@ -81,6 +81,63 @@ public enum GraphTranslation {
         return (0..<Self.windowDays).map { GraphCell(tier: tiers[$0], isToday: $0 == todayOffset) }
     }
 
+    /// The grid's column headings — one entry per week column of `strip`'s
+    /// window, nil where no month begins in that column. Pinned by
+    /// `GraphMonthLabelTests`; every rule below is specified there, not here.
+    ///
+    /// One entry per column and never a compacted list of the named ones: the
+    /// renderer indexes this BY COLUMN, so dropping the nils would slide every
+    /// heading left of the columns it describes — which still reads as a
+    /// perfectly ordinary grid, and mis-dates every square under it.
+    ///
+    /// Column 0 always carries the window start's month, because a window
+    /// opening on the 2nd would otherwise go nearly a month unscaled. The
+    /// accepted consequence: a month whose 1st falls INSIDE column 0 is never
+    /// named — a window opening Sun Dec 28 is headed "Dec" and never says
+    /// January.
+    ///
+    /// - Parameters:
+    ///   - now: decides where the window opens, exactly as it does for `strip`.
+    ///   - timeZone: decides which local day `now` is, and so which week the
+    ///     window opens in — 23:30 Saturday in Indiana is Sunday in UTC, and the
+    ///     two readings head the grid with different months.
+    public static func monthLabels(now: Date, timeZone: TimeZone) -> [String?] {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        calendar.locale = Locale(identifier: "en_US_POSIX")
+
+        let windowStart = Self.sundayOfWeek(containing: calendar.startOfDay(for: now), in: calendar)
+
+        return (0..<(Self.windowDays / 7)).map { column in
+            // Stepping by `.day` components, never by 7 × 86_400 seconds: a week
+            // spanning a DST transition is not 168 hours, and a window counted in
+            // seconds slides an hour and mislabels every column after it.
+            let days = (0..<7).compactMap {
+                calendar.date(byAdding: .day, value: column * 7 + $0, to: windowStart)
+            }
+            // Column 0 is named from the day the window opens; every later column
+            // is named only if one of its seven local days IS a 1st. "Contains
+            // the 1st", not "opens in a new month" — the column opening May 31 is
+            // June's, and the other rule would head the one after it.
+            guard let named = column == 0 ? days.first : days.first(where: {
+                calendar.component(.day, from: $0) == 1
+            }) else { return nil }
+            return Self.monthName(of: named, in: calendar)
+        }
+    }
+
+    /// Three-letter month names, fixed rather than locale-derived, for the same
+    /// reason the calendar's own locale is pinned: a suite that passes in Indiana
+    /// and fails in Paris is a suite nobody trusts. Localization is future work,
+    /// and lands here as a threaded locale.
+    private static let monthNames = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    ]
+
+    private static func monthName(of day: Date, in calendar: Calendar) -> String {
+        Self.monthNames[calendar.component(.month, from: day) - 1]
+    }
+
     /// The local start of the SUNDAY on or before `day`.
     ///
     /// Sunday explicitly, from the Gregorian weekday number (1 = Sunday), rather

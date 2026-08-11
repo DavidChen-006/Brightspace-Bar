@@ -35,39 +35,84 @@ import SwiftUI
 /// Every metric the component is laid out from. One table, because the SwiftUI
 /// layers lay content out from the same numbers the frame arithmetic predicts —
 /// two tables would silently disagree and the row would clip.
-enum ComponentMetrics {
+public enum ComponentMetrics {
     /// Native menu rows lead their text by ~14pt inside the highlight capsule.
-    static let textInset: CGFloat = 14
+    public static let textInset: CGFloat = 14
     /// The capsule, inset from the item edge. RepoBar's 6/2/6, verified against
     /// real menu rows in experiment 9.
     static let highlightInsetX: CGFloat = 6
     static let highlightInsetY: CGFloat = 2
     static let highlightRadius: CGFloat = 6
 
-    static let cellSide: CGFloat = 8
-    static let cellGap: CGFloat = 2
+    public static let cellSide: CGFloat = 8
+    public static let cellGap: CGFloat = 2
     static let cellRadius: CGFloat = 2
+    /// Cell to cell, stated once: the grid's only spacing arithmetic.
+    static var cellStep: CGFloat { self.cellSide + self.cellGap }
+    /// A week is a column, so the grid is seven deep for every window.
+    static let rowsPerColumn = 7
+
+    /// Reserved above the grid for the month headings.
+    public static let monthRowHeight: CGFloat = 12
+    /// Reserved left of it for the M/W/F letters.
+    public static let weekdayGutter: CGFloat = 18
 
     static let titleHeight: CGFloat = 17
-    /// Between the title baseline row and the cells.
+    /// Between the title baseline row and the graph.
     static let rowGap: CGFloat = 5
     static let verticalPad: CGFloat = 6
     /// A menu never looks right narrower than this, whatever the content is.
     static let minimumWidth: CGFloat = 240
 
-    static func stripWidth(cells: Int) -> CGFloat {
-        let count = CGFloat(max(cells, 0))
-        return count * self.cellSide + max(count - 1, 0) * self.cellGap
+    /// Where each cell of a flat window lands, read as columns of seven.
+    ///
+    /// The whole of the grid's geometry, and pure — `column = i / 7`,
+    /// `row = i % 7`, row 0 (Sunday) at the TOP, which §3.3's week-aligned window
+    /// makes true of every window rather than of this one. Rects are in a
+    /// top-left-origin, y-downward space; `GraphRasterNSView` is `isFlipped` so
+    /// they are used verbatim.
+    ///
+    /// `origin` is the grid's top-left corner, which is not the view's: the
+    /// labels push the grid right by `weekdayGutter` and down by
+    /// `monthRowHeight`.
+    public static func gridRects(count: Int, origin: CGPoint) -> [CGRect] {
+        (0..<max(count, 0)).map { index in
+            CGRect(
+                x: origin.x + CGFloat(index / self.rowsPerColumn) * self.cellStep,
+                y: origin.y + CGFloat(index % self.rowsPerColumn) * self.cellStep,
+                width: self.cellSide, height: self.cellSide
+            )
+        }
+    }
+
+    static func gridWidth(cells: Int) -> CGFloat {
+        let columns = CGFloat((max(cells, 0) + self.rowsPerColumn - 1) / self.rowsPerColumn)
+        return columns * self.cellSide + max(columns - 1, 0) * self.cellGap
+    }
+
+    static var gridHeight: CGFloat {
+        CGFloat(self.rowsPerColumn) * self.cellSide + CGFloat(self.rowsPerColumn - 1) * self.cellGap
     }
 
     /// What the item's frame must be. `NSMenuItem.view` is not laid out for you:
     /// AppKit honours this number and computes nothing, so a course with cells
-    /// has to ask for the extra height itself or the cells have nowhere to draw.
-    static func fittingSize(cells: Int) -> CGSize {
-        let graph = cells > 0 ? self.rowGap + self.cellSide : 0
+    /// has to ask for the extra height itself — and a grid is seven rows and a
+    /// heading row, not the one row the strip was, so a frame left at the strip's
+    /// height clips six rows away and reads as "not much is due".
+    public static func fittingSize(cells: Int) -> CGSize {
+        guard cells > 0 else {
+            return CGSize(
+                width: max(self.minimumWidth, self.textInset * 2),
+                height: self.verticalPad * 2 + self.titleHeight
+            )
+        }
         return CGSize(
-            width: max(self.minimumWidth, self.textInset * 2 + self.stripWidth(cells: cells)),
-            height: self.verticalPad * 2 + self.titleHeight + graph
+            width: max(
+                self.minimumWidth,
+                self.textInset * 2 + self.weekdayGutter + self.gridWidth(cells: cells)
+            ),
+            height: self.verticalPad * 2 + self.titleHeight + self.rowGap
+                + self.monthRowHeight + self.gridHeight
         )
     }
 }
@@ -82,6 +127,10 @@ public final class MenuItemHostingView: NSView {
     /// one has to say so itself — otherwise the submenu exists with nothing on
     /// screen suggesting it does.
     public let showsChevron: Bool
+    /// One entry per week column of `cells`, nil where no month begins. Derived
+    /// from the calendar in `GraphTranslation` — the renderer has no dates and
+    /// draws whatever strings it is handed, over whatever columns exist.
+    public let monthLabels: [String?]
 
     /// Set by the menu delegate. The ONE highlight signal AppKit gives us, and
     /// it arrives on the delegate rather than on the view, which is why the
@@ -96,12 +145,17 @@ public final class MenuItemHostingView: NSView {
 
     private let hosting: NSHostingView<CourseCardView>
 
-    public init(title: String, cells: [GraphCell], showsChevron: Bool) {
+    public init(
+        title: String, cells: [GraphCell], showsChevron: Bool, monthLabels: [String?] = []
+    ) {
         self.title = title
         self.cells = cells
         self.showsChevron = showsChevron
+        self.monthLabels = monthLabels
         self.hosting = NSHostingView(
-            rootView: CourseCardView(title: title, cells: cells, isHighlighted: false)
+            rootView: CourseCardView(
+                title: title, cells: cells, monthLabels: monthLabels, isHighlighted: false
+            )
         )
         super.init(frame: CGRect(origin: .zero, size: ComponentMetrics.fittingSize(cells: cells.count)))
         // Stretch to the menu's final width, so the capsule spans the row like a
@@ -118,7 +172,10 @@ public final class MenuItemHostingView: NSView {
     }
 
     private var card: CourseCardView {
-        CourseCardView(title: self.title, cells: self.cells, isHighlighted: self.isHighlightedForMenu)
+        CourseCardView(
+            title: self.title, cells: self.cells, monthLabels: self.monthLabels,
+            isHighlighted: self.isHighlightedForMenu
+        )
     }
 
     /// Only the two things that sit *behind* and *beside* the SwiftUI content:
@@ -177,6 +234,7 @@ public final class MenuItemHostingView: NSView {
 struct CourseCardView: View {
     let title: String
     let cells: [GraphCell]
+    let monthLabels: [String?]
     let isHighlighted: Bool
 
     var body: some View {
@@ -192,7 +250,10 @@ struct CourseCardView: View {
                 .frame(height: ComponentMetrics.titleHeight, alignment: .leading)
 
             if !self.cells.isEmpty {
-                CourseGraphView(cells: self.cells, isHighlighted: self.isHighlighted)
+                CourseGraphView(
+                    cells: self.cells, monthLabels: self.monthLabels,
+                    isHighlighted: self.isHighlighted
+                )
             }
         }
         .padding(.horizontal, ComponentMetrics.textInset)
@@ -206,15 +267,18 @@ struct CourseCardView: View {
 /// this is the seam between the two (§3.5).
 struct CourseGraphView: View {
     let cells: [GraphCell]
+    let monthLabels: [String?]
     let isHighlighted: Bool
 
     var body: some View {
-        GraphRasterView(cells: self.cells, isHighlighted: self.isHighlighted)
-            .frame(
-                width: ComponentMetrics.stripWidth(cells: self.cells.count),
-                height: ComponentMetrics.cellSide
-            )
-            .accessibilityLabel(self.label)
+        GraphRasterView(
+            cells: self.cells, monthLabels: self.monthLabels, isHighlighted: self.isHighlighted
+        )
+        .frame(
+            width: ComponentMetrics.weekdayGutter + ComponentMetrics.gridWidth(cells: self.cells.count),
+            height: ComponentMetrics.monthRowHeight + ComponentMetrics.gridHeight
+        )
+        .accessibilityLabel(self.label)
     }
 
     /// VoiceOver cannot read a drawing, and the drawing is the whole content.
@@ -229,10 +293,13 @@ struct CourseGraphView: View {
 /// The adapter back out to AppKit.
 struct GraphRasterView: NSViewRepresentable {
     let cells: [GraphCell]
+    let monthLabels: [String?]
     let isHighlighted: Bool
 
     func makeNSView(context: Context) -> GraphRasterNSView {
-        GraphRasterNSView(cells: self.cells, isHighlighted: self.isHighlighted)
+        GraphRasterNSView(
+            cells: self.cells, monthLabels: self.monthLabels, isHighlighted: self.isHighlighted
+        )
     }
 
     func updateNSView(_ view: GraphRasterNSView, context: Context) {
@@ -240,12 +307,21 @@ struct GraphRasterView: NSViewRepresentable {
     }
 }
 
-/// The cells, drawn. Immediate mode, no cache and no per-cell object: derivation
-/// is microseconds and the menu is closed almost always (§3.2). A strip for now
-/// — the week-aligned grid is slice 4, and it changes this rect arithmetic and
-/// nothing above it.
+/// The grid, drawn. Immediate mode, no cache and no per-cell object: derivation
+/// is microseconds and the menu is closed almost always (§3.2). The geometry is
+/// `ComponentMetrics.gridRects` and lives there because it is the half that can
+/// be wrong in a way a screenshot will not show; this layer only paints.
+///
+/// `isFlipped` is true, deliberately. `gridRects` speaks a top-left-origin,
+/// y-downward space so that "row 0 is Sunday, at the top" is the smallest y,
+/// and flipping the view lets those rects be used verbatim — the alternative
+/// (§5) is subtracting every one of them from `bounds.height`, which is the same
+/// arithmetic written once per drawing call instead of never. Text draws
+/// correctly in a flipped view; `NSAttributedString.draw(at:)` takes the
+/// string's top-left corner here.
 final class GraphRasterNSView: NSView {
     private let cells: [GraphCell]
+    private let monthLabels: [String?]
 
     var isHighlighted: Bool {
         didSet {
@@ -254,14 +330,22 @@ final class GraphRasterNSView: NSView {
         }
     }
 
-    init(cells: [GraphCell], isHighlighted: Bool) {
+    /// The grid's top-left corner inside this view: the gutters the labels need.
+    private static let gridOrigin = CGPoint(
+        x: ComponentMetrics.weekdayGutter, y: ComponentMetrics.monthRowHeight
+    )
+
+    override var isFlipped: Bool { true }
+
+    init(cells: [GraphCell], monthLabels: [String?], isHighlighted: Bool) {
         self.cells = cells
+        self.monthLabels = monthLabels
         self.isHighlighted = isHighlighted
         super.init(frame: CGRect(
             origin: .zero,
             size: CGSize(
-                width: ComponentMetrics.stripWidth(cells: cells.count),
-                height: ComponentMetrics.cellSide
+                width: ComponentMetrics.weekdayGutter + ComponentMetrics.gridWidth(cells: cells.count),
+                height: ComponentMetrics.monthRowHeight + ComponentMetrics.gridHeight
             )
         ))
     }
@@ -272,13 +356,10 @@ final class GraphRasterNSView: NSView {
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        for (index, cell) in self.cells.enumerated() {
-            let rect = CGRect(
-                x: CGFloat(index) * (ComponentMetrics.cellSide + ComponentMetrics.cellGap),
-                y: self.bounds.midY - ComponentMetrics.cellSide / 2,
-                width: ComponentMetrics.cellSide,
-                height: ComponentMetrics.cellSide
-            )
+        let rects = ComponentMetrics.gridRects(count: self.cells.count, origin: Self.gridOrigin)
+        self.drawLabels(over: rects)
+
+        for (cell, rect) in zip(self.cells, rects) {
             self.fillColor(for: cell.tier).setFill()
             NSBezierPath(
                 roundedRect: rect,
@@ -296,6 +377,40 @@ final class GraphRasterNSView: NSView {
             outline.lineWidth = 1
             (self.isHighlighted ? NSColor.selectedMenuItemTextColor : .labelColor).setStroke()
             outline.stroke()
+        }
+    }
+
+    /// The scale: weekday letters down the left gutter, month names across the
+    /// top row. Drawn BEFORE the cells, so a label can never paint over a fill.
+    ///
+    /// The weekday letters are a literal here rather than contract vocabulary:
+    /// §3.3's week-aligned window makes row 0 Sunday for every window the backend
+    /// can emit, so rows 1, 3 and 5 are Monday, Wednesday and Friday forever —
+    /// GitHub's own choice, and the only three that fit at 8pt cells.
+    private func drawLabels(over rects: [CGRect]) {
+        guard !rects.isEmpty else { return }
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 9),
+            .foregroundColor: self.isHighlighted
+                ? NSColor.selectedMenuItemTextColor.withAlphaComponent(0.75)
+                : NSColor.secondaryLabelColor,
+        ]
+
+        for (letter, row) in [("M", 1), ("W", 3), ("F", 5)] where row < rects.count {
+            let label = NSAttributedString(string: letter, attributes: attributes)
+            label.draw(at: CGPoint(
+                x: Self.gridOrigin.x - 4 - label.size().width,
+                y: rects[row].minY - 2
+            ))
+        }
+
+        // Indexed BY COLUMN — entry i heads the column starting at cell i × 7 —
+        // which is why the backend hands over the nils rather than a compacted
+        // list of the named columns.
+        for (column, month) in self.monthLabels.enumerated() {
+            guard let month, column * ComponentMetrics.rowsPerColumn < rects.count else { continue }
+            NSAttributedString(string: month, attributes: attributes)
+                .draw(at: CGPoint(x: rects[column * ComponentMetrics.rowsPerColumn].minX, y: 0))
         }
     }
 

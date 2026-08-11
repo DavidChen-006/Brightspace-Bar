@@ -84,7 +84,8 @@ public struct MenuAssembler {
             // view draws the text: it is how the rest of the suite, and
             // accessibility, find this row.
             item.view = MenuItemHostingView(
-                title: title, cells: course.graph, showsChevron: item.submenu != nil
+                title: title, cells: course.graph, showsChevron: item.submenu != nil,
+                monthLabels: course.graphMonths
             )
             return [item]
 

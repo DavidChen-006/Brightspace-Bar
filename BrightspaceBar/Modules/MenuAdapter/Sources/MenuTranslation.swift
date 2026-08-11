@@ -196,7 +196,11 @@ public enum MenuTranslation {
             // SEAM: the graph join, over the same state the submenu reads.
             // `neverFetched` yields `[]`, so a course absent from the map keeps
             // the pre-graph row it had before this feature existed.
-            graph: GraphTranslation.strip(state: assignments, now: now, timeZone: timeZone)
+            graph: GraphTranslation.strip(state: assignments, now: now, timeZone: timeZone),
+            // The headings for that same window, from the same `now` and zone —
+            // two clocks here would head one menu with columns and another with
+            // the months of a different week.
+            graphMonths: GraphTranslation.monthLabels(now: now, timeZone: timeZone)
         )
     }
 

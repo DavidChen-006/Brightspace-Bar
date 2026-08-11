@@ -127,6 +127,19 @@ public struct CourseRow: Equatable, Sendable, Identifiable {
     /// untouched. It participates in `Equatable` like every other field, so a
     /// strip that changes at midnight is a change the menu redraws.
     public let graph: [GraphCell]
+    /// One entry per week COLUMN of `graph`, nil where no month begins there.
+    ///
+    /// The one place the backend names a column, and it belongs to the backend
+    /// because "which column holds April's first" is a fact about real days and
+    /// the renderer has no dates. Weekday labels are the opposite — row 0 is
+    /// Sunday for every window the backend can emit — so they stay a renderer
+    /// literal and never enter this contract.
+    ///
+    /// Last and defaulted like `graph`, so every pre-existing call site compiles
+    /// untouched, and `Equatable` like every other field: a window that rolls
+    /// into a new month over cells that happen to be unchanged is still a change
+    /// the menu must redraw, which for an empty grid is the common case.
+    public let graphMonths: [String?]
 
     public init(
         id: Int,
@@ -134,7 +147,8 @@ public struct CourseRow: Equatable, Sendable, Identifiable {
         subtitle: String? = nil,
         url: URL,
         submenu: [MenuRow] = [],
-        graph: [GraphCell] = []
+        graph: [GraphCell] = [],
+        graphMonths: [String?] = []
     ) {
         self.id = id
         self.title = title
@@ -142,6 +156,7 @@ public struct CourseRow: Equatable, Sendable, Identifiable {
         self.url = url
         self.submenu = submenu
         self.graph = graph
+        self.graphMonths = graphMonths
     }
 }
 
