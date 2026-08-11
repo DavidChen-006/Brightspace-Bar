@@ -231,7 +231,15 @@ struct HairlinePlacementTests {
         // Arrange — a semester break: only undated administrative shells are
         // visible, so the menu leads with an explanatory message and then the
         // "Other" group. The message must not acquire a boundary of its own.
-        let courses = [makeCourse(id: 412_690, code: "wl.nc.civics.test")]
+        //
+        // Built inline rather than via `makeCourse`, whose wide-open Access
+        // window would make the course CURRENT — this case needs `isUndated`
+        // (nil dates), or `hasCurrent` is true and the message never renders.
+        let courses = [Course(
+            id: 412_690, name: "Course 412690", code: "wl.nc.civics.test",
+            role: "Learner", isActive: true, homeUrl: nil,
+            startDate: nil, endDate: nil
+        )]
 
         // Act
         let model = MenuTranslation.menu(
