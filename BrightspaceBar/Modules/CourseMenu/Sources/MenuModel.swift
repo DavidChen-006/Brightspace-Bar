@@ -165,6 +165,13 @@ public enum MenuRow: Equatable, Sendable {
     /// Freshness, e.g. `Updated 3 minutes ago`. Not selectable.
     case status(String)
     case separator
+    /// A boundary line between courses (NewVertical-3 §3.1). Not selectable.
+    ///
+    /// Carries no payload — a hairline knows nothing about what it separates,
+    /// which is what lets the translation layer place it by rule rather than by
+    /// asking a row about its neighbours. It sits ALONGSIDE `.separator`, which
+    /// stays native and stays the footer's boundary above the status row.
+    case hairline
     case command(MenuCommand)
 }
 

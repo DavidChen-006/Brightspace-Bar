@@ -144,14 +144,19 @@ public enum MenuTranslation {
         return groups.flatMap { group -> [MenuRow] in
             // Intra-group order: code ascending (id breaks ties for determinism).
             let sorted = group.courses.sorted { ($0.code, $0.id) < ($1.code, $1.id) }
-            return [.sectionHeader(group.header)] + sorted.map {
-                .course(self.row(
-                    for: $0, baseURL: baseURL,
+            // A `.hairline` leads EVERY course (NewVertical-3 §3.1). Stated as
+            // "before each course" rather than "between courses" because that is
+            // the form with no fence posts to get wrong: one boundary per course,
+            // never two adjacent, never trailing, and a group of one still gets
+            // its line under the header.
+            return [.sectionHeader(group.header)] + sorted.flatMap { course -> [MenuRow] in
+                [.hairline, .course(self.row(
+                    for: course, baseURL: baseURL,
                     // Absent key == `neverFetched` == no submenu, which is what
                     // makes the empty map reproduce the pre-assignment output.
-                    assignments: assignments[$0.id] ?? .neverFetched,
+                    assignments: assignments[course.id] ?? .neverFetched,
                     now: now, timeZone: timeZone
-                ))
+                ))]
             }
         }
     }

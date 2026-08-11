@@ -109,6 +109,16 @@ public struct MenuAssembler {
 
         case .separator:
             return [NSMenuItem.separator()]
+
+        case .hairline:
+            // Inert in every sense the design depends on: no title to read, no
+            // action, and explicitly disabled so hover skips the row rather than
+            // lighting an empty band between two courses. The line itself is the
+            // view's; an ordinary disabled item would draw nothing at all.
+            let item = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+            item.isEnabled = false
+            item.view = HairlineRowView()
+            return [item]
         }
     }
 

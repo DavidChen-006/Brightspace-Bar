@@ -51,6 +51,10 @@ public struct StubMenuDataSource: MenuDataSource {
 
     public static let seeded = MenuModel(rows: [
         .sectionHeader("Fall 2026"),
+        // A `.hairline` leads every course, mirroring `MenuTranslation` exactly —
+        // otherwise the boundaries would never appear under BRIGHTSPACEBAR_STUB=1
+        // and their real look would go unreviewed until it shipped.
+        .hairline,
         // Dated assignments, so the "name — due date" format is visible in the
         // running app even though no reachable real course has a due date yet.
         .course(CourseRow(
@@ -62,6 +66,7 @@ public struct StubMenuDataSource: MenuDataSource {
             // Work on today's cell — the outline has to survive a fill underneath it.
             graph: strip([0: .assignment, 1: .quiz, 3: .assignment, 5: .quiz])
         )),
+        .hairline,
         // Undated assignments — the shape of every assignment in the real tenant
         // today, and the case where a naive formatter ships the literal "nil".
         .course(CourseRow(
@@ -77,6 +82,7 @@ public struct StubMenuDataSource: MenuDataSource {
             // upstream to the higher tier — the stub shows the outcome, not the race.
             graph: strip([2: .quiz, 6: .assignment, 9: .quiz, 27: .assignment])
         )),
+        .hairline,
         // The empty state: a course fetched successfully with zero assignments.
         // Says so rather than opening onto a blank box.
         .course(CourseRow(
@@ -86,10 +92,12 @@ public struct StubMenuDataSource: MenuDataSource {
             // two courses below cover the other empty, where no strip is drawn at all.
             graph: strip([:])
         )),
+        .hairline,
         // Long title on purpose — the GUI should meet an awkward string before the
         // network hands it one. Real tenant max is 49 characters. No strip either:
         // the row must lay out with the graph absent, not with 28 empty cells.
         .course(CourseRow(id: 1_460_912, title: "Transformative Texts: Critical Thinking", subtitle: "SCLA 10100", url: url(1_460_912))),
+        .hairline,
         // No subtitle on purpose — `subtitle` is optional and must render cleanly nil.
         // Also no submenu and no strip, so the legacy directly-clickable row stays
         // demoable exactly as it was before either field existed.
