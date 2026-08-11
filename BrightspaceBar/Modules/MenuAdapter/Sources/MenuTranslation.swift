@@ -22,9 +22,11 @@ public enum MenuTranslation {
     ///
     /// - Parameters:
     ///   - assignments: what is known about each course's assignments, keyed by
-    ///     course id. A course absent from the map is `neverFetched`, which yields
-    ///     no submenu — so the `[:]` default reproduces the pre-assignment output
-    ///     exactly, and every call site written before this feature stays correct.
+    ///     course id. A course absent from the map is `neverFetched`, which now
+    ///     yields the same "No assignments" submenu as a fetch that found none:
+    ///     the `[:]` default no longer reproduces the pre-assignment output, because
+    ///     making submenu presence depend on whether a fetch had happened gave
+    ///     identical-looking rows two different interaction models.
     ///   - timeZone: which zone deadline dates are rendered in. A parameter for
     ///     the same reason `now` is — a pure function may not read ambient state.
     ///     `.current` belongs in the composition root.
@@ -152,8 +154,9 @@ public enum MenuTranslation {
             return [.sectionHeader(group.header)] + sorted.flatMap { course -> [MenuRow] in
                 [.hairline, .course(self.row(
                     for: course, baseURL: baseURL,
-                    // Absent key == `neverFetched` == no submenu, which is what
-                    // makes the empty map reproduce the pre-assignment output.
+                    // Absent key == `neverFetched`, which `AssignmentTranslation`
+                    // renders as "No assignments" — the same rows as loaded-empty,
+                    // so every course row carries a submenu either way.
                     assignments: assignments[course.id] ?? .neverFetched,
                     now: now, timeZone: timeZone
                 ))]

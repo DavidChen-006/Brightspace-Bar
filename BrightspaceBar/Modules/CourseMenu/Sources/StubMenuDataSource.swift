@@ -114,13 +114,14 @@ public struct StubMenuDataSource: MenuDataSource {
         // week that have already gone by, on either side of the opening Sunday.
         .course(CourseRow(
             id: 1_460_912, title: "Transformative Texts: Critical Thinking", subtitle: "SCLA 10100", url: url(1_460_912),
+            submenu: [.message("No assignments")],
             graph: strip([0: .assignment, 1: .quiz]), graphMonths: months
         )),
         .hairline,
         // No subtitle on purpose — `subtitle` is optional and must render cleanly nil.
-        // No submenu either, so the legacy directly-clickable row stays demoable; it
-        // still gets a window, because every course does.
-        .course(CourseRow(id: 412_690, title: "Purdue Civics Knowledge Test", subtitle: nil, url: url(412_690), graph: strip([:]), graphMonths: months)),
+        // It still gets a submenu and a window, because every course does: a bare
+        // row would demo an interaction model the app can no longer reach.
+        .course(CourseRow(id: 412_690, title: "Purdue Civics Knowledge Test", subtitle: nil, url: url(412_690), submenu: [.message("No assignments")], graph: strip([:]), graphMonths: months)),
         .separator,
         .status("Updated just now"),
         .command(.refresh),

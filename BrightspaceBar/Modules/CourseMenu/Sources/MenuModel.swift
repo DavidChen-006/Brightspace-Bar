@@ -106,9 +106,11 @@ public struct CourseRow: Equatable, Sendable, Identifiable {
     /// building a row. Making this non-optional means a row cannot exist without a
     /// working click target, so the GUI never needs a "what if there's no URL" branch.
     public let url: URL
-    /// The rows shown when this course is hovered. Empty means no submenu at all —
-    /// the course renders as a plain clickable item, exactly as before this field
-    /// existed.
+    /// The rows shown when this course is hovered. Empty means no submenu at all,
+    /// and the course renders as a plain clickable item — a shape the assignment
+    /// translation no longer produces for any state, since a row's interaction
+    /// model must not depend on whether a fetch has happened yet. The empty case
+    /// stays supported as a mechanism, not as a state the app can reach.
     ///
     /// It is `[MenuRow]` rather than `[AssignmentRow]` so that *every* structural
     /// decision — order, the "No assignments" line, a staleness note — stays in the

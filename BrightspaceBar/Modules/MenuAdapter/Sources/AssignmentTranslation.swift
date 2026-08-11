@@ -24,9 +24,10 @@ public enum AssignmentTranslation {
 
     // MARK: - What the submenu says when it has no assignments to show
 
-    /// A successful fetch that found nothing. Deliberately a message rather than
-    /// `[]`: an empty row list makes `MenuAssembler` attach no submenu at all,
-    /// which reads as "this feature does not exist" instead of "nothing is due".
+    /// Nothing to show — either a successful fetch that found nothing, or no fetch
+    /// yet. Deliberately a message rather than `[]`: an empty row list makes
+    /// `MenuAssembler` attach no submenu at all, which reads as "this feature does
+    /// not exist" instead of "nothing is due".
     static let noAssignments = "No assignments"
     /// A failure with nothing previously known — the dead-session-on-first-fetch
     /// case. Silence here would be indistinguishable from a course that genuinely
@@ -55,7 +56,8 @@ public enum AssignmentTranslation {
     /// rule below is specified there, not here.
     ///
     /// - Parameters:
-    ///   - state: what the store knows about this course.
+    ///   - state: what the store knows about this course. Every state yields at
+    ///     least one row, so every course row owns a submenu.
     ///   - courseId: the course this submenu belongs to. Every row's `ou=` comes
     ///     from *this* value rather than from `Assignment.courseId`, so a row in
     ///     course A's submenu structurally cannot carry course B's id — the one
@@ -70,22 +72,24 @@ public enum AssignmentTranslation {
         baseURL: URL,
         timeZone: TimeZone
     ) -> [MenuRow] {
-        // `neverFetched` is the only state that yields nothing at all. Assignments
-        // are deliberately not persisted, so this is every course's state at
-        // launch: no submenu, and the course behaves exactly as it did before this
-        // feature existed. A "Loading…" row would claim a fetch is in flight,
-        // which nothing here knows to be true.
-        guard state != .neverFetched else { return [] }
-
         let rows = self.rows(for: state.assignments, courseId: courseId, now: now,
                              baseURL: baseURL, timeZone: timeZone)
 
         switch state {
-        case .neverFetched:
-            return []  // unreachable, guarded above
-
-        case .loaded:
-            // An empty list here is data — the server said there are none.
+        case .neverFetched, .loaded:
+            // `neverFetched` deliberately renders as loaded-empty rather than as
+            // `[]`. Assignments are not persisted, so `neverFetched` is every
+            // course's state at launch; returning `[]` there gave a course row a
+            // *different interaction model* — plain click-through instead of a
+            // submenu — decided by whether a fetch had happened yet. Two models
+            // behind identical-looking rows is the bug the uniform row retires.
+            // The distinction survives where it is actionable: in the store and
+            // in the graph, not in whether hovering does anything.
+            //
+            // A "Loading…" row would instead claim a fetch is in flight, which
+            // nothing here knows to be true.
+            //
+            // For `.loaded`, an empty list is data — the server said there are none.
             return rows.isEmpty ? [.message(Self.noAssignments)] : rows
 
         case .failed:
