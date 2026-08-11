@@ -231,4 +231,34 @@ struct GraphEndToEndTests {
         // And the item count matches the model exactly — nothing extra anywhere.
         #expect(menu.items.count == model.rows.count)
     }
+
+    @Test("the finished component: labels, boundaries, and a uniform submenu")
+    @MainActor
+    func theWholeComponentAssembles() async throws {
+        // Arrange / Act — the campaign's closing assertion set: everything the
+        // five slices added, observed together through one real menu.
+        let model = try await self.translatedModel()
+        let menu = MenuAssembler(opener: FakeURLOpener(), onCommand: { _ in }).assemble(model)
+
+        // Month labels flowed backend → contract → component, and the window's
+        // opening month is February at column 0 (now is Feb 24; window opens
+        // Sun Feb 22).
+        for expected in model.courses {
+            let item = try #require(menu.items.first { ($0.representedObject as? URL) == expected.url })
+            let component = try #require(item.view as? MenuItemHostingView)
+            #expect(component.monthLabels == expected.graphMonths)
+            #expect(component.monthLabels.count == 16)
+            #expect(component.monthLabels.first == "Feb")
+
+            // Submenu uniformity: EVERY course — including the five that
+            // fetched to empty — opens onto Open Course Home above its rows.
+            let submenu = try #require(item.submenu, "course \(expected.id) has no submenu")
+            #expect(submenu.items.first?.title == "Open Course Home")
+        }
+
+        // Boundaries: exactly one hairline row per course, all inert.
+        let hairlines = menu.items.filter { $0.view is HairlineRowView }
+        #expect(hairlines.count == model.courses.count)
+        #expect(hairlines.allSatisfy { !$0.isEnabled && $0.title.isEmpty })
+    }
 }
