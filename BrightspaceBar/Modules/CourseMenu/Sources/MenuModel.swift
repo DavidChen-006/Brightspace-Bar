@@ -50,6 +50,47 @@ public struct AssignmentRow: Equatable, Sendable, Identifiable {
     }
 }
 
+/// What kind of work a day in a course's graph holds, ranked by importance.
+///
+/// A ranking rather than an intensity scale, because a day with both an
+/// assignment and a quiz renders as the more important kind — expressed
+/// downstream as one expression, `itemsDueThatDay.map(\.tier).max()`. That
+/// expression is only correct while `<` follows the rank, so the ordering is
+/// part of the contract rather than an accident of declaration order.
+///
+/// The raw values are pinned with nothing above `quiz` so a future
+/// `case test = 3` slots in with no other change.
+public enum CellTier: Int, Comparable, Equatable, Sendable, CaseIterable {
+    case assignment = 1
+    case quiz = 2
+
+    public static func < (lhs: Self, rhs: Self) -> Bool { lhs.rawValue < rhs.rawValue }
+}
+
+/// One day in a course's graph strip.
+///
+/// Carries no date. The strip is positional — index is the day offset from the
+/// window start and cell 0 is today — because bucketing UTC instants into local
+/// calendar days is the mapping layer's job, and keeping it out of here is what
+/// lets the GUI be built against hand-written strips.
+public struct GraphCell: Equatable, Sendable {
+    /// The most important work due that day. Nil is an empty day, not a zero-th
+    /// tier; empty days still occupy their index.
+    public let tier: CellTier?
+    /// Whether this is today's cell.
+    ///
+    /// A separate field, never a fill value. The renderer draws the fill from
+    /// `tier` and the outline from this independently, so "the today indicator
+    /// must not obscure the underlying activity state" holds by construction
+    /// rather than by careful drawing.
+    public let isToday: Bool
+
+    public init(tier: CellTier?, isToday: Bool = false) {
+        self.tier = tier
+        self.isToday = isToday
+    }
+}
+
 /// One clickable class.
 public struct CourseRow: Equatable, Sendable, Identifiable {
     /// D2L org-unit id. Unique per row, and what the click URL is derived from.
@@ -78,13 +119,29 @@ public struct CourseRow: Equatable, Sendable, Identifiable {
     /// non-empty. The view layer therefore re-exposes it as a course-home row inside
     /// the submenu; see `MenuAssembler`.
     public let submenu: [MenuRow]
+    /// The strip of upcoming days drawn beside this course. Empty means no graph,
+    /// and the course renders as the plain row it was before this field existed.
+    ///
+    /// Last and defaulted for the same reason `AssignmentRow.subtitle` is: every
+    /// existing call site — tests, stubs, the translation layer — compiles
+    /// untouched. It participates in `Equatable` like every other field, so a
+    /// strip that changes at midnight is a change the menu redraws.
+    public let graph: [GraphCell]
 
-    public init(id: Int, title: String, subtitle: String? = nil, url: URL, submenu: [MenuRow] = []) {
+    public init(
+        id: Int,
+        title: String,
+        subtitle: String? = nil,
+        url: URL,
+        submenu: [MenuRow] = [],
+        graph: [GraphCell] = []
+    ) {
         self.id = id
         self.title = title
         self.subtitle = subtitle
         self.url = url
         self.submenu = submenu
+        self.graph = graph
     }
 }
 
