@@ -69,7 +69,7 @@ final class StrumGridView: NSView {
     /// "quieter" = SPARSER: crossings within this interval of the last tick
     /// are felt visually but not haptically. Slow deliberate sweeps still
     /// tick every tooth; fast flicks thin out instead of buzzing.
-    private static let minimumTickInterval: TimeInterval = 0.06
+    private static let minimumTickInterval: TimeInterval = 0.09
     private var lastTick: TimeInterval = 0
 
     var isHighlightedForMenu = false {
