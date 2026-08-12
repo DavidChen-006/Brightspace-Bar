@@ -64,6 +64,14 @@ final class StrumGridView: NSView {
     private var hoveredIndex: Int?
     private var strumCount = 0
 
+    /// The volume knob macOS doesn't provide. Haptic amplitude is not
+    /// controllable (.alignment is already the subtlest pattern), so
+    /// "quieter" = SPARSER: crossings within this interval of the last tick
+    /// are felt visually but not haptically. Slow deliberate sweeps still
+    /// tick every tooth; fast flicks thin out instead of buzzing.
+    private static let minimumTickInterval: TimeInterval = 0.06
+    private var lastTick: TimeInterval = 0
+
     var isHighlightedForMenu = false {
         didSet { if oldValue != self.isHighlightedForMenu { self.needsDisplay = true } }
     }
@@ -127,6 +135,9 @@ final class StrumGridView: NSView {
         // .drawCompleted: fast sweeps cross several cells per frame, and
         // deferred ticks would smear into one.
         if index != nil {
+            let now = ProcessInfo.processInfo.systemUptime
+            guard now - self.lastTick >= Self.minimumTickInterval else { return }
+            self.lastTick = now
             NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
             self.strumCount += 1
             print("[exp14] detent #\(self.strumCount) at cell \(index!)")
