@@ -23,6 +23,8 @@ import AppKit
 enum Tier: Int, Comparable {
     case assignment = 1
     case quiz = 2
+    /// Added for the click-to-cycle experiment: David's fourth state.
+    case test = 3
     static func < (lhs: Self, rhs: Self) -> Bool { lhs.rawValue < rhs.rawValue }
 }
 
@@ -249,12 +251,14 @@ final class CourseComponentView: NSView {
             case .none: return base.withAlphaComponent(0.25)
             case .assignment: return base.withAlphaComponent(0.6)
             case .quiz: return base.withAlphaComponent(0.95)
+            case .test: return base
             }
         }
         switch tier {
         case .none: return .quaternaryLabelColor
         case .assignment: return NSColor.controlAccentColor.withAlphaComponent(0.45)
         case .quiz: return .controlAccentColor
+        case .test: return .systemRed
         }
     }
 
