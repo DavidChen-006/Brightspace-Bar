@@ -1,0 +1,3 @@
+# The persistent browser profile IS a credential store: it holds the live
+# Microsoft Entra cookie that makes silent capture possible. Never commit it.
+artifacts/profile/
