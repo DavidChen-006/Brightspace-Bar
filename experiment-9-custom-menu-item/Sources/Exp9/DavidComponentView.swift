@@ -72,6 +72,27 @@ final class DavidComponentView: NSView {
         let height = Self.verticalPad + Self.titleHeight + Self.rowGap + gridHeight + Self.verticalPad
         super.init(frame: CGRect(x: 0, y: 0, width: 340, height: height))
         self.autoresizingMask = [.width]
+
+        // MEASUREMENT, not the feature: register a NATIVE macOS tooltip on
+        // every named cell. The suspicion is that menu tracking suppresses
+        // ordinary tooltip windows entirely — if that's right, the query
+        // callback below never logs and the hand-drawn bubble is the only
+        // path. If a native tooltip DOES appear, that's worth knowing too.
+        for (index, rect) in self.cellRects().enumerated() where cells[index].name != nil {
+            self.addToolTip(rect, owner: self, userData: nil)
+        }
+    }
+
+    /// NSViewToolTipOwner (informal protocol, hence no `override`) — answers
+    /// native tooltip queries, and logs each one so suppression-in-menus is
+    /// observable rather than assumed.
+    @objc func view(
+        _ view: NSView, stringForToolTip tag: NSView.ToolTipTag,
+        point: NSPoint, userData: UnsafeMutableRawPointer?
+    ) -> String {
+        let name = self.cellIndex(at: point).flatMap { self.cells[$0].name } ?? ""
+        print("[exp9] NATIVE tooltip queried → \"\(name)\" — so menus do NOT suppress them")
+        return name
     }
 
     @available(*, unavailable)
@@ -239,6 +260,51 @@ final class DavidComponentView: NSView {
                 outline.stroke()
             }
         }
+
+        // The hover popup, hand-drawn LAST so it floats over everything else.
+        // Drawn inside the view because a bubble is just geometry + text —
+        // the same immediate-mode toolkit as the cells — and unlike a native
+        // tooltip window, nothing about menu tracking can suppress it.
+        if let hovered = self.hoveredIndex, let name = self.cells[hovered].name {
+            self.drawBubble(text: name, near: rects[hovered], highlighted: highlighted)
+        }
+    }
+
+    /// A tooltip bubble anchored to a cell: above it by default, flipped below
+    /// when "above" would cover the title, clamped inside the component's
+    /// width. Uses window-background + separator so it reads as a floating
+    /// surface in both light and dark menus.
+    private func drawBubble(text: String, near cell: CGRect, highlighted: Bool) {
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.menuFont(ofSize: 11),
+            .foregroundColor: NSColor.labelColor,
+        ]
+        let label = NSAttributedString(string: text, attributes: attrs)
+        let padding: CGFloat = 7
+        let size = label.size()
+        var bubble = CGRect(
+            x: cell.midX - size.width / 2 - padding,
+            y: cell.maxY + 5,
+            width: size.width + padding * 2,
+            height: size.height + 8
+        )
+        // Clamp inside the capsule's footprint; flip below the cell when the
+        // bubble would cover the title row.
+        bubble.origin.x = max(
+            Self.highlightInsetX + 2,
+            min(bubble.origin.x, self.bounds.width - Self.highlightInsetX - 2 - bubble.width)
+        )
+        if bubble.maxY > self.bounds.height - Self.verticalPad - Self.titleHeight {
+            bubble.origin.y = cell.minY - bubble.height - 5
+        }
+
+        let path = NSBezierPath(roundedRect: bubble, xRadius: 5, yRadius: 5)
+        NSColor.windowBackgroundColor.setFill()
+        path.fill()
+        NSColor.separatorColor.setStroke()
+        path.lineWidth = 1
+        path.stroke()
+        label.draw(at: CGPoint(x: bubble.minX + padding, y: bubble.minY + 4))
     }
 
     /// Same palette as CourseComponentView, so the A/B against SCLA holds.

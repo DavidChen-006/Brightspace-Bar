@@ -31,9 +31,13 @@ enum Tier: Int, Comparable {
 struct DayCell {
     let tier: Tier?
     let isToday: Bool
-    init(_ tier: Tier?, isToday: Bool = false) {
+    /// Hover-popup experiment: what the cell IS ("HW 3 — Vector Fields").
+    /// Nil for empty days and for rows that don't carry names.
+    let name: String?
+    init(_ tier: Tier?, isToday: Bool = false, name: String? = nil) {
         self.tier = tier
         self.isToday = isToday
+        self.name = name
     }
 }
 

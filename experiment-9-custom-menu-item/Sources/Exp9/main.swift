@@ -125,13 +125,31 @@ func componentItem(view: NSView, submenu: NSMenu?) -> NSMenuItem {
 
 // ── The legos: each row built and named, chemistry kept out of the diagram ──
 
+/// Seeds for the hover-popup experiment: every marked cell carries the NAME of
+/// the thing it represents, laid out like a real Multivariable Calculus
+/// semester, so hovering the graph answers "what is that red cell?".
+func davidCells(columns: Int) -> [DayCell] {
+    var cells = (0..<(columns * 7)).map { _ in DayCell(nil) }
+    cells[2] = DayCell(.assignment, isToday: true, name: "HW 3 — Vector Fields (due today)")
+    cells[5] = DayCell(.quiz, name: "Quiz 4 — Chain Rule")
+    cells[9] = DayCell(.assignment, name: "HW 4 — Partial Derivatives")
+    cells[16] = DayCell(.test, name: "Midterm 1 — Chapters 1–4")
+    cells[23] = DayCell(.assignment, name: "HW 5 — Gradients")
+    cells[30] = DayCell(.quiz, name: "Quiz 5 — Lagrange Multipliers")
+    cells[44] = DayCell(.assignment, name: "HW 6 — Double Integrals")
+    cells[61] = DayCell(.test, name: "Midterm 2 — Chapters 5–8")
+    cells[75] = DayCell(.quiz, name: "Quiz 6 — Surface Area")
+    cells[104] = DayCell(.test, name: "Final Exam — cumulative")
+    return cells
+}
+
 // David's playground: directly under the native rows it must match, so parity
-// is judged against adjacent neighbours. SAME cells as the SCLA grid below,
-// so the graph rendering (once drawn) is a direct A/B of rendering alone.
+// is judged against adjacent neighbours. Now seeded with NAMED work so the
+// hover popup has something true to say.
 let davidRow = componentItem(
     view: DavidComponentView(
         title: "DAVID 10000 — Rendering Playground",
-        cells: gridCells(columns: 16)
+        cells: davidCells(columns: 16)
     ),
     submenu: nil
 )
