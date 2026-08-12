@@ -1,0 +1,5 @@
+# The profile directory IS a credential store (Entra + D2L cookies live in it).
+# The journal is the experiment's result and is safe: outcomes and statuses only.
+artifacts/profile*/
+artifacts/*.png
+node_modules/
