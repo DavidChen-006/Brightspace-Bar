@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- The entitlement Apple documents as the price of .timeSensitive. It is
+         a RESTRICTED entitlement: normally it must be authorised by a
+         provisioning profile from a paid developer account. We claim it in an
+         ad-hoc signature anyway and let the experiment report whether the OS
+         cares. -->
+    <key>com.apple.developer.usernotifications.time-sensitive</key>
+    <true/>
+</dict>
+</plist>

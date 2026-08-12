@@ -1,0 +1,19 @@
+[23:37:55.071] === Experiment 13 starting ===
+[23:37:55.072] bundleIdentifier = com.davidchen.exp13
+[23:37:55.072] bundlePath       = /Users/davidchen/PaperShelf/experiment-13-time-sensitive-notification/.build/arm64-apple-macosx/debug/Exp13.app
+[23:37:55.195] menu bar item installed — click the bell icon
+[23:37:55.243] [before] authorizationStatus  = 1 (0=notDetermined 1=denied 2=authorized 3=provisional)
+[23:37:55.243] [before] alertSetting         = 2 (0=notSupported 1=disabled 2=enabled)
+[23:37:55.243] [before] alertStyle           = 1 (0=none 1=banner 2=alert)  ← banner auto-hides, alert persists
+[23:37:55.243] [before] timeSensitiveSetting = 0 (0=notSupported 1=disabled 2=enabled)
+[23:37:55.243] [before]   ^ timeSensitiveSetting is THE answer to 'did we get the entitlement':
+[23:37:55.243] [before]     notSupported(0) = the OS does not believe this app may send time-sensitive.
+[23:37:55.243] requesting authorization — IF THIS IS THE FIRST RUN, a system prompt is now
+[23:37:55.243] waiting for you on screen. Nothing below this line prints until you answer it.
+[23:37:55.244] requestAuthorization FAILED: Error Domain=UNErrorDomain Code=1 "Notifications are not allowed for this application" UserInfo={NSLocalizedDescription=Notifications are not allowed for this application}
+[23:37:55.245] [after] authorizationStatus  = 1 (0=notDetermined 1=denied 2=authorized 3=provisional)
+[23:37:55.245] [after] alertSetting         = 2 (0=notSupported 1=disabled 2=enabled)
+[23:37:55.245] [after] alertStyle           = 1 (0=none 1=banner 2=alert)  ← banner auto-hides, alert persists
+[23:37:55.245] [after] timeSensitiveSetting = 0 (0=notSupported 1=disabled 2=enabled)
+[23:37:55.245] [after]   ^ timeSensitiveSetting is THE answer to 'did we get the entitlement':
+[23:37:55.245] [after]     notSupported(0) = the OS does not believe this app may send time-sensitive.
