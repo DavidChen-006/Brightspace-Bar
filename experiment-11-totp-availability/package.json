@@ -1,0 +1,12 @@
+{
+  "name": "experiment-11-totp-availability",
+  "private": true,
+  "type": "module",
+  "description": "Does Purdue's Entra tenant permit registering a TOTP (software OATH) method?",
+  "scripts": {
+    "probe": "node src/probe.mjs"
+  },
+  "devDependencies": {
+    "playwright": "1.58.2"
+  }
+}
