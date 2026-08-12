@@ -5,6 +5,7 @@
   "description": "Capture a live Brightspace session without handling a password",
   "scripts": {
     "capture": "node src/manual-capture.mjs",
+    "auto": "node src/auto-capture.mjs",
     "xsrf": "node src/refresh-xsrf.mjs"
   },
   "devDependencies": {

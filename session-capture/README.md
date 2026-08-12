@@ -9,9 +9,18 @@ starts showing stale data.
 ## Use
 
 ```sh
-npm run capture     # opens a browser; YOU sign in, including MFA
+npm run capture     # silent if possible; otherwise YOU sign in, including MFA
+npm run auto        # silent if possible; otherwise types BS_EMAIL/BS_PASSWORD for you
 npm run xsrf        # re-derive just the CSRF token for a still-live cookie
 ```
+
+Both capture scripts run on a **persistent browser profile**
+(`artifacts/profile/`, gitignored — it is a credential store). The profile
+keeps the Microsoft Entra cookie (`ESTSAUTHPERSISTENT`, ~90-day lifetime) from
+your last real login, so most captures complete **silently in seconds** — the
+dead D2L session re-mints itself through SSO with no password and no MFA
+(proven in `experiment-10-entra-silent-sso`). You are only asked to sign in
+when the Entra session itself has expired.
 
 Then install it into the app:
 
@@ -22,18 +31,26 @@ cd ../BrightspaceBar && ./Scripts/refresh-session.sh ../session-capture/artifact
 The app re-reads that file on every fetch, so a running app picks up a fresh
 session on its next poll — no relaunch needed.
 
-## Why two scripts
+## Why two capture scripts
 
-**`manual-capture.mjs`** opens a headed Chromium at the tenant and then just
-waits. You pick your campus, type your credentials, and approve MFA yourself.
-Nothing is typed for you and no credential is ever read, stored, or logged.
+Both try the silent path first; they differ only in the **fallback** when a
+real login is due:
 
-That is the point. `experiment-1-fresh-cookie` automates the whole login, which
-means it needs `BS_EMAIL` and `BS_PASSWORD` in the environment — fine when a human
-runs it, but it puts a password into shell history and into the transcript of any
-agent that invokes it. This path has no password to leak. It is also the closer
-analogue of where the app is heading: an in-app `WKWebView` login window where the
-user signs in and the app only reads the resulting cookie store.
+**`manual-capture.mjs`** waits for YOU. You pick your campus, type your
+credentials, and approve MFA yourself. Nothing is typed for you and no
+credential is ever read, stored, or logged — which makes it the only capture
+path safe to run from an agent's shell. It is also the closer analogue of
+where the app is heading: an in-app `WKWebView` login window where the user
+signs in and the app only reads the resulting cookie store.
+
+**`auto-capture.mjs`** (ported from `experiment-1-fresh-cookie`, which stays
+frozen as the experiment record) types `BS_EMAIL`/`BS_PASSWORD` for you, so a
+full login costs only the MFA tap on your phone. Credentials are demanded only
+*after* the silent path has actually failed — a cron can run it with no
+environment at all, and it only errors on the rare day a real login is due.
+The cost: a password in the environment lands in shell history and in the
+transcript of any agent that invokes it. Prefer `capture` from an agent's
+shell.
 
 Authentication is detected **positively** — the `d2lSessionVal` cookie must exist
 *and* `window.D2L.LP` must be reachable. "The URL no longer looks like a login
@@ -57,6 +74,11 @@ Useful on its own too: XSRF tokens rotate independently of the cookie.
 | 4.4 h | alive |
 | 15.6 h | dead — mint returned `200` + a `sessionExpired=1` HTML stub |
 | 28.4 h | dead — mint returned a hard `403 Not authenticated` |
+
+The D2L cookie dying daily no longer matters much: with the persistent
+profile, a capture re-mints it silently for as long as the Entra session
+lives. The Entra cookie claims 90 days; its *real* honored lifetime is being
+measured by `experiment-10-entra-silent-sso`'s daily journal.
 
 Note the two different death signatures on the same endpoint; code that keys on
 status alone will misread one of them. Whether expiry is idle-based or absolute is
