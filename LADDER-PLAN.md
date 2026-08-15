@@ -172,6 +172,15 @@ exit codes) are the load-bearing decisions.
   file on injected crash), old-data preservation on failure, status truthfulness,
   exit codes.
 - Done when: `npm test` green in session-capture; `refresh.mjs --help` runs; reset.sh works on a temp root.
+- **Contract nuances pinned by the red suite (c709524) — binding on all later phases:**
+  `clock()` returns a `Date` (orchestrator calls `.toISOString()`); `runRefresh`
+  never throws and RETURNS exactly the status object it wrote; a failed run
+  carries `lastSuccessAt` forward from the previous status.json (corrupt
+  status.json tolerated, → null); a rung whose `attempt()` throws counts as a
+  failed rung and the ladder continues; still-sessionExpired after a successful
+  rung keeps climbing; failure with no prior data.json writes no data.json.
+  npm test uses the glob form (`node --test "tests/**/*.test.mjs"`) — bare
+  `tests/` breaks on node 26.
 
 ### Phase 2 — real rungs + real fetcher behind the seams
 - `src/rungs/silent.mjs` — wraps `trySilentLogin` path; writes session.json on success.
