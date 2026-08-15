@@ -36,6 +36,21 @@ import path from "node:path";
  */
 
 /**
+ * The fetcher seam. It reads the credentials itself (session.json, via paths)
+ * and reports a classified failure — `sessionExpired` is the ONLY reason that
+ * makes the ladder climb, so a fetch engine that returns a dead session under
+ * any other reason turns a re-mintable lapse into a permanent error state.
+ *
+ * `data` is the payload MINUS fetchedAt: the orchestrator stamps that from the
+ * injected clock, and a fetchedAt of the fetcher's own would override it.
+ *
+ * @typedef {{fetch: (world: {paths: object, log: (m: string) => void}) => Promise<
+ *             {ok: true, data: {courses: object[], assignments: object}}
+ *           | {ok: false, reason: "sessionExpired"}
+ *           | {ok: false, reason: string, detail?: string}>}} Fetcher
+ */
+
+/**
  * Run one refresh to completion. NEVER throws and never rejects: the caller is
  * a CLI whose contract with Swift is an exit code, so every failure has to come
  * back as a status. Returns exactly the status object it wrote to disk.
