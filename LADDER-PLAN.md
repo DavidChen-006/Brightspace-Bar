@@ -217,6 +217,26 @@ exit codes) are the load-bearing decisions.
   cache files); decode tests incl. ISO-8601 dates; needs-login mapping test.
 - Done when: `swift test` (all 131+new) green; `make live` green with daemon sources.
 
+### Phase 3 outcomes (binding facts for phases 4-5)
+- Pinned API landed: `DaemonPaths` / `DaemonOutcome` / `DaemonRunner` /
+  `DaemonCourseSource` / `RefreshScheduler` (CoursePipeline) +
+  `DaemonAssignmentSource(paths:)` (AssignmentPipeline, structurally spawn-free).
+  `DaemonCache.swift` is the single reader of status/data.json.
+- main.swift wiring: `/usr/bin/env node <cli>`, cli = env `BSB_REFRESH_CLI` else
+  `$HOME/PaperShelf/session-capture/src/refresh.mjs`; spawn timeout 180s; no
+  extra argv ever (D8; refresh.mjs rejects unknown argv anyway).
+- The timer refreshes COURSES ONLY — assignments refresh at launch/manual
+  (`MenuAdapter.timerTick()` is phase-5 work).
+- `open -n` does NOT inherit shell env: E2E must use `open -n --env BSB_ROOT=…`
+  or run the built binary directly.
+- `BS_LIVE=1 swift test` now spawns the real daemon (cron-safe) twice — it IS
+  the Swift half of tier 0/1, and cannot green until a tier-2 login has seeded
+  the root.
+- DELETION DEFERRED to phase 5: retired sources are production-dead but kept
+  alive by tests outside phase-3 authorization (CompositeSourceTests suite;
+  EndToEndTests.swift:351; AssignmentSourceContractTests.swift:144;
+  QuizSourceContractTests.swift:45-46). ARCHITECTURE.md rewrite rides with it.
+
 ### Phase 4 — tiered E2E (test-writer only; orchestrator runs it to green)
 - `session-capture/tests/e2e.sh` (or .mjs): tier 0/1 automated against the real
   tenant, tier 2 interactive (prints instructions, waits for David).
