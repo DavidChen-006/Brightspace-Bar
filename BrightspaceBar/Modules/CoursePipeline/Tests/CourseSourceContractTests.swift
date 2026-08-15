@@ -26,6 +26,20 @@ private struct SourceCase: Sendable, CustomStringConvertible {
         FakeCourseSource([.bytes(try Fixture.enrollments)])
     }
 
+    /// The daemon source, over a `/bin/sh` stub standing in for
+    /// `node src/refresh.mjs`: it publishes a canned `cache/data.json` into a temp
+    /// `BSB_ROOT` and exits 0, exactly as the real daemon does after a successful
+    /// climb. Hermetic — no node, no network, no credentials — so the phase-3
+    /// source is held to the same standard as the fake and the live adapter.
+    /// (Added by the phase-3 test-writer; the assertions below are untouched.)
+    static let daemon = SourceCase(name: "DaemonCourseSource") {
+        let world = DaemonWorld()
+        world.plan(.ok)
+        world.stage(data: DaemonJSON.twoCourses, status: DaemonJSON.freshStatus)
+        // The world owns the temp root and deletes it when the source goes away.
+        return RootedCourseSource(world: world, inner: world.courseSource())
+    }
+
     /// The real adapter, over the standard session seam: `SESSION_JSON` when set,
     /// else `~/Library/Application Support/BrightspaceBar/session.json`. A missing
     /// or dead session fails the live run loudly — never silently green.
@@ -78,7 +92,7 @@ struct CourseSourceContractTests {
 
     /// Runs offline, always. Add further hermetic implementations to this array and they
     /// are held to the same contract automatically.
-    private static let hermetic: [SourceCase] = [.fake]
+    private static let hermetic: [SourceCase] = [.fake, .daemon]
 
     @Test("a hermetic source satisfies the contract", arguments: CourseSourceContractTests.hermetic)
     fileprivate func hermeticSourcesSatisfyTheContract(_ sourceCase: SourceCase) async throws {

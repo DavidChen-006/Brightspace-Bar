@@ -39,6 +39,18 @@ private struct SourceCase: Sendable, CustomStringConvertible {
         FakeAssignmentSource([Truth.scholarlyID: [.bytes(try Fixture.folders440703)]])
     }
 
+    /// The daemon source, reading a canned `cache/data.json` out of a temp
+    /// `BSB_ROOT` — the file the daemon writes after a successful climb. Hermetic:
+    /// no node, no network, no credentials, and no spawn at all, because an
+    /// assignment fetch is a file read by design.
+    /// (Added by the phase-3 test-writer; the assertions below are untouched.)
+    static let daemon = SourceCase(name: "DaemonAssignmentSource") {
+        let world = DaemonWorld()
+        world.seedCache(data: DaemonJSON.cache, status: DaemonJSON.freshStatus)
+        // The world owns the temp root and deletes it when the source goes away.
+        return RootedAssignmentSource(world: world, inner: world.assignmentSource())
+    }
+
     /// The real adapter over the standard session seam: `SESSION_JSON` when set,
     /// else `~/Library/Application Support/BrightspaceBar/session.json`. A missing
     /// or dead session fails the live run loudly — never silently green.
@@ -89,7 +101,7 @@ struct AssignmentSourceContractTests {
 
     /// Runs offline, always. Add further hermetic implementations here and they
     /// are held to the same contract automatically.
-    private static let hermetic: [SourceCase] = [.fake]
+    private static let hermetic: [SourceCase] = [.fake, .daemon]
 
     @Test(
         "a hermetic source satisfies the contract",
