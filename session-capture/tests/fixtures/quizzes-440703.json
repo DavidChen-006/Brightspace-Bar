@@ -1,0 +1,22 @@
+{
+  "Objects": [
+    {
+      "QuizId": 476481,
+      "Name": "Module 1 Completion Quiz - What Is Research?",
+      "IsActive": true,
+      "DueDate": null,
+      "StartDate": null,
+      "EndDate": null,
+      "Description": null,
+      "ActivityId": "https://ids.brightspace.com/activities/quiz/A4E19B37-0C82-4D6E-9F15-3B7A62D8E0C9-476481",
+      "AttemptsAllowed": { "IsUnlimited": true, "NumberOfAttemptsAllowed": null },
+      "CategoryId": null,
+      "DisplayInCalendar": false,
+      "GradeItemId": null,
+      "Shuffle": false,
+      "SortOrder": 1,
+      "SubmissionTimeLimit": null
+    }
+  ],
+  "Next": null
+}
