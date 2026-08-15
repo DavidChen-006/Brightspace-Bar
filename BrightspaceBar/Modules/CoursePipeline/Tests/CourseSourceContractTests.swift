@@ -1,11 +1,14 @@
 import Foundation
 import Testing
 import CoursePipeline
-import BrightspaceSession
 
 /// `true` only when the operator asks for a live run: `BS_LIVE=1 swift test`.
 /// Read once at load so the gate cannot change mid-suite.
 private let bsLiveEnabled = ProcessInfo.processInfo.environment["BS_LIVE"] != nil
+
+/// The daemon a live run spawns — the same resolution `main.swift` performs.
+private let liveDaemonCLI = ProcessInfo.processInfo.environment["BSB_REFRESH_CLI"]
+    ?? NSHomeDirectory() + "/PaperShelf/session-capture/src/refresh.mjs"
 
 /// Signals that Concern 3.5 has not landed yet. Only reachable when `BS_LIVE` is set
 /// before the real adapter exists — a deliberately loud failure rather than a silent skip,
@@ -40,11 +43,22 @@ private struct SourceCase: Sendable, CustomStringConvertible {
         return RootedCourseSource(world: world, inner: world.courseSource())
     }
 
-    /// The real adapter, over the standard session seam: `SESSION_JSON` when set,
-    /// else `~/Library/Application Support/BrightspaceBar/session.json`. A missing
-    /// or dead session fails the live run loudly — never silently green.
-    static let live = SourceCase(name: "BrightspaceCourseSource") {
-        BrightspaceCourseSource(provider: FileSessionProvider.standard)
+    /// The real thing: the actual `node src/refresh.mjs`, against the actual
+    /// `BSB_ROOT` (`BSB_REFRESH_CLI` overrides the CLI's location, the
+    /// `SESSION_JSON` precedent). It climbs the real ladder with David's real
+    /// credentials and writes the real cache, so a dead session or a broken
+    /// endpoint fails the live run loudly — never silently green.
+    ///
+    /// Cron-safe, deliberately: no `--allow-full-login`, so this can never open a
+    /// browser window mid-suite. A run that needs a headed login fails as
+    /// `.sessionExpired`, which is the honest answer (D8).
+    static let live = SourceCase(name: "DaemonCourseSource (live)") {
+        DaemonCourseSource(runner: DaemonRunner(
+            executable: URL(fileURLWithPath: "/usr/bin/env"),
+            arguments: ["node", liveDaemonCLI],
+            paths: DaemonPaths.resolve(),
+            timeout: 180
+        ))
     }
 }
 

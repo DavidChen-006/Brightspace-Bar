@@ -1,10 +1,8 @@
 import AppKit
 import AssignmentPipeline
-import BrightspaceSession
 import CourseMenu
 import CoursePipeline
 import MenuAdapter
-import QuizPipeline
 
 // ═════════════════════════════════════════════════════════════════════════════
 // COMPOSITION ROOT — the one file allowed to see both sides of the contract.
@@ -37,6 +35,22 @@ private let pollInterval: TimeInterval = 15 * 60
 /// `HomeUrl` field is null for nearly every real enrollment.
 private let brightspaceBaseURL = URL(string: "https://purdue.brightspace.com")!
 
+/// The daemon CLI this app spawns: `BSB_REFRESH_CLI` when set — which is how a
+/// test or a moved checkout points elsewhere, the `SESSION_JSON` precedent —
+/// otherwise David's own `session-capture` package.
+///
+/// Run through `/usr/bin/env` so `node` is found on PATH rather than pinned to
+/// one installation.
+private let daemonCLI = ProcessInfo.processInfo.environment["BSB_REFRESH_CLI"]
+    ?? NSHomeDirectory() + "/PaperShelf/session-capture/src/refresh.mjs"
+
+/// How long a spawn may take before it is killed. Generous: a run that has to
+/// climb the silent rung launches a headless browser and waits on a real Entra
+/// round trip, and the cost of being wrong in the short direction is a refresh
+/// that can never succeed. Comfortably inside `pollInterval`, so a stuck run can
+/// never overlap the next one.
+private let daemonTimeout: TimeInterval = 3 * 60
+
 let app = NSApplication.shared
 // Menu-bar-only at runtime — LSUIElement's twin, so even the bare `swift build`
 // executable stays out of the Dock.
@@ -46,6 +60,10 @@ let dataSource: any MenuDataSource
 /// Set only in the live path: the launch fetch needs the poller directly, and it
 /// must not go through `MenuDataSource.refresh()`, which maps to `.manual`.
 var launchFetch: (@Sendable () async -> Void)?
+/// Set only in the live path: what the production timer fires. Separate from
+/// `launchFetch` for the same reason — the trigger is part of the meaning, and
+/// `.timer` must reach `PollPolicy` as `.timer`.
+var timerFetch: (@Sendable () async -> Void)?
 
 // Escape hatch: BRIGHTSPACEBAR_STUB=1 launches against the phase-2 seeded stub —
 // no session file, no network — so the GUI stays demoable offline.
@@ -54,11 +72,10 @@ if ProcessInfo.processInfo.environment["BRIGHTSPACEBAR_STUB"] == "1" {
 } else {
     // ── The backend stack, assembled bottom-up ────────────────────────────────
     //
-    //   BrightspaceCourseSource     → Poller ⇄ CourseCache      ─┐
-    //                                 (PollPolicy decides)       │
-    //   BrightspaceAssignmentSource ┐                            ├→ MenuAdapter
-    //   BrightspaceQuizSource       ┴→ Composite → Fetcher ⇄ Store ┘
-    //                                 (two requests per visible course)
+    //   DaemonRunner → DaemonCourseSource → Poller ⇄ CourseCache  ─┐
+    //     (spawns node src/refresh.mjs)     (PollPolicy decides)   ├→ MenuAdapter
+    //   DaemonAssignmentSource → Fetcher ⇄ Store  ─────────────────┘
+    //     (reads the same cache; no spawn)
     //
     // Every constructor here is synchronous by design, which is what lets this
     // file stay a sync main. The only async steps (load + tick + fan-out) run in
@@ -77,21 +94,30 @@ if ProcessInfo.processInfo.environment["BRIGHTSPACEBAR_STUB"] == "1" {
         staleAfter: pollInterval
     )
 
-    // SEAM: session acquisition. Today `FileSessionProvider.standard` — the JSON
-    // that `Scripts/refresh-session.sh` writes to
-    // `~/Library/Application Support/BrightspaceBar/session.json` (`SESSION_JSON`
-    // overrides). Later, a `WKWebView` login window conforms to the same
-    // `SessionProviding` and this is the ONLY line that changes.
+    // SEAM: where data comes from. The app does not fetch, hold a cookie, or mint
+    // a JWT any more — it spawns the Node daemon, which owns the login ladder
+    // (existing credentials → silent Entra SSO → headed login) and David's own
+    // endpoints, and writes `$BSB_ROOT/cache/`. Secrets stay on that side of the
+    // boundary entirely (D7).
     //
-    // The provider is consulted per fetch and its failures are typed: no file →
-    // `.transport`, dead cookie → `.sessionExpired` — both of which the cache
-    // folds into `.preservedStale`, so cached courses still render with an honest
-    // staleness line instead of the app dying at launch.
-    // One provider serves all three sources, so courses, assignments and quizzes
-    // always authenticate with the same session and a refreshed cookie reaches all
-    // of them.
-    let sessionProvider = FileSessionProvider.standard
-    let source = BrightspaceCourseSource(provider: sessionProvider)
+    // `BSB_ROOT` is resolved here, once, exactly as `session-capture/src/paths.mjs`
+    // resolves it, and the same value is both handed to the child and read back
+    // from — so the writer and the reader cannot disagree about which install
+    // they mean.
+    //
+    // ⚠️ D8: no argument is passed, and in particular never --allow-full-login.
+    // `CourseSource.fetchCourses()` carries no trigger context, so the app cannot
+    // tell a manual click from a timer tick at the source; every spawn it can make
+    // is therefore a cron-safe one, which may climb the silent rung and no
+    // further. A headed login is terminal-initiated, with David present:
+    // `npm run refresh -- --allow-full-login`.
+    let daemonPaths = DaemonPaths.resolve()
+    let source = DaemonCourseSource(runner: DaemonRunner(
+        executable: URL(fileURLWithPath: "/usr/bin/env"),
+        arguments: ["node", daemonCLI],
+        paths: daemonPaths,
+        timeout: daemonTimeout
+    ))
 
     let poller = Poller(
         source: source,
@@ -100,21 +126,12 @@ if ProcessInfo.processInfo.environment["BRIGHTSPACEBAR_STUB"] == "1" {
         clock: clock
     )
 
-    // SEAM: the two routes a course's work arrives on. Assignments come from
-    // `dropbox/folders`, quizzes from `quizzes/` — a separate D2L entity with a
-    // separate envelope and a separate deep-link template, and one the app used to
-    // omit silently: on this tenant it showed 4 assignments while hiding 4 quizzes.
-    //
-    // The composite hides that two-ness BELOW the store, so `AssignmentFetcher`,
-    // `AssignmentStore` and every submenu see one list per course. It also decides
-    // what a half-failure means: a quiz route answering 403 returns the assignments
-    // anyway rather than throwing, which would have discarded data just fetched
-    // successfully. Both sources share `sessionProvider`, so a refreshed cookie
-    // reaches both on the next fetch.
-    let workSource = CompositeAssignmentSource(sources: [
-        BrightspaceAssignmentSource(provider: sessionProvider),
-        BrightspaceQuizSource(provider: sessionProvider),
-    ])
+    // SEAM: a course's work — assignments and quizzes both, merged by the daemon
+    // before it ever reaches disk, which is why there is no composite here any
+    // more. This source takes paths and no runner: every course's answer is
+    // already inside the one `data.json` the course fetch just produced, so the
+    // fan-out over 27 courses costs 27 file reads and not one extra spawn.
+    let workSource = DaemonAssignmentSource(paths: daemonPaths)
 
     // SEAM: the assignments half. `AssignmentFeed` builds the fetcher and its
     // store together — passing them separately would allow a fetcher wired to a
@@ -148,6 +165,14 @@ if ProcessInfo.processInfo.environment["BRIGHTSPACEBAR_STUB"] == "1" {
     // Assignments always fetch, because nothing on disk can supply them.
     launchFetch = { await adapter.launch() }
 
+    // SEAM: the timer trigger, driving the poller directly. NOT
+    // `MenuDataSource.refresh()`, which maps to `.manual` and always fetches:
+    // `.timer` is the trigger `PollPolicy` may decline when the cache is still
+    // fresh, and the whole point of a trigger is that it reaches the policy
+    // intact. Courses only — the assignment fan-out lives behind `MenuAdapter`
+    // and still runs at launch and on a manual refresh.
+    timerFetch = { _ = await poller.tick(.timer) }
+
     dataSource = adapter
 }
 
@@ -163,8 +188,24 @@ let controller = StatusBarController(
 // adds the launch fetch on top and repaints if it changed anything.
 Task { @MainActor in
     await controller.reload()          // disk first: instant, offline-safe
-    await launchFetch?()               // then the network, if the policy agrees
+    await launchFetch?()               // then the daemon, if the policy agrees
     await controller.reload()          // repaint only if the model actually changed
+}
+
+// The production timer, at last: until now `.timer` was a trigger only tests
+// ever fired, so the app refreshed at launch and on a click and otherwise sat
+// there going stale. Top-level `let` keeps it (and its timer) alive for the life
+// of the process.
+let refreshTimer = RefreshScheduler()
+if let timerFetch {
+    refreshTimer.restart(interval: pollInterval) {
+        // The tick handler stays synchronous — a `Timer` cannot await — and hands
+        // the work to a Task, which is also what keeps this file a sync main.
+        Task { @MainActor in
+            await timerFetch()
+            await controller.reload()
+        }
+    }
 }
 
 app.run()

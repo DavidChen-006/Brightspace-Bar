@@ -27,6 +27,10 @@ import AssignmentPipeline
 /// Read once at load so the gate cannot change mid-suite.
 private let bsLiveEnabled = ProcessInfo.processInfo.environment["BS_LIVE"] != nil
 
+/// The daemon a live run spawns — the same resolution `main.swift` performs.
+private let liveDaemonCLI = ProcessInfo.processInfo.environment["BSB_REFRESH_CLI"]
+    ?? NSHomeDirectory() + "/PaperShelf/session-capture/src/refresh.mjs"
+
 /// One implementation under test, named so a failure says which one broke.
 private struct SourceCase: Sendable, CustomStringConvertible {
     let name: String
@@ -51,11 +55,23 @@ private struct SourceCase: Sendable, CustomStringConvertible {
         return RootedAssignmentSource(world: world, inner: world.assignmentSource())
     }
 
-    /// The real adapter over the standard session seam: `SESSION_JSON` when set,
-    /// else `~/Library/Application Support/BrightspaceBar/session.json`. A missing
-    /// or dead session fails the live run loudly — never silently green.
-    static let live = SourceCase(name: "BrightspaceAssignmentSource") {
-        BrightspaceAssignmentSource(provider: FileSessionProvider.standard)
+    /// The real thing: the actual `node src/refresh.mjs`, run once against the
+    /// actual `BSB_ROOT`, and then its cache read exactly as the app reads it.
+    ///
+    /// The source cannot spawn — that is its design — so the *arrangement* runs
+    /// the daemon, once, the way a refresh does. Where the hermetic case seeds a
+    /// canned cache, this one earns a real one. Cron-safe: no
+    /// `--allow-full-login`, so a run that needs a headed login fails as
+    /// `.sessionExpired` rather than opening a browser mid-suite (D8).
+    static let live = SourceCase(name: "DaemonAssignmentSource (live)") {
+        let paths = DaemonPaths.resolve()
+        _ = await DaemonRunner(
+            executable: URL(fileURLWithPath: "/usr/bin/env"),
+            arguments: ["node", liveDaemonCLI],
+            paths: paths,
+            timeout: 180
+        ).run()
+        return DaemonAssignmentSource(paths: paths)
     }
 }
 
