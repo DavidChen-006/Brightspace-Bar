@@ -11,8 +11,11 @@
  * `--help` must stay free of side effects — no files, no browser import. It is
  * the one command a human runs to find out what this thing does.
  */
+import { createFetcher } from "./fetch-engine.mjs";
 import { exitCode, runRefresh } from "./orchestrate.mjs";
 import { resolvePaths } from "./paths.mjs";
+import { createFullLoginRung } from "./rungs/full-login.mjs";
+import { createSilentRung } from "./rungs/silent.mjs";
 
 const USAGE = `Usage: node src/refresh.mjs [--allow-full-login]
 
@@ -25,17 +28,6 @@ Climbs the session ladder and writes the course cache under BSB_ROOT
   --help              print this and exit
 
 Exit codes: 0 fresh cache written · 2 needs login · 1 error`;
-
-/**
- * PHASE-2 PLACEHOLDER — replace with src/fetch-engine.mjs (mint → enrollments →
- * assignments). Reporting a transport failure keeps the CLI honest today: it
- * runs, writes a truthful status.json, and exits 1 instead of pretending.
- */
-const notYetBuiltFetcher = {
-  async fetch() {
-    return { ok: false, reason: "transport", detail: "fetch engine not yet built (phase 2)" };
-  },
-};
 
 const args = process.argv.slice(2);
 if (args.includes("--help") || args.includes("-h")) {
@@ -52,9 +44,10 @@ if (unknown.length > 0) {
 
 const status = await runRefresh({
   paths: resolvePaths(),
-  // PHASE-2: the real ladder — [silentRung, fullLoginRung].
-  rungs: [],
-  fetcher: notYetBuiltFetcher,
+  // The ladder, cheapest rung first. The full one is skipped unless the caller
+  // passed --allow-full-login; the gate itself lives in orchestrate.mjs.
+  rungs: [createSilentRung(), createFullLoginRung()],
+  fetcher: createFetcher(),
   clock: () => new Date(),
   allowFullLogin: args.includes("--allow-full-login"),
   log: (message) => console.error(message),
