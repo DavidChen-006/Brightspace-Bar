@@ -101,6 +101,13 @@ click is the proof of presence).
   `session-capture/scripts/`), implemented as deletion: `--cache`, `--session`, `--all`.
 - **D7 — Secrets never enter `cache/`**, never appear in logs (lengths only),
   never cross into Swift. Swift's old session.json read path retires with the swap.
+- **D8 — The app NEVER passes `--allow-full-login` in this build.**
+  `CourseSource.fetchCourses()` carries no trigger context and Contracts.swift is
+  frozen, so the app cannot distinguish manual from timer at the source. All app
+  spawns are cron-safe (rung 1 max). Full login is terminal-initiated
+  (`npm run refresh -- --allow-full-login`, David present — phase 4 tier 2 runs
+  it this way). Wiring a presence-gated full login into the Refresh click (or a
+  dedicated "Log in…" menu item) is an open item, not this build.
 
 ### The rung seam
 
@@ -201,7 +208,8 @@ exit codes) are the load-bearing decisions.
   call, like FileSessionProvider). Exit 2 / status needs-login → throw
   `.sessionExpired` (fold then yields `.preservedStale` — menu never blanks).
 - Production timer: a repeating task in main.swift driving `Poller.tick(.timer)`
-  at the existing `pollInterval`; manual Refresh spawns with `--allow-full-login`.
+  at the existing `pollInterval`. Per D8, no app spawn ever passes
+  `--allow-full-login` — manual Refresh and timer both run the cron-safe ladder.
 - Wiring swap in main.swift ONLY (ArchitectureTests enforce this). Stub mode untouched.
 - Delete the retired Swift network path; migrate its BS_LIVE contract runs to the daemon sources.
 - Tests first: daemon sources through the existing contract suite
