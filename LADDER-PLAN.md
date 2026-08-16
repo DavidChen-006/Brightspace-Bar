@@ -320,9 +320,19 @@ Why a file, not stdout events: D8 — the app is not always the spawner
 pipe. `cache/mfa.json` is ephemeral STATUS: not course data, not a secret
 (the number is display-by-design and useless without the phone).
 
-- Experiment 17 (experiment-17-mfa-icon-watch/): measures file-write→icon
-  latency for kqueue DispatchSource vs FSEventStream vs 500ms poll; picks the
-  render pickup technique. FINDINGS in its README.
+- Experiment 17 (experiment-17-mfa-icon-watch/, commit 66205f0): VERDICT —
+  **kqueue DispatchSource on the cache DIRECTORY**: 2.6ms median / 3.8ms max
+  end-to-end (write→repaint), 5x faster than FSEvents at median, no cold-start
+  tail (FSEvents' first delivery after idle = 117-257ms — and one-write-after-
+  hours-idle is this feature's only traffic pattern). Binding traps for
+  Phase B: (1) watch the DIRECTORY, never the file — a rename unlinks the
+  watched inode and the watcher goes deaf after one write (measured);
+  (2) one atomic write = two dir events, the first a lie — re-read the file
+  and compare content before rendering; (3) warm the font with a throwaway
+  render at startup (first attributedTitle costs 19ms once); (4) revert-check
+  timers in .common run-loop mode; (5) re-arm the watcher if cache/ itself is
+  deleted (reset.sh --cache); (6) delete is a first-class event (icon revert).
+  Untested, accepted: kqueue across sleep/wake.
 - Phase A (daemon): test-writer pins the mfa.json contract in the full rung —
   written on scrape (mintedAt from clock), deleted on success/expiry/error/
   crash-path, never any credential material; hermetic via the rung's injected
