@@ -417,6 +417,76 @@ routes, verified — but undocumented, so corroborating key only).
 content/discussions and whether graded work arrives via LTI — then re-derive
 the ranking from coverage numbers before building rungs 3-5 of this list.
 
+## BUILD 4 — rung 2 v1: the gradebook diff → "Heads up" section (started 2026-08-16)
+
+**The story.** The gradebook is the one place graded work casts a shadow before
+it is visible anywhere else. Rung 2 v1: fetch each course's `grades/` alongside
+the two content routes, and any student-scored column that matches NO fetched
+item becomes a row in a new per-course submenu section — name only, no date,
+linking to the course gradebook. Stub-mode build (no live semester exists);
+David decided: no rung 3, no TOC, no name-regex until Fall data justifies them.
+
+**The diff rule (decided, includes the linked-but-hidden case).** A column is a
+heads-up row when it is student-scored AND unmatched:
+- student-scored = `GradeObjectTypeId ∈ {1,2,3,4}` (numeric/passfail/selectbox/
+  text). Categories, calculated, formula, and final grades are excluded — a
+  "Final Calculated Grade" heads-up row would be visible nonsense.
+- unmatched = `AssociatedTool` is null, **or** `AssociatedTool.ToolItemId`
+  equals no fetched item id in that course. Linked-but-unfetchable (hidden /
+  release-gated — the Civics probe case, 4/5 columns) is the most valuable
+  catch and MUST be included; "unlinked only" is the wrong membership test.
+
+**Contract change (data.json — the whole API, additive).** Per-course item
+lists gain a third `kind`:
+
+```json
+{ "id": <GradeObjectId>, "title": <grade item Name>, "dueDate": null,
+  "kind": "gradeOnly",
+  "url": "<base>/d2l/lms/grades/my_grades/main.d2l?ou=<courseId>" }
+```
+
+- `dueDate` is ALWAYS null in v1. The date ladder / abstaining regex is a Fall
+  decision, designed from logged real column names, not guessed now.
+- Route: `GET /d2l/api/le/{LE_VERSION}/{courseId}/grades/` (bearer; bare JSON
+  array of GradeObjects; fields used: `Id`, `Name`, `GradeObjectTypeId`,
+  `AssociatedTool{ToolId,ToolItemId}`).
+- Failure isolation extends "half the data beats none": the grades route
+  failing (transport, non-2xx, bad shape) costs ONLY the gradeOnly rows and a
+  log line — never the course. Course-unknown stays "both dropbox AND quizzes
+  failed"; grades never votes.
+
+**Swift contract.**
+- `ItemKind.gradeOnly`; wire string `"gradeOnly"`; every other unknown string
+  still fails the course (the existing parseKind rule is untouched).
+- Section list gains `(.gradeOnly, "Heads up")` LAST; existing labelling rule
+  (headers only when >1 populated section) unchanged.
+- Row subtitle is the fixed string `"In gradebook — no due date"` — never
+  `dueLabel`, so the section explains itself to a student.
+- Click target: `{base}/d2l/lms/grades/my_grades/main.d2l?ou={courseId}` (a new
+  GradebookLink beside AssignmentLink/QuizLink; the exhaustive clickTarget
+  switch forces this decision at compile time).
+- **Heatmap: gradeOnly marks NOTHING.** `GraphTranslation.strip` excludes
+  gradeOnly items by kind — pinned with a hostile *dated* gradeOnly item, so
+  the exclusion is structural, not an accident of null dates.
+
+**Phases (subagent protocol as before: fresh agents, red then green, every
+spike commits scoped files only and pushes).**
+- **Phase 0 (orchestrator)** — this contract. Commit+push.
+- **Phase A (backend, session-capture)** — A1 test-writer red, A2 builder
+  green. Parallel with B.
+- **Phase B (frontend, BrightspaceBar)** — B1 test-writer red, B2 builder
+  green. Parallel with A.
+- **Phase C (intent E2E, stub mode)** — C1 test-writer writes the intent test
+  (designed gradebook fixtures → daemon writes data.json → Swift renders the
+  Heads up row, heatmap untouched); orchestrator runs it personally; a builder
+  spike only if it reads red.
+
+**Tree caveat (2026-08-16):** experiment-18 refresh-countdown work sits
+UNCOMMITTED in BrightspaceBar (MenuAssembler, MenuModel, MenuTranslation,
+RefreshScheduler, StatusText + tests). Both suites green with it in-tree
+(node 195 pass / Swift 577 pass — the BUILD 4 baseline). No BUILD 4 file
+overlaps it; agents stage explicit paths only, never `git add -A`.
+
 ## Open items / not in scope now
 - Wake-from-sleep trigger (`NSWorkspace.didWakeNotification`) — add after E2E greens.
 - Menu-open trigger (`.menuOpened` exists in `PollTrigger` but is unwired in
