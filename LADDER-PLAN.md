@@ -373,6 +373,50 @@ unless BSB_FULL_HEADED=1; cron/silent can NEVER open a window regardless.
 NOTE: this repo now drives the interactive Entra form headless for the first
 time and it works (proven live); watch for tenant UA/conditional-access changes.
 
+## RUNG 2 — defined by survey (2026-08-16, docs + live probe; not yet built)
+
+Context that gates everything: **no live semester course existed at probe time**
+— 25/27 courses 403 uniformly across ALL endpoint families (exp 6's gate);
+only the 2 non-semester shells answered. 9 Fall-2026 sections already exist in
+the tenant (visible only with the `orgUnitTypeId=3` filter dropped). So the
+verdicts below prove MECHANISM; population rates are unmeasurable until Fall.
+
+**Rung 2 = the course's own gradebook and index, cross-checked against the
+map.** Deterministic, gated to courses whose rung-1 call returned 200
+(~25 extra GETs per live semester, not 135). Ranked:
+1. **Gradebook diff (2 GETs/course, DETECTION)** — PROVEN live: students CAN
+   call `grades/`; `AssociatedTool{ToolId,ToolItemId}` populated; ID-join
+   verified both directions (ToolItemId == folder Id / QuizId; reverse link
+   folder/quiz.GradeItemId == gradeObject.Id is the primary join). The two
+   sources genuinely disagree on the shells — 4/5 Civics grade objects point
+   at quizzes rung 1 cannot see (release-gated), AND two quizzes carry
+   GradeItemIds whose grade objects 404: NEITHER LIST IS A SUPERSET. Doubt
+   kind: `gradedItemNotVisible`. `myGradeValues.LastModified` dates prove
+   work happened even when nothing is dated.
+2. **TOC spine (1 GET/course, DETECTION + robustness)** — merge by
+   (ToolId,ToolItemId); prefer TOC's server-provided quickLink `Url` over the
+   hand-built template in fetch-engine; ToolId 390000 (LTI) topics →
+   `externallyHosted` doubt flag (Gradescope hypothesis: plausible, untested).
+3. **Discussions (1+F GETs, ACQUISITION)** — the only pure acquisition source:
+   topics carry first-class DueDate + ScoringType/ScoreOutOf.
+4. **Content `modules/{id}/structure/` — DEFERRED** (~10-20 calls/course; its
+   value = whether instructors set content due dates: unmeasured, decide on
+   Fall data). `content/root/` children are stubs — not a shortcut.
+5. **Course-set doubt (1-2 GETs total)** — unfiltered myenrollments reveals
+   next semester's sections before offerings exist (delimited Code parse, not
+   fuzzy). LATENT BUG found: unfiltered call paginates at 100; current fetcher
+   would silently truncate a >100 filtered set someday.
+**Dropped: calendar** — 3 events across 27 courses × 3 years; every item has
+`DisplayInCalendar: false` (docs: defaults false, per-instructor opt-in).
+Dead on this tenant; the daemon can assert this from rung-1 payloads for free.
+Schema: per-course `doubt: [{source, kind, count, evidence[]}]` in data.json
+(fetched layer); items gain optional `activityId` (byte-identical across
+routes, verified — but undocumented, so corroborating key only).
+**ACTION when Fall 2026 offerings go live (days): re-run the probe**
+(scratchpad p8/p10 scripts) to measure DueDate population on dropbox/quizzes/
+content/discussions and whether graded work arrives via LTI — then re-derive
+the ranking from coverage numbers before building rungs 3-5 of this list.
+
 ## Open items / not in scope now
 - Wake-from-sleep trigger (`NSWorkspace.didWakeNotification`) — add after E2E greens.
 - Menu-open trigger (`.menuOpened` exists in `PollTrigger` but is unwired in
