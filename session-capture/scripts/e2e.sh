@@ -368,7 +368,7 @@ tier2() {
   # gone, so silent SSO CANNOT succeed — which makes them mandatory here.
   if [ -z "${BS_EMAIL:-}" ] || [ -z "${BS_PASSWORD:-}" ]; then
     say "REFUSED: tier 2 needs BS_EMAIL and BS_PASSWORD in the environment." >&2
-    say "         The headed rung autofills them (D3); it never waits for typing." >&2
+    say "         The full rung autofills them; it never waits for typing." >&2
     say "         Nothing has been deleted. Re-run as:" >&2
     say "           BS_EMAIL='you@purdue.edu' BS_PASSWORD='…' scripts/e2e.sh tier2 --yes" >&2
     exit 2
@@ -381,13 +381,15 @@ tier2() {
   cat <<EOF
 
   WHAT HAPPENS NEXT — read this before it starts:
-    1. A Chromium window OPENS (headed, on purpose). Leave it alone.
+    1. NO window opens — the login runs fully headless in the background.
     2. It fills in your email and password by itself.
-    3. Microsoft shows a NUMBER on that screen. Have your phone ready:
+    3. Microsoft shows a NUMBER. This script SHOUTS it at you (and, if the app
+       is running, it appears on the menu-bar icon). Have your phone ready:
        approve the sign-in and type that number into the Authenticator prompt.
     4. If it offers "Stay signed in?" the script clicks Yes — that is the
-       wristband every later tier-1 run lives on. Do not click No.
-    5. The window closes itself. Then ~55 requests fetch courses and assignments.
+       wristband every later tier-1 run lives on.
+    5. Then ~55 requests fetch courses and assignments.
+    (To watch the browser for debugging, re-run with BSB_FULL_HEADED=1.)
   Budget: up to ${LOGIN_TIMEOUT}s in total. Do not close the terminal.
 
 EOF

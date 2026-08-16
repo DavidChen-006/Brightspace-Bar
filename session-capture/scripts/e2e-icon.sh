@@ -413,14 +413,13 @@ BSB_ROOT="$ROOT" "$RESET_SH" --all || fail "reset.sh --all failed" "the root was
 cat <<EOF
 
   WHAT HAPPENS NEXT — read this before it starts:
-    1. A Chromium window OPENS (headed, for now). Leave it alone.
-    2. It fills in your email and password by itself.
-    3. Microsoft shows a NUMBER — and THIS SCRIPT WILL SHOUT IT AT YOU, because
-       the point of this run is that the SAME number appears ON YOUR MENU BAR.
-       Look up there, then type it into Authenticator on your phone.
+    1. NO window opens — the login runs fully headless. Watch your MENU BAR.
+    2. It fills in your email and password by itself, in the background.
+    3. Microsoft shows a NUMBER — it appears ON YOUR MENU BAR icon (and this
+       script also SHOUTS it at you). Type it into Authenticator on your phone.
     4. If it offers "Stay signed in?" the rung clicks Yes — that is the wristband.
-    5. The window closes itself, ~55 requests fetch courses, and the icon goes
-       back to being a logo.
+    5. ~55 requests fetch courses, and the icon goes back to being a logo.
+    (To watch the browser for debugging, re-run with BSB_FULL_HEADED=1.)
   The number is only good for 60 seconds on the icon. Watch the menu bar.
 
 EOF
