@@ -202,11 +202,16 @@ if ProcessInfo.processInfo.environment["BRIGHTSPACEBAR_STUB"] == "1" {
     dataSource = adapter
 }
 
-// Top-level `let` keeps the controller (and its status item) alive for the
-// life of the process.
+// SEAM: which browser a click opens in. The switch defaults to `.chromium` —
+// clicks land in the daemon's signed-in profile with no login — and flips to the
+// default browser with `BSB_BROWSER_TARGET=system`. The composition root asks
+// for a target and never names a concrete opener.
+//
+// Top-level `let` keeps the controller (and its status item) alive for the life
+// of the process.
 let controller = StatusBarController(
     dataSource: dataSource,
-    opener: WorkspaceURLOpener()
+    opener: BrowserTarget.resolve().makeOpener()
 )
 
 // SEAM: the login challenge. The daemon writes the Entra verification number to
