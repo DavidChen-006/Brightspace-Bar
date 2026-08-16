@@ -102,3 +102,69 @@ BS_EMAIL=x@y.edu BS_PASSWORD=z scripts/e2e.sh all --yes
 The stub must write `data.json` (`fetchedAt` = now, non-empty `courses` with
 unique positive ids), `status.json` (`state`, `rungUsed`), `session.json`, and a
 `profile/` directory, then exit 0. That is exactly what the assertions read.
+
+## The MFA-icon E2E — `scripts/e2e-icon.sh`
+
+The BUILD 2 acceptance run: the number Entra shows lands on the **status-bar
+icon**, David types it into Authenticator, and the icon goes back to the logo.
+It is `tier2` plus the icon claim — same cost (one MFA, the root is wiped, the
+wristband is re-seeded), same artifact-only discipline.
+
+```sh
+cd ~/PaperShelf/BrightspaceBar && ./Scripts/run.sh      # the app must already be running
+cd ~/PaperShelf/session-capture
+BS_EMAIL='you@purdue.edu' BS_PASSWORD='…' scripts/e2e-icon.sh --yes
+```
+
+What it does, in order: check the preconditions (credentials, a running app) →
+wipe the root → start `refresh.mjs --allow-full-login` in the **background** →
+poll for `cache/mfa.json` → the instant it appears, print an unmissable banner
+with the number and measure the icon → wait for the login → assert exit 0,
+`mfa.json` **gone**, the icon back to logo width, `status.json` `fresh`/`full`,
+a fresh non-empty `data.json`, and `profile/` re-seeded.
+
+The banner is the point: the number it shouts is read from `mfa.json`, and the
+icon must be showing that same number. Look up before you touch your phone —
+the badge is only good for **60 seconds** (`MfaBadge.ttl`), whatever the phone
+is doing.
+
+### The icon witness
+
+`screencapture` is TCC-denied in the session this was written in, so the
+automated evidence is the status item's **window geometry**: `ICON_WITNESS`
+points at a helper that prints BrightspaceBar's window bounds (logo ≈ 30pt
+wide, a two-digit badge ≈ 62pt). Three readings — before the wipe, with the
+number live, after the login — give two assertions: the item **grew** for the
+badge, and **shrank back** afterwards. When the helper is missing or prints no
+status-item window, both checks report `skipped: no witness` and the run can
+still green. **David's eyes are the primary verification**; the witness only
+catches a regression when nobody is looking.
+
+### Exit codes and preconditions
+
+Same alphabet as `e2e.sh`: **0** green · **1** an assertion failed · **2** usage
+or a refused wipe · **3** a precondition is not met. One deliberate difference:
+missing `BS_EMAIL`/`BS_PASSWORD` is a **3** here (a precondition, like the app
+not running), where `e2e.sh tier2` calls it a refusal (**2**). Both check before
+deleting anything.
+
+The script never launches the app: `run.sh` rebuilds, which is not a test
+script's decision. If nothing is running it prints the command and exits 3.
+
+Note that the running app polls on its own every 15 minutes without
+`--allow-full-login`. Such a tick cannot touch `mfa.json` (the full rung is
+skipped before it is entered), but it *can* overwrite `status.json` with
+`needs-login` while the root is empty — a `status.json` assertion that fails
+that way is a collision, not a regression. Re-run.
+
+| Variable | Meaning |
+|---|---|
+| `ICON_WITNESS` | the window-geometry helper. Missing → the width checks skip. |
+| `ICON_MFA_TIMEOUT` | seconds to wait for `cache/mfa.json`, default 90. |
+| `ICON_LOGIN_TIMEOUT` | seconds for the whole run, default 600 (mostly your phone). |
+| `ICON_REQUIRE_APP` | 1 (default) demands a running app; 0 is for rehearsals only. |
+
+`BSB_ROOT` and `BSB_REFRESH_CLI` mean what they mean above, and rehearsing is
+the same trick: a throwaway root plus a stub CLI that writes `mfa.json`, sleeps,
+deletes it, writes a good cache and exits 0 (with `ICON_REQUIRE_APP=0`, since a
+rehearsal has no icon).
