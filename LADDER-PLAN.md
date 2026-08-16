@@ -301,7 +301,13 @@ exit codes) are the load-bearing decisions.
 - Suite: 518 tests / 68 suites, green hermetic AND under BS_LIVE=1
   (live cases spawn the real daemon; needs a seeded BSB_ROOT).
 
-## BUILD 2 — the MFA number on the icon (started 2026-08-16)
+## BUILD 2 — the MFA number on the icon (started 2026-08-16 — **COMPLETE, E2E GREEN same night**)
+
+Live pass evidence (scripts/e2e-icon.sh, one MFA): number "72" published 69s
+into the run; status item measured GROWING 30pt→62pt while the number was
+live and SHRINKING back 62pt→30pt after the login; mfa.json deleted by the
+rung's finally; status fresh, rungUsed full, 27 courses, wristband re-seeded.
+Suites: session-capture 166 (162 pass/4 BS_LIVE-skip) · Swift 561/74 green.
 
 The finished form of the login story: during a full login, the status-bar icon
 becomes the verification number; the human types it into Authenticator on their
