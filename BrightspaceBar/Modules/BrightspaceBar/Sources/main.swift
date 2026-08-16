@@ -51,6 +51,13 @@ private let daemonCLI = ProcessInfo.processInfo.environment["BSB_REFRESH_CLI"]
 /// never overlap the next one.
 private let daemonTimeout: TimeInterval = 3 * 60
 
+/// The install both halves mean, resolved once and shared: the daemon is handed
+/// this root and writes `cache/` under it, and the MFA watcher watches that same
+/// `cache/`. Resolved out here rather than inside the live branch because the
+/// watcher is wired in both modes — resolution is pure and creates nothing, so
+/// the stub path pays only the string.
+let daemonPaths = DaemonPaths.resolve()
+
 let app = NSApplication.shared
 // Menu-bar-only at runtime — LSUIElement's twin, so even the bare `swift build`
 // executable stays out of the Dock.
@@ -100,10 +107,10 @@ if ProcessInfo.processInfo.environment["BRIGHTSPACEBAR_STUB"] == "1" {
     // endpoints, and writes `$BSB_ROOT/cache/`. Secrets stay on that side of the
     // boundary entirely (D7).
     //
-    // `BSB_ROOT` is resolved here, once, exactly as `session-capture/src/paths.mjs`
-    // resolves it, and the same value is both handed to the child and read back
-    // from — so the writer and the reader cannot disagree about which install
-    // they mean.
+    // `BSB_ROOT` is resolved once, at the top of this file, exactly as
+    // `session-capture/src/paths.mjs` resolves it, and the same value is both
+    // handed to the child and read back from — so the writer and the reader
+    // cannot disagree about which install they mean.
     //
     // ⚠️ D8: no argument is passed, and in particular never --allow-full-login.
     // `CourseSource.fetchCourses()` carries no trigger context, so the app cannot
@@ -111,7 +118,6 @@ if ProcessInfo.processInfo.environment["BRIGHTSPACEBAR_STUB"] == "1" {
     // is therefore a cron-safe one, which may climb the silent rung and no
     // further. A headed login is terminal-initiated, with David present:
     // `npm run refresh -- --allow-full-login`.
-    let daemonPaths = DaemonPaths.resolve()
     let source = DaemonCourseSource(runner: DaemonRunner(
         executable: URL(fileURLWithPath: "/usr/bin/env"),
         arguments: ["node", daemonCLI],
@@ -183,6 +189,26 @@ let controller = StatusBarController(
     dataSource: dataSource,
     opener: WorkspaceURLOpener()
 )
+
+// SEAM: the login challenge. The daemon writes the Entra verification number to
+// `cache/mfa.json` mid-login and deletes it when the challenge resolves; the
+// watcher turns that file into `IconState` and this is the one place allowed to
+// know both that word and `show(code:)` — `IconState` is a CoursePipeline type
+// and no view file may import a backend module.
+//
+// Wired in both modes, stub included: it is a reader of one file and spawns
+// nothing (D8), so the cost of running it against a stub install is a kqueue
+// descriptor, and the reward is that the demo path exercises the same wiring the
+// live one does. Top-level `let` because a watcher bound inside a branch is
+// deallocated at the end of it, cancelling its source — the app would launch,
+// wire everything, and never see a challenge.
+let mfaWatcher = MfaWatcher(paths: daemonPaths)
+mfaWatcher.start { state in
+    switch state {
+    case .code(let number): controller.show(code: number)
+    case .logo: controller.show(code: nil)
+    }
+}
 
 // The controller's own init already pulls `currentMenu()`, which serves the
 // cache off disk — so courses appear without waiting for the network. This Task

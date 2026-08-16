@@ -33,6 +33,10 @@ public struct DaemonPaths: Sendable, Equatable {
     public var cacheDirectory: URL { self.root.appending(path: "cache") }
     public var dataFile: URL { self.cacheDirectory.appending(path: "data.json") }
     public var statusFile: URL { self.cacheDirectory.appending(path: "status.json") }
+    /// The login challenge in flight, written mid-run and deleted on every exit
+    /// path. Under `cache/` with the rest: it is ephemeral status, and the app
+    /// watches that one directory for all of it.
+    public var mfaFile: URL { self.cacheDirectory.appending(path: "mfa.json") }
 
     /// Where the install lives when `BSB_ROOT` is unset — `paths.mjs`'s
     /// `DEFAULT_ROOT`, so writer and reader agree without being told.

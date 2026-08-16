@@ -24,10 +24,8 @@ public final class StatusBarController {
         self.dataSource = dataSource
         self.opener = opener
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        self.statusItem.button?.image = NSImage(
-            systemSymbolName: Self.iconSymbolName,
-            accessibilityDescription: "Brightspace courses"
-        )
+        self.statusItem.button?.image = Self.logoImage
+        Self.warmUp()
         // Placeholder immediately — the icon must never carry an empty menu —
         // then whatever the data source already knows, without blocking launch.
         self.show(.placeholder)
@@ -41,6 +39,63 @@ public final class StatusBarController {
     /// After that fetch lands, the menu has to be told.
     public func reload() async {
         self.show(await self.dataSource.currentMenu())
+    }
+
+    // MARK: - The MFA number
+
+    /// Shows a verification number in place of the icon, or restores the icon
+    /// when `code` is nil — which is how the caller says the challenge is over.
+    ///
+    /// A `String` and not a state enum: `IconState` lives in `CoursePipeline`
+    /// and no view file may import a backend module, so the composition root is
+    /// the one place that knows both words for this.
+    ///
+    /// Experiment 12 measured this exact path at 1–4 ms: the button is repainted
+    /// in place and the status item is never torn down, which is what keeps it in
+    /// its slot in the menu bar across the flip.
+    public func show(code: String?) {
+        guard let button = self.statusItem.button else { return }
+        guard let code else {
+            // Both title properties, or a previously set `attributedTitle`
+            // survives as a ghost beside the restored icon (exp 12's gotcha).
+            button.attributedTitle = NSAttributedString(string: "")
+            button.title = ""
+            button.image = Self.logoImage
+            button.imagePosition = .imageOnly
+            return
+        }
+        button.image = nil
+        button.imagePosition = .noImage
+        button.attributedTitle = Self.badgeTitle(code)
+    }
+
+    /// The number as the menu bar draws it: exp 12's treatment B, the one it
+    /// recommended for this flow. Red in a menu bar is rare enough to mean
+    /// *something is waiting on you*, and a number-matching prompt is genuinely
+    /// blocking and times out, so this is the one moment where being loud is
+    /// correct. The digits are monospaced so the item does not resize between
+    /// codes like 11 and 88 — `.variableLength` means every status item to its
+    /// left slides when it does.
+    public static func badgeTitle(_ code: String) -> NSAttributedString {
+        NSAttributedString(
+            string: "🔐 \(code)",
+            attributes: [
+                .font: NSFont.monospacedDigitSystemFont(ofSize: 14, weight: .bold),
+                .foregroundColor: NSColor.systemRed,
+            ]
+        )
+    }
+
+    /// Pays the font-resolution cost while nobody is watching. Exp 12 measured
+    /// the FIRST attributed title at 19 ms and every later one under a
+    /// millisecond; unwarmed, that 19 ms lands on the one paint that matters and
+    /// makes a 2.6 ms transport look slow.
+    private static func warmUp() {
+        _ = Self.badgeTitle("88").size()
+    }
+
+    private static var logoImage: NSImage? {
+        NSImage(systemSymbolName: Self.iconSymbolName, accessibilityDescription: "Brightspace courses")
     }
 
     private func show(_ model: MenuModel) {
