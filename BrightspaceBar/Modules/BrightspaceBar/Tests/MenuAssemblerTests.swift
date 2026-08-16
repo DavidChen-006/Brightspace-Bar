@@ -102,7 +102,7 @@ private enum Make {
             .sectionHeader("Spring 2026"),
             .course(Make.three[2]),
             .separator,
-            .status(.updated(Make.epoch)),
+            .status(.nextRefresh(.distantFuture)),
             .command(.refresh),
             .command(.quit),
         ])
@@ -309,7 +309,7 @@ struct MenuAssemblerInertRowTests {
         "header, status, and message rows are neither enabled nor actionable",
         arguments: [
             MenuRow.sectionHeader("Fall 2026"),
-            MenuRow.status(.updated(nil)),
+            MenuRow.status(.nextRefresh(.distantFuture)),
             MenuRow.message("No courses yet"),
         ]
     )
@@ -476,14 +476,13 @@ struct MenuAssemblerRenderingTests {
         // Act
         let menu = assembler.assemble(MenuModel(rows: [
             .sectionHeader("Fall 2026"),
-            .status(.updated(Make.epoch)),
             .status(.nextRefresh(Make.epoch.addingTimeInterval(180 + 720))),
             .message("No courses yet"),
         ]))
 
         // Assert
         #expect(menu.items.map(\.title) == [
-            "Fall 2026", "Updated 3 minutes ago", "Refreshes in 12 minutes", "No courses yet",
+            "Fall 2026", "Refreshes in 12 minutes", "No courses yet",
         ])
     }
 

@@ -46,7 +46,7 @@ struct MenuModelTests {
         let model = MenuModel(rows: [
             .sectionHeader("Term"),
             .course(a),
-            .status(.updated(nil)),
+            .status(.nextRefresh(.distantFuture)),
             .course(b),
             .separator,
             .command(.quit),

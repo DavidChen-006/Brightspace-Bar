@@ -73,7 +73,6 @@ public enum MenuTranslation {
             ))
         }
         rows.append(.separator)
-        rows.append(.status(.updated(lastFetch)))
         if let nextRefresh {
             rows.append(.status(.nextRefresh(nextRefresh)))
         }
@@ -264,8 +263,9 @@ public enum MenuTranslation {
         return s.allSatisfy(\.isNumber) && s.allSatisfy(\.isASCII)
     }
 
-    // The status-string rules that lived here moved to `CourseMenu.StatusText`:
-    // baking "Updated 3 minutes ago" into the model at build time is exactly what
-    // made the menu stale at open. The translation now emits dates; the GUI
-    // formats them when the menu actually opens (experiment 18).
+    // The status row now carries only the next-refresh date; the GUI formats it
+    // against a fresh `now` when the menu opens (experiment 18). `lastFetch`
+    // survives as a parameter for one reason — the cold-start test above, which
+    // tells a never-fetched app (placeholder) from a fetch that found no courses
+    // ("No enrolled courses").
 }

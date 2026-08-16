@@ -8,7 +8,7 @@ import CourseMenu
 // ═════════════════════════════════════════════════════════════════════════════
 // Menu-open freshness — the mechanism experiment 18 exists to prove.
 //
-// The claim: the time rows ("Updated N min ago", "Refreshes in N min") are
+// The claim: the time row ("Refreshes in N min") is
 // correct AT THE MOMENT THE MENU OPENS, with no ticking display timer and no
 // async race, because `NSMenuDelegate.menuWillOpen` is delivered synchronously
 // before the menu is drawn and the titles are recomputed there from the dates
@@ -44,45 +44,49 @@ struct MenuFreshnessTests {
 
     @Test("an assembled menu carries a delegate, so opening can re-title at all")
     func assembledMenuHasADelegate() {
-        let menu = Self.assembled(clock: ClockBox(epoch), rows: [.status(.updated(epoch))])
+        let menu = Self.assembled(
+            clock: ClockBox(epoch),
+            rows: [.status(.nextRefresh(epoch.addingTimeInterval(15 * 60)))]
+        )
         #expect(menu.delegate != nil)
     }
 
-    @Test("opening the menu later re-titles the time rows against the new now")
+    @Test("opening the menu later re-titles the time row against the new now")
     func openingRefreshesTheTimeRows() throws {
-        // Arrange — built at fetch time: "Updated just now", 15 minutes on the
-        // countdown. This is the exact repaint the timer path performs.
+        // Arrange — built at fetch time: 15 minutes on the countdown. This is the
+        // exact repaint the timer path performs.
         let clock = ClockBox(epoch)
         let menu = Self.assembled(clock: clock, rows: [
-            .status(.updated(epoch)),
             .status(.nextRefresh(epoch.addingTimeInterval(15 * 60))),
         ])
-        try #require(menu.items.map(\.title) == ["Updated just now", "Refreshes in 15 minutes"])
+        try #require(menu.items.map(\.title) == ["Refreshes in 15 minutes"])
 
         // Act — fourteen minutes pass with NO repaint (the stale-at-open bug's
         // exact setup), then the user opens the menu.
         clock.now = epoch.addingTimeInterval(14 * 60)
         menu.delegate?.menuWillOpen?(menu)
 
-        // Assert — the titles are true for the moment of opening, not for the
+        // Assert — the title is true for the moment of opening, not for the
         // moment the model was built.
-        #expect(menu.items.map(\.title) == ["Updated 14 minutes ago", "Refreshes in 1 minute"])
+        #expect(menu.items.map(\.title) == ["Refreshes in 1 minute"])
     }
 
-    @Test("every open re-titles again — the second open is not served the first's strings")
+    @Test("every open re-titles again — the second open is not served the first's string")
     func eachOpenIsFreshAgain() throws {
-        // Arrange
+        // Arrange — a countdown 15 minutes out.
         let clock = ClockBox(epoch)
-        let menu = Self.assembled(clock: clock, rows: [.status(.updated(epoch))])
+        let menu = Self.assembled(
+            clock: clock, rows: [.status(.nextRefresh(epoch.addingTimeInterval(15 * 60)))]
+        )
 
         // Act / Assert — two opens, minutes apart, each honest.
         clock.now = epoch.addingTimeInterval(2 * 60)
         menu.delegate?.menuWillOpen?(menu)
-        #expect(menu.items.map(\.title) == ["Updated 2 minutes ago"])
+        #expect(menu.items.map(\.title) == ["Refreshes in 13 minutes"])
 
         clock.now = epoch.addingTimeInterval(9 * 60)
         menu.delegate?.menuWillOpen?(menu)
-        #expect(menu.items.map(\.title) == ["Updated 9 minutes ago"])
+        #expect(menu.items.map(\.title) == ["Refreshes in 6 minutes"])
     }
 
     @Test("a countdown past its deadline clamps to soon at open, never negative")
@@ -116,7 +120,7 @@ struct MenuFreshnessTests {
             .sectionHeader("Fall 2026"),
             .course(course),
             .separator,
-            .status(.updated(epoch)),
+            .status(.nextRefresh(epoch.addingTimeInterval(15 * 60))),
             .command(.refresh),
         ])
         let before = menu.items.map(\.title)
@@ -130,6 +134,6 @@ struct MenuFreshnessTests {
         try #require(before.count == after.count)
         let changed = zip(before, after).enumerated().filter { $1.0 != $1.1 }.map(\.offset)
         #expect(changed == [3])
-        #expect(after[3] == "Updated 5 minutes ago")
+        #expect(after[3] == "Refreshes in 10 minutes")
     }
 }

@@ -6,11 +6,10 @@ import CourseMenu
 // ═════════════════════════════════════════════════════════════════════════════
 // StatusText — the pure formatter the GUI calls at menu-open.
 //
-// PRIORITY: HONESTY AT THE MOMENT OF DISPLAY. These strings are the only place
-// the app talks about time, and they are minted against the `now` of the person
-// actually looking — so every rule is pinned as (dates in, string out) with no
-// clock anywhere. The "Updated" table is experiment 5's, moved here verbatim;
-// the "Refreshes" table is experiment 18's addition.
+// PRIORITY: HONESTY AT THE MOMENT OF DISPLAY. This string is the only place the
+// app talks about time, and it is minted against the `now` of the person
+// actually looking — so every rule is pinned as (date in, string out) with no
+// clock anywhere. The "Refreshes" table is experiment 18's.
 //
 // SCOPE: Google-small. Pure function, plain values.
 // ═════════════════════════════════════════════════════════════════════════════
@@ -19,39 +18,6 @@ private let epoch = Date(timeIntervalSince1970: 1_786_230_000)
 
 @Suite("StatusText — stamps to display strings")
 struct StatusTextTests {
-
-    // ── Updated (rules unchanged from experiment 5) ──────────────────────────
-
-    @Test(
-        "the updated line reports how long ago the data was fetched",
-        arguments: [
-            (TimeInterval(0), "Updated just now"),
-            (TimeInterval(59), "Updated just now"),
-            (TimeInterval(60), "Updated 1 minute ago"),
-            (TimeInterval(120), "Updated 2 minutes ago"),
-            (TimeInterval(3599), "Updated 59 minutes ago"),
-            (TimeInterval(3600), "Updated 1 hour ago"),
-            (TimeInterval(7200), "Updated 2 hours ago"),
-        ]
-    )
-    func updatedReflectsAge(age: TimeInterval, expected: String) {
-        let title = StatusText.title(for: .updated(epoch), now: epoch.addingTimeInterval(age))
-        #expect(title == expected)
-    }
-
-    @Test("a nil fetch date says never updated")
-    func nilFetchDateSaysNever() {
-        #expect(StatusText.title(for: .updated(nil), now: epoch) == "Never updated")
-    }
-
-    @Test("a future fetch date does not render negative arithmetic")
-    func futureFetchDateFoldsIntoJustNow() {
-        // Clock skew and waking from sleep both produce this; the menu must not
-        // display arithmetic ("Updated -3 minutes ago") at the user.
-        let title = StatusText.title(for: .updated(epoch.addingTimeInterval(600)), now: epoch)
-        #expect(title == "Updated just now")
-        #expect(!title.contains("-"))
-    }
 
     // ── Refreshes (the countdown) ────────────────────────────────────────────
 

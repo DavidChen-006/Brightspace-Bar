@@ -12,26 +12,9 @@ public enum StatusText {
 
     public static func title(for stamp: StatusStamp, now: Date) -> String {
         switch stamp {
-        case .updated(let lastFetch):
-            return self.updated(lastFetch: lastFetch, now: now)
         case .nextRefresh(let next):
             return self.nextRefresh(next, now: now)
         }
-    }
-
-    /// Freshness line, rules unchanged from experiment 5. Negative age folds into
-    /// "just now": a future timestamp is untrustworthy (experiment 4), and the
-    /// menu must not display arithmetic ("Updated -3 minutes ago") at the user.
-    static func updated(lastFetch: Date?, now: Date) -> String {
-        guard let lastFetch else { return "Never updated" }
-        let age = now.timeIntervalSince(lastFetch)
-        if age < 60 { return "Updated just now" }
-        if age < 3600 {
-            let m = Int(age / 60)
-            return "Updated \(m) minute\(m == 1 ? "" : "s") ago"
-        }
-        let h = Int(age / 3600)
-        return "Updated \(h) hour\(h == 1 ? "" : "s") ago"
     }
 
     /// Countdown line. Minutes are *rounded* (RepoBar's rule), so the text is

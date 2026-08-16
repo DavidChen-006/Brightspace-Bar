@@ -121,7 +121,7 @@ struct HairlinePlacementTests {
         // than derived from the output.
         #expect(shape(model.rows) == [
             "header", "hairline", "course", "hairline", "course",
-            "separator", "status", "command", "command",
+            "separator", "command", "command",
         ])
     }
 
@@ -144,7 +144,7 @@ struct HairlinePlacementTests {
         #expect(shape(model.rows) == [
             "header", "hairline", "course",
             "header", "hairline", "course", "hairline", "course",
-            "separator", "status", "command", "command",
+            "separator", "command", "command",
         ])
     }
 
@@ -250,7 +250,7 @@ struct HairlinePlacementTests {
         // Assert
         #expect(shape(model.rows) == [
             "message", "header", "hairline", "course",
-            "separator", "status", "command", "command",
+            "separator", "command", "command",
         ])
     }
 
@@ -316,8 +316,8 @@ struct HairlinePlacementTests {
         // Assert — the pre-hairline shape, stated independently: grouped headers
         // and courses, then the footer.
         try #require(!withoutBoundaries.isEmpty)
-        #expect(shape(withoutBoundaries).suffix(4) == ["separator", "status", "command", "command"])
-        #expect(!shape(withoutBoundaries).dropLast(4).contains("separator"))
+        #expect(shape(withoutBoundaries).suffix(3) == ["separator", "command", "command"])
+        #expect(!shape(withoutBoundaries).dropLast(3).contains("separator"))
         #expect(withoutBoundaries.compactMap { if case .course(let c) = $0 { c.id } else { nil } }
             == model.courses.map(\.id))
     }

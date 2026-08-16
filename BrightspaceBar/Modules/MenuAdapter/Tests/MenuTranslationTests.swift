@@ -82,20 +82,19 @@ import MenuAdapter
 //   own recitation (`…CS.25100.LE1` before `…CS.25100.P06`).
 //
 // ── status ───────────────────────────────────────────────────────────────────
-//   The row carries DATES, not strings — `.status(.updated(lastFetch))` always,
-//   plus `.status(.nextRefresh(d))` when a next-refresh date is provided. The
-//   string rules ("Updated N minutes ago", "Refreshes in N minutes") moved to
-//   `CourseMenu.StatusText`, pinned by `StatusTextTests` — the GUI formats at
-//   menu-open, which is the whole point of experiment 18.
+//   The row carries a DATE, not a string — `.status(.nextRefresh(d))`, and only
+//   when a next-refresh date is provided. The string rule ("Refreshes in N
+//   minutes") lives in `CourseMenu.StatusText`, pinned by `StatusTextTests` —
+//   the GUI formats at menu-open, which is the whole point of experiment 18.
 //
 //   Consequence, pinned below: with fixed data and a fixed window position, the
-//   status rows no longer make identical menus compare unequal across time.
+//   status row no longer makes identical menus compare unequal across time.
 //
 // ── overall shape ────────────────────────────────────────────────────────────
-//   [headers + courses, grouped] + .separator + .status(es) + .refresh + .quit
+//   [headers + courses, grouped] + .separator + .status? + .refresh + .quit
 //
 //   Empty courses + nil lastFetch  →  exactly MenuModel.placeholder
-//   Empty courses + a lastFetch    →  a message, a status, and the commands
+//   Empty courses + a lastFetch    →  a message and the commands
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Expected values, built independently of the production code. Nothing here calls
@@ -455,34 +454,7 @@ struct MenuTranslationTests {
 
     // ── Derivations: status ─────────────────────────────────────────────────
 
-    @Test("the status row carries the fetch timestamp verbatim — not a string")
-    func statusCarriesTheFetchDate() throws {
-        // Arrange — `now` well after the fetch. Under the old design this baked
-        // "Updated 10 minutes ago" into the model; now the date rides through
-        // untouched and the GUI formats it at menu-open (StatusTextTests pins
-        // the string rules).
-        let model = MenuTranslation.menu(
-            courses: [makeCourse(id: 1)],
-            lastFetch: epoch, now: epoch.addingTimeInterval(600), baseURL: RealData.baseURL
-        )
-
-        // Assert
-        #expect(model.statuses == [.updated(epoch)])
-    }
-
-    @Test("a never-fetched list with courses still reports honestly")
-    func nilLastFetchWithCoursesSaysNeverUpdated() throws {
-        // Arrange — courses present but no timestamp. Reachable if a cache file is
-        // hand-placed, or if the format ever changes.
-        let model = MenuTranslation.menu(
-            courses: [makeCourse(id: 1)], lastFetch: nil, now: epoch, baseURL: RealData.baseURL
-        )
-
-        // Assert — `.updated(nil)` is the honest "Never updated" datum.
-        #expect(model.statuses == [.updated(nil)])
-    }
-
-    @Test("a next-refresh date yields a second status row, after the first")
+    @Test("a next-refresh date yields the countdown status row")
     func nextRefreshYieldsItsOwnStatusRow() throws {
         // Arrange
         let next = epoch.addingTimeInterval(900)
@@ -494,11 +466,11 @@ struct MenuTranslationTests {
             nextRefresh: next
         )
 
-        // Assert — order pinned: freshness first, countdown second.
-        #expect(model.statuses == [.updated(epoch), .nextRefresh(next)])
+        // Assert — the countdown is the only status row.
+        #expect(model.statuses == [.nextRefresh(next)])
     }
 
-    @Test("no next-refresh date means no countdown row — never a placeholder row")
+    @Test("no next-refresh date means no status row at all — never a placeholder row")
     func absentNextRefreshOmitsTheRow() throws {
         // Arrange / Act — nil is the stub path and any build without a timer.
         let model = MenuTranslation.menu(
@@ -508,7 +480,7 @@ struct MenuTranslationTests {
         )
 
         // Assert
-        #expect(model.statuses == [.updated(epoch)])
+        #expect(model.statuses.isEmpty)
     }
 
     @Test("the status rows are time-invariant: same data minutes apart compares equal")
@@ -542,9 +514,11 @@ struct MenuTranslationTests {
         // Arrange
         let courses = try CrossPackageFixture.realCourses
 
-        // Act
+        // Act — the production shape: the timer always provides a next-refresh
+        // date, so a populated menu carries the countdown status row.
         let model = MenuTranslation.menu(
-            courses: courses, lastFetch: epoch, now: epoch, baseURL: RealData.baseURL
+            courses: courses, lastFetch: epoch, now: epoch, baseURL: RealData.baseURL,
+            nextRefresh: epoch.addingTimeInterval(900)
         )
 
         // Assert — the user must always have a way to refresh and a way out.
@@ -592,7 +566,6 @@ struct MenuTranslationTests {
         // Assert
         #expect(model != MenuModel.placeholder)
         #expect(!model.messages.isEmpty, "an empty list must explain itself")
-        #expect(model.statuses == [.updated(epoch)])
         #expect(model.commands.contains(.refresh))
     }
 

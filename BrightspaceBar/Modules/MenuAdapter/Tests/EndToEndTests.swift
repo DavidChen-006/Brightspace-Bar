@@ -302,35 +302,6 @@ struct EndToEndTests {
         #expect(await secondRun.callCount() == 0)
     }
 
-    @Test("the status row reflects the age of the cached fetch after a relaunch")
-    func warmStartReportsRealStaleness() async throws {
-        // Arrange
-        let scratch = try ScratchDir()
-        let file = scratch.file()
-        let clock = ManualClock(epoch)
-        let firstRun = CountingSource([.bytes(try CrossPackageFixture.enrollmentBytes)])
-        let (first, _) = makeAdapter(source: firstRun, file: file, clock: clock)
-        _ = await first.refresh()
-
-        // Two hours pass while the laptop is shut.
-        clock.advance(by: 7200)
-
-        let secondRun = CountingSource([.failure(.transport("offline"))])
-        let (second, _) = makeAdapter(source: secondRun, file: file, clock: clock)
-
-        // Act
-        let model = await second.currentMenu()
-
-        // Assert — the model carries the true fetch time, and the GUI's formatter
-        // (fed the advanced clock) renders it as honest staleness. Split this way
-        // because that is the architecture now: the model holds dates, and the
-        // string is minted against `now` at display time.
-        let stamp = try #require(
-            model.rows.compactMap { if case .status(let s) = $0 { s } else { nil } }.first
-        )
-        #expect(stamp == .updated(epoch))
-        #expect(StatusText.title(for: stamp, now: clock.now) == "Updated 2 hours ago")
-    }
 
     // ── SystemClock: the one place Date() is allowed ─────────────────────────
 

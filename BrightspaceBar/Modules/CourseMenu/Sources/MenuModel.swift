@@ -202,25 +202,27 @@ public enum MenuCommand: String, Equatable, Sendable, CaseIterable {
 /// A timestamp the GUI renders as a relative time — at *display* time, not at
 /// model-build time (experiment 18).
 ///
-/// The row used to carry a baked string ("Updated 3 minutes ago"), which had
-/// two costs:
+/// The row carries the `Date`, never a baked string ("Refreshes in 12
+/// minutes"), which would have had two costs:
 ///
-///   1. STALE AT OPEN. The string was computed when the model was built
-///      (launch, timer tick, refresh click) — so a menu opened 14 minutes later
-///      still said "Updated just now". The GUI cannot re-derive a fresher
-///      string from a string.
+///   1. STALE AT OPEN. A string computed when the model was built (launch, timer
+///      tick, refresh click) would still read "12 minutes" when the menu is
+///      opened 11 minutes later. The GUI cannot re-derive a fresher string from
+///      a string.
 ///   2. FALSE INEQUALITY. `MenuModel`'s `Equatable` exists so an unchanged menu
-///      is not rebuilt, but the baked string changed every minute, so identical
-///      data compared unequal and forced a full rebuild on every timer tick.
+///      is not rebuilt, but a baked string changing every minute would make
+///      identical data compare unequal and force a full rebuild on every tick.
 ///
-/// Carrying the `Date` fixes both: the model is time-invariant (equal data →
+/// Carrying the `Date` avoids both: the model is time-invariant (equal data →
 /// equal model, whenever built), and the GUI formats against a fresh `now` each
 /// time the menu opens (`StatusText`, `menuWillOpen`). RepoBar does exactly
 /// this — an absolute deadline in the model, relative formatting at paint time,
 /// no ticking display timer.
+///
+/// A single case today (the older "Updated N ago" freshness row was removed);
+/// it stays an enum because the status row is where a second timestamp kind
+/// would plug in.
 public enum StatusStamp: Equatable, Sendable {
-    /// When the data was last fetched; nil = never. Renders "Updated N min ago".
-    case updated(Date?)
     /// When the next automatic refresh fires. Renders "Refreshes in N min".
     case nextRefresh(Date)
 }
