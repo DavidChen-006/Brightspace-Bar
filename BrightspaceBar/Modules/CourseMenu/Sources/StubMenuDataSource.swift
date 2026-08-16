@@ -62,6 +62,53 @@ public struct StubMenuDataSource: MenuDataSource {
         ))
     }
 
+    /// Every announcement in a course opens the same page — its announcements
+    /// list. D2L offers no per-item deep link worth trusting, so one destination
+    /// per course is the design rather than a stub simplification.
+    private static func announcementURL(course: Int) -> URL {
+        URL(string: "https://purdue.brightspace.com/d2l/lms/news/main.d2l?ou=\(course)")!
+    }
+
+    /// Posting dates are seeded RELATIVE to launch, unlike the fixed assignment
+    /// dates above. An announcements section is a recency window — the translation
+    /// layer shows only the last 30 days — so a stub pinned to literal instants
+    /// would demo an empty section a month after it was written, which is the one
+    /// state the GUI already handles by drawing nothing.
+    ///
+    /// The rendered subtitle is derived from that same instant rather than written
+    /// as a literal, so a moving date and a fixed string can never disagree.
+    private static func announcement(
+        _ id: Int, _ title: String, daysAgo: Int, course: Int
+    ) -> MenuRow {
+        let posted = Date().addingTimeInterval(-Double(daysAgo) * 24 * 60 * 60)
+        return .announcement(AnnouncementRow(
+            id: id, title: title, subtitle: postedLabel(posted), date: posted,
+            url: announcementURL(course: course)
+        ))
+    }
+
+    /// The same `"MMM d"` shape `AnnouncementTranslation` produces, restated here
+    /// because `CourseMenu` is the contract module and depends on nothing but
+    /// Foundation — it cannot see the translation layer. A fixed table rather than
+    /// a `DateFormatter` for the same reason that layer uses one: the abbreviation
+    /// must not change with the machine's locale.
+    ///
+    /// Optional, never `""`: an empty subtitle renders as a dangling separator in
+    /// the GUI's "title — subtitle" join, so the unreachable branch drops the line
+    /// rather than emitting one with nothing in it.
+    private static func postedLabel(_ date: Date) -> String? {
+        let months = [
+            "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+        ]
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.locale = Locale(identifier: "en_US_POSIX")
+        let parts = calendar.dateComponents([.month, .day], from: date)
+        guard let month = parts.month, let day = parts.day, months.indices.contains(month - 1)
+        else { return nil }
+        return "\(months[month - 1]) \(day)"
+    }
+
     public static let seeded = MenuModel(rows: [
         .sectionHeader("Fall 2026"),
         // A `.hairline` leads every course, mirroring `MenuTranslation` exactly —
@@ -75,6 +122,15 @@ public struct StubMenuDataSource: MenuDataSource {
             submenu: [
                 assignment(2_001, "Project 1: ETL Pipeline", due: "Due Sep 12", dueDate: Date(timeIntervalSince1970: 1_789_516_800), course: 1_498_777),
                 assignment(2_002, "Lab 3 Write-up", due: "Due Sep 19", dueDate: Date(timeIntervalSince1970: 1_790_121_600), course: 1_498_777),
+                // The announcements section, seeded exactly as `MenuTranslation`
+                // appends it: a separator, a mandatory label, then the recent
+                // posts newest first. The label is what stops these rows from
+                // reading as two more assignments.
+                .separator,
+                .sectionHeader("Announcements"),
+                announcement(3_001, "Project 1 spec updated — see §4", daysAgo: 2, course: 1_498_777),
+                announcement(3_002, "Guest lecture Thursday: data contracts in practice", daysAgo: 6, course: 1_498_777),
+                announcement(3_003, "Office hours moved to Lawson 1142", daysAgo: 13, course: 1_498_777),
             ],
             // Work on today's cell — the outline has to survive a fill underneath it.
             graph: strip([2: .assignment, 3: .quiz, 5: .assignment, 7: .quiz]), graphMonths: months
@@ -88,6 +144,13 @@ public struct StubMenuDataSource: MenuDataSource {
                 assignment(2_101, "Homework 1", course: 1_415_558),
                 assignment(2_102, "Homework 2", course: 1_415_558),
                 assignment(2_103, "Written Reflection on Vector Fields", course: 1_415_558),
+                // A second course with announcements, so the demo shows two
+                // sections side by side and a cross-wired `ou=` would be visible
+                // rather than merely untested.
+                .separator,
+                .sectionHeader("Announcements"),
+                announcement(3_101, "Exam 1 rooms posted — check your section", daysAgo: 1, course: 1_415_558),
+                announcement(3_102, "Quiz 4 solutions are up", daysAgo: 9, course: 1_415_558),
             ],
             // An empty today cell, so the outline is exercised with no fill behind
             // it, and work on index 111 so the window's trailing edge is visible —

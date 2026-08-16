@@ -422,6 +422,39 @@ struct MenuAssemblerRenderingTests {
         #expect(opener.opened == [Make.url(412_690)])
     }
 
+    /// The announcement row's one GUI claim. It renders with the same INVERSION
+    /// as an assignment — title first, metadata second — because the title is the
+    /// identity you scan for and the posting date is metadata, and it stays
+    /// actionable because an announcement with nowhere to go has no reason to be
+    /// a row at all.
+    ///
+    /// Assembled at the top level rather than inside a submenu, which is where the
+    /// model actually puts it: `MenuAssembler` builds rows through one path at
+    /// either level (that is the whole point of the shared builder), so one test
+    /// here covers both, and the submenu's own structure is already pinned by
+    /// `MenuAssemblerSubmenuTests`.
+    @Test("an announcement renders as a clickable title then posting date")
+    func announcementRendersTitleThenDate() throws {
+        // Arrange
+        let assembler = Make.assembler()
+        let row = AnnouncementRow(
+            id: 3_001,
+            title: "Office hours moved to Lawson 1142",
+            subtitle: "Aug 10",
+            date: Make.epoch,
+            url: URL(string: "https://purdue.brightspace.com/d2l/lms/news/main.d2l?ou=101")!
+        )
+
+        // Act
+        let menu = assembler.assemble(MenuModel(rows: [.announcement(row)]))
+
+        // Assert — expected value written independently, not via production code.
+        let item = try #require(menu.items.first)
+        #expect(item.title == "Office hours moved to Lawson 1142 — Aug 10")
+        #expect(item.action != nil, "an announcement row carries no action and cannot be opened")
+        #expect(item.isEnabled, "an announcement row is disabled and looks inert")
+    }
+
     @Test("command rows use their pinned titles")
     func commandTitles() throws {
         // Arrange

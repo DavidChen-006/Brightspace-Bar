@@ -27,6 +27,11 @@ public enum MenuTranslation {
     ///     the `[:]` default no longer reproduces the pre-assignment output, because
     ///     making submenu presence depend on whether a fetch had happened gave
     ///     identical-looking rows two different interaction models.
+    ///   - announcements: what is known about each course's announcements, keyed
+    ///     the same way. A course absent from the map is `neverFetched`, which
+    ///     contributes NO rows — so unlike `assignments`, the `[:]` default
+    ///     reproduces the pre-announcement output exactly. The section is a
+    ///     suffix on a submenu that already exists, so it can only be additive.
     ///   - timeZone: which zone deadline dates are rendered in. A parameter for
     ///     the same reason `now` is — a pure function may not read ambient state.
     ///     `.current` belongs in the composition root.
@@ -40,6 +45,7 @@ public enum MenuTranslation {
         now: Date,
         baseURL: URL,
         assignments: [Int: AssignmentsState] = [:],
+        announcements: [Int: AnnouncementsState] = [:],
         timeZone: TimeZone = .current,
         nextRefresh: Date? = nil
     ) -> MenuModel {
@@ -63,7 +69,7 @@ public enum MenuTranslation {
             }
             rows.append(contentsOf: self.groupedCourseRows(
                 visible, baseURL: baseURL, assignments: assignments,
-                now: now, timeZone: timeZone
+                announcements: announcements, now: now, timeZone: timeZone
             ))
         }
         rows.append(.separator)
@@ -133,6 +139,7 @@ public enum MenuTranslation {
         _ courses: [Course],
         baseURL: URL,
         assignments: [Int: AssignmentsState],
+        announcements: [Int: AnnouncementsState],
         now: Date,
         timeZone: TimeZone
     ) -> [MenuRow] {
@@ -166,6 +173,10 @@ public enum MenuTranslation {
                     // renders as "No assignments" — the same rows as loaded-empty,
                     // so every course row carries a submenu either way.
                     assignments: assignments[course.id] ?? .neverFetched,
+                    // Absent key == `neverFetched`, which contributes no rows at
+                    // all — so a menu built without announcements is byte-identical
+                    // to the one this function produced before they existed.
+                    announcements: announcements[course.id] ?? .neverFetched,
                     now: now, timeZone: timeZone
                 ))]
             }
@@ -186,6 +197,7 @@ public enum MenuTranslation {
         for course: Course,
         baseURL: URL,
         assignments: AssignmentsState,
+        announcements: AnnouncementsState,
         now: Date,
         timeZone: TimeZone
     ) -> CourseRow {
@@ -197,11 +209,20 @@ public enum MenuTranslation {
             title: course.name,
             subtitle: self.subtitle(from: course.code),
             url: self.url(id: course.id, baseURL: baseURL),
-            // SEAM: the assignments join. `AssignmentTranslation` owns every
-            // decision inside the submenu; this only says which course it is for,
+            // SEAM: the two submenu joins. Each translation owns every decision
+            // inside its own half; this only says which course they are for,
             // which is what guarantees a row can never carry another course's id.
+            //
+            // Two translations rather than one because the halves answer two
+            // different questions — what you owe, then what was said — and the
+            // work leads because it is the half a student acts on. The
+            // announcements section is a pure SUFFIX: with nothing recent to show
+            // it is `[]`, and the submenu is exactly what it was before.
             submenu: AssignmentTranslation.submenu(
                 state: assignments, courseId: course.id,
+                now: now, baseURL: baseURL, timeZone: timeZone
+            ) + AnnouncementTranslation.section(
+                state: announcements, courseId: course.id,
                 now: now, baseURL: baseURL, timeZone: timeZone
             ),
             // SEAM: the graph join, over the same state the submenu reads.

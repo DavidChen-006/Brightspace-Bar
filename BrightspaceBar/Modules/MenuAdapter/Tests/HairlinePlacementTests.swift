@@ -86,6 +86,7 @@ private func shape(_ rows: [MenuRow]) -> [String] {
         switch row {
         case .course: "course"
         case .assignment: "assignment"
+        case .announcement: "announcement"
         case .sectionHeader: "header"
         case .message: "message"
         case .status: "status"
