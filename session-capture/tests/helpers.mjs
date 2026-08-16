@@ -69,6 +69,9 @@ export const SAMPLE_DATA = {
       },
     ],
   },
+  announcements: {
+    412690: [{ id: 900, title: "Office hours moved to Friday", date: "2026-08-14T18:00:00Z" }],
+  },
 };
 
 /** A second, distinguishable payload — proves a refetch's data is the one kept. */

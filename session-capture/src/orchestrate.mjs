@@ -45,7 +45,8 @@ import { writeJsonAtomic } from "./atomic-write.mjs";
  * injected clock, and a fetchedAt of the fetcher's own would override it.
  *
  * @typedef {{fetch: (world: {paths: object, log: (m: string) => void}) => Promise<
- *             {ok: true, data: {courses: object[], assignments: object}}
+ *             {ok: true, data: {courses: object[], assignments: object,
+ *                               announcements: object}}
  *           | {ok: false, reason: "sessionExpired"}
  *           | {ok: false, reason: string, detail?: string}>}} Fetcher
  */

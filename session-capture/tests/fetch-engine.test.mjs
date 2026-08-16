@@ -25,6 +25,7 @@ import { writeFileSync } from "node:fs";
 import { createFetcher } from "../src/fetch-engine.mjs";
 import { recorder, tempPaths } from "./helpers.mjs";
 import {
+  ANNOUNCEMENT_KEYS,
   COURSE_KEYS,
   CSRF_TOKEN,
   ISO_SECONDS,
@@ -63,6 +64,18 @@ async function fetchWith(t, { routes = {}, session = {}, log = () => {} } = {}) 
 
 /** Courses keyed by id — spot-checking one course should not depend on order. */
 const byId = (courses) => new Map(courses.map((course) => [course.id, course]));
+
+/**
+ * Settle `work`, or fail loudly. For the one claim that is about two requests
+ * being in flight together: the wrong implementation does not return a wrong
+ * answer, it returns none at all, and a suite that hangs reports nothing.
+ */
+function withDeadline(work, message, ms = 2000) {
+  return Promise.race([
+    work,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(message)), ms).unref()),
+  ]);
+}
 
 // ---------------------------------------------------------------------------
 // Credentials — the fetcher reads session.json itself (the seam's own rule).
@@ -660,6 +673,319 @@ test("tells the log which course it could not fetch", async (t) => {
 });
 
 // ---------------------------------------------------------------------------
+// Announcements — a fourth route per course, and a section of its own.
+//
+// Two rules make this route different from the three above it. It rides the
+// SAME fan-out, so a course still costs one round trip rather than two; and it
+// does not vote — the gradebook's pattern — so a news route that 403s costs a
+// course its announcements and nothing else.
+// ---------------------------------------------------------------------------
+
+test("asks the news route for every enrolled course", async (t) => {
+  // Arrange / Act
+  const { http } = await fetchWith(t, { routes: { enrollments: enrollmentsFor([412690, 440703]) } });
+
+  // Assert — the ids, not just the count, for the same reason the content
+  // routes pin theirs: a course silently skipped is a section that never fills.
+  assert.deepStrictEqual(
+    requestsFor(http, MARKS.news).map((r) => r.url),
+    [
+      `${TEST_BASE}/d2l/api/le/1.96/412690/news/`,
+      `${TEST_BASE}/d2l/api/le/1.96/440703/news/`,
+    ],
+  );
+});
+
+test("fetches the news route alongside the others, not as an extra round trip", async (t) => {
+  // Arrange — the dropbox route answers only once the news request has been
+  // seen. Under one Promise.all both are in flight at once and this resolves; a
+  // news call awaited AFTER the content routes could never satisfy it, and the
+  // deadline below reports that as a failure instead of hanging the suite.
+  let newsAsked;
+  const newsSeen = new Promise((resolve) => {
+    newsAsked = resolve;
+  });
+
+  // Act
+  const fetching = fetchWith(t, {
+    routes: {
+      enrollments: enrollmentsFor([412690]),
+      dropbox: {
+        412690: async () => {
+          await newsSeen;
+          return raw(fixture("dropbox-folders-412690.json"));
+        },
+      },
+      news: {
+        412690: () => {
+          newsAsked();
+          return raw(fixture("news-412690.json"));
+        },
+      },
+    },
+  });
+  const { result } = await withDeadline(fetching, "the news route did not ride the same fan-out");
+
+  // Assert
+  assert.equal(result.data.assignments[412690].length, 1);
+  assert.equal(result.data.announcements[412690].length, 4);
+});
+
+test("maps a news item onto the three fields the announcement contract names", async (t) => {
+  // Arrange — the fixture is this tenant's own answer for 412690: four items,
+  // every one of the nineteen D2L fields but three of them dropped on the floor.
+  const { result } = await fetchWith(t, {
+    routes: {
+      enrollments: enrollmentsFor([412690]),
+      news: { 412690: raw(fixture("news-412690.json")) },
+    },
+  });
+
+  // Assert
+  assert.deepStrictEqual(result.data.announcements[412690][0], {
+    id: 1654367,
+    title: "Due Date Error Posting",
+    date: "2025-07-17T18:02:00Z",
+  });
+  for (const announcement of result.data.announcements[412690]) {
+    assert.deepStrictEqual(Object.keys(announcement).sort(), [...ANNOUNCEMENT_KEYS].sort());
+  }
+});
+
+test("strips the fractional seconds D2L sends off an announcement date", async (t) => {
+  // Arrange — the same trap the due dates carry: Swift decodes data.json with
+  // `.iso8601`, which rejects "2025-07-17T18:02:00.000Z".
+  const { result } = await fetchWith(t, {
+    routes: {
+      enrollments: enrollmentsFor([412690]),
+      news: { 412690: raw(fixture("news-412690.json")) },
+    },
+  });
+
+  // Assert
+  for (const announcement of result.data.announcements[412690]) {
+    assert.match(announcement.date, ISO_SECONDS);
+  }
+});
+
+test("falls back to the created date when D2L sent no start date", async (t) => {
+  // Arrange — `StartDate` is when the instructor scheduled it and is the honest
+  // answer when it exists; `CreatedDate` is always there and is close enough to
+  // sort by. An announcement with neither would otherwise be undatable.
+  const { result } = await fetchWith(t, {
+    routes: {
+      enrollments: enrollmentsFor([412690]),
+      news: { 412690: raw(fixture("news-with-mixed-dates.json")) },
+    },
+  });
+
+  // Assert
+  const dates = new Map(result.data.announcements[412690].map((a) => [a.id, a.date]));
+  assert.equal(dates.get(800002), "2026-03-11T14:22:31Z");
+});
+
+test("falls back to the created date when the start date cannot be read", async (t) => {
+  // Arrange — unreadable and absent are the same answer here: the field did not
+  // yield a date, so the next-best one is asked.
+  const { result } = await fetchWith(t, {
+    routes: {
+      enrollments: enrollmentsFor([412690]),
+      news: { 412690: raw(fixture("news-with-mixed-dates.json")) },
+    },
+  });
+
+  // Assert
+  const dates = new Map(result.data.announcements[412690].map((a) => [a.id, a.date]));
+  assert.equal(dates.get(800006), "2026-05-01T10:00:00Z");
+});
+
+test("keeps an announcement whose dates are both unusable, with no date", async (t) => {
+  // Arrange — fail OPEN, as the due dates do: an announcement still reads fine
+  // without a timestamp, and dropping it would lose the row entirely.
+  const { result } = await fetchWith(t, {
+    routes: {
+      enrollments: enrollmentsFor([412690]),
+      news: { 412690: raw(fixture("news-with-mixed-dates.json")) },
+    },
+  });
+
+  // Assert
+  const undated = result.data.announcements[412690].find((a) => a.id === 800004);
+  assert.equal(undated.title, "No Date At All");
+  assert.equal(undated.date, null);
+});
+
+test("leaves an announcement the instructor has not published out of the cache", async (t) => {
+  // Arrange — a draft is not news yet. Only `IsPublished === false` is excluded:
+  // an item that omits the field entirely is a shape the tenant has never sent,
+  // and treating unknown as unpublished would empty a section on a schema change.
+  const { result } = await fetchWith(t, {
+    routes: {
+      enrollments: enrollmentsFor([412690]),
+      news: { 412690: raw(fixture("news-with-mixed-dates.json")) },
+    },
+  });
+
+  // Assert
+  assert.ok(
+    !result.data.announcements[412690].some((a) => a.id === 800005),
+    "a draft reached the cache",
+  );
+});
+
+test("lists announcements newest first, with the undated ones last", async (t) => {
+  // Arrange — order is the whole value of this section: the menu shows the top
+  // few and a stable newest-first order is what makes those the right few. The
+  // undated ones sort last rather than first, where a null read as epoch-zero
+  // would put them.
+  const { result } = await fetchWith(t, {
+    routes: {
+      enrollments: enrollmentsFor([412690]),
+      news: { 412690: raw(fixture("news-with-mixed-dates.json")) },
+    },
+  });
+
+  // Assert
+  assert.deepStrictEqual(
+    result.data.announcements[412690].map((a) => a.id),
+    [800003, 800006, 800002, 800001, 800004],
+  );
+});
+
+test("keeps at most ten announcements for a course", async (t) => {
+  // Arrange — 440703 really carries 467 of them, and all 467 in a menu bar app's
+  // cache is a payload nobody reads. The fixture is the first twelve, verbatim.
+  const { result } = await fetchWith(t, {
+    routes: {
+      enrollments: enrollmentsFor([440703]),
+      news: { 440703: raw(fixture("news-440703.json")) },
+    },
+  });
+
+  // Assert
+  assert.equal(result.data.announcements[440703].length, 10);
+});
+
+test("caps to the ten NEWEST, whatever order the server sent them in", async (t) => {
+  // Arrange — the same twelve real items, reversed: D2L happens to answer
+  // newest-first today, so a cap applied before the sort would pass on the live
+  // payload and quietly keep the ten oldest the day that changes.
+  const oldestFirst = [...fixtureJson("news-440703.json")].reverse();
+  const { result } = await fetchWith(t, {
+    routes: {
+      enrollments: enrollmentsFor([440703]),
+      news: { 440703: json(oldestFirst) },
+    },
+  });
+
+  // Assert — the two dropped ids are the two oldest of the twelve.
+  const kept = result.data.announcements[440703].map((a) => a.id);
+  assert.equal(kept.length, 10);
+  assert.ok(!kept.includes(1901940), "kept an older announcement over a newer one");
+  assert.ok(!kept.includes(1900208), "kept an older announcement over a newer one");
+  assert.equal(kept[0], 1975874);
+});
+
+test("records an empty list for a course that genuinely has no announcements", async (t) => {
+  // Arrange — the route answered and had nothing. That is data, and it has to be
+  // distinguishable from "we could not find out" (the next test).
+  const { result } = await fetchWith(t, {
+    routes: {
+      enrollments: enrollmentsFor([412690]),
+      news: { 412690: raw(fixture("news-empty.json")) },
+    },
+  });
+
+  // Assert
+  assert.deepStrictEqual(result.data.announcements[412690], []);
+});
+
+test("omits a course from the announcements map when its news route failed", async (t) => {
+  // Arrange — an ended course answers 403 here exactly as it does on the content
+  // routes. Writing [] would claim the course has posted nothing; leaving the key
+  // out says "unknown", which is what lets the app keep what it already had.
+  const { result } = await fetchWith(t, {
+    routes: {
+      enrollments: enrollmentsFor([412690, 440703]),
+      news: { 412690: status(403, "forbidden"), default: raw(fixture("news-empty.json")) },
+    },
+  });
+
+  // Assert
+  assert.deepStrictEqual(Object.keys(result.data.announcements), ["440703"]);
+});
+
+test("refuses to read an error page as a course with no announcements", async (t) => {
+  // Arrange — news is a BARE ARRAY, and the 404 body D2L sends instead is a JSON
+  // object that parses perfectly. A decoder that only checked "did it parse"
+  // would report a clean empty section for a course it never reached.
+  const { result } = await fetchWith(t, {
+    routes: {
+      enrollments: enrollmentsFor([412690]),
+      news: { 412690: raw(fixture("news-malformed.json")) },
+    },
+  });
+
+  // Assert
+  assert.deepStrictEqual(Object.keys(result.data.announcements), []);
+});
+
+test("keeps the assignments it fetched when only the news route failed", async (t) => {
+  // Arrange — THE rule for this route: news does not vote. It is the newest
+  // thing here and the assignments are shipped, so a news outage regressing them
+  // would trade a working feature for a new one.
+  const { result } = await fetchWith(t, {
+    routes: {
+      enrollments: enrollmentsFor([412690]),
+      dropbox: { 412690: raw(fixture("dropbox-folders-412690.json")) },
+      news: { 412690: status(500, "server error") },
+    },
+  });
+
+  // Assert
+  assert.deepStrictEqual(
+    result.data.assignments[412690].map((item) => item.id),
+    [648911],
+  );
+});
+
+test("records a course's announcements even when both content routes failed", async (t) => {
+  // Arrange — the independence runs both ways. `assignments` and
+  // `announcements` are two separate answers about one course, and a course
+  // whose dropbox is closed can still be posting news.
+  const { result } = await fetchWith(t, {
+    routes: {
+      enrollments: enrollmentsFor([412690]),
+      dropbox: { 412690: status(403, "forbidden") },
+      quizzes: { 412690: status(403, "forbidden") },
+      news: { 412690: raw(fixture("news-412690.json")) },
+    },
+  });
+
+  // Assert
+  assert.deepStrictEqual(Object.keys(result.data.assignments), []);
+  assert.equal(result.data.announcements[412690].length, 4);
+});
+
+test("tells the log which course it could not read announcements for", async (t) => {
+  // Arrange — a section silently missing from the cache is a bug nobody can see,
+  // the same argument the gradebook's own log line rests on.
+  const journal = recorder();
+
+  // Act
+  await fetchWith(t, {
+    log: journal.log,
+    routes: {
+      enrollments: enrollmentsFor([412690]),
+      news: { 412690: status(403, "forbidden") },
+    },
+  });
+
+  // Assert
+  assert.match(journal.text(), /412690.*announcements/);
+});
+
+// ---------------------------------------------------------------------------
 // The payload the orchestrator receives.
 // ---------------------------------------------------------------------------
 
@@ -669,7 +995,10 @@ test("returns the payload without a fetchedAt of its own", async (t) => {
   const { result } = await fetchWith(t, { routes: { enrollments: enrollmentsFor([412690]) } });
 
   // Assert
-  assert.deepStrictEqual(Object.keys(result.data).sort(), ["assignments", "courses"]);
+  assert.deepStrictEqual(
+    Object.keys(result.data).sort(),
+    ["announcements", "assignments", "courses"],
+  );
 });
 
 test("keys the assignments map by course id", async (t) => {

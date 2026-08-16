@@ -125,6 +125,7 @@ const ENROLLMENTS_MARK = "/enrollments/myenrollments";
 const DROPBOX_MARK = "/dropbox/folders";
 const QUIZZES_MARK = "/quizzes";
 const GRADES_MARK = "/grades/";
+const NEWS_MARK = "/news/";
 
 /** The org-unit id out of a per-course route, so a router can answer per course. */
 export const courseIdOf = (url) => Number(url.match(/\/d2l\/api\/le\/[\d.]+\/(\d+)\//)?.[1] ?? 0);
@@ -147,6 +148,7 @@ export function fakeHttp(routes = {}) {
     dropbox = {},
     quizzes = {},
     grades = {},
+    news = {},
   } = routes;
 
   const answer = async (route, request) => {
@@ -170,6 +172,9 @@ export function fakeHttp(routes = {}) {
     // A gradebook of no columns is the quiet default: every test that is not
     // about the diff must keep answering this route without saying so.
     if (url.includes(GRADES_MARK)) return perCourse(grades, request, json([]));
+    // A course with no announcements, likewise: the quiet default every test
+    // that is not about the news route keeps answering without saying so.
+    if (url.includes(NEWS_MARK)) return perCourse(news, request, json([]));
     throw new Error(`the fake was asked for an unrouted URL: ${url}`);
   };
   http.requests = [];
@@ -192,6 +197,7 @@ export const MARKS = {
   dropbox: DROPBOX_MARK,
   quizzes: QUIZZES_MARK,
   grades: GRADES_MARK,
+  news: NEWS_MARK,
 };
 
 // ---------------------------------------------------------------------------
@@ -242,6 +248,7 @@ export function scratchDir(t) {
 /** The keys the plan's data.json contract fixes for each kind of object. */
 export const COURSE_KEYS = ["id", "name", "code", "role", "isActive", "homeUrl", "startDate", "endDate"];
 export const ITEM_KEYS = ["id", "title", "dueDate", "url", "kind"];
+export const ANNOUNCEMENT_KEYS = ["id", "title", "date"];
 
 /** ISO-8601 with no fractional seconds — the form Swift's `.iso8601` decodes. */
 export const ISO_SECONDS = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;

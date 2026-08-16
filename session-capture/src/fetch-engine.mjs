@@ -1,6 +1,6 @@
 /**
  * The real fetcher: session.json → JWT → enrollments → per-course assignments,
- * quizzes and gradebook → the data.json contract.
+ * quizzes, gradebook and announcements → the data.json contract.
  *
  * A port of David's own proven Swift path (`BrightspaceCourseSource`,
  * `EnrollmentParser`, `BrightspaceAssignmentSource`/`AssignmentParser`,
@@ -64,8 +64,17 @@ export function createFetcher({ http = nodeHttp } = {}) {
       if (!enrolled.courses) return transport(enrolled.detail);
 
       const assignments = {};
+      const announcements = {};
       for (const course of enrolled.courses) {
         const outcome = await courseItems(http, credentials, mint.token, course.id);
+        // Announcements are answered first and separately: they are their own
+        // question about the course, so the verdict on its work — including the
+        // `continue` below — must not decide them either way.
+        if (outcome.news.ok) {
+          announcements[course.id] = outcome.news.items;
+        } else {
+          log(`course ${course.id}: no announcements (${outcome.news.detail})`);
+        }
         // A course with no key means "unknown", which is what lets the app keep
         // whatever it already had; an empty list would claim it owes nothing.
         if (!outcome.ok) {
@@ -81,7 +90,7 @@ export function createFetcher({ http = nodeHttp } = {}) {
       }
       log(`fetched ${enrolled.courses.length} courses`);
 
-      return { ok: true, data: { courses: enrolled.courses, assignments } };
+      return { ok: true, data: { courses: enrolled.courses, assignments, announcements } };
     },
   };
 }
@@ -111,17 +120,24 @@ async function send(http, request) {
 }
 
 /**
- * One course's three routes, in parallel, merged content-first. Half the data
+ * One course's four routes, in parallel, merged content-first. Half the data
  * beats none: a failing quiz route must not regress the assignments that already
- * worked. Only when BOTH content routes fail is the course unknown — the
- * gradebook never votes, it only adds its own rows or reports why it could not.
+ * worked. Only when BOTH content routes fail is the course unknown — neither the
+ * gradebook nor the news route votes, they only add their own rows or report why
+ * they could not.
  *
  * The gradebook is fetched with the others but read after them: a heads-up row
  * is a column NOTHING the content routes returned matched, so the diff cannot be
  * decided until they have answered.
+ *
+ * `news` rides along and comes back on its own field rather than merged into
+ * `items`, because an announcement is not work the student owes — it answers a
+ * different question about the course and fails independently of that one. One
+ * more entry in this `Promise.all` is also all it costs: a fourth route awaited
+ * separately would double a 27-course refresh's wall time.
  */
 async function courseItems(http, credentials, token, courseId) {
-  const [folders, quizzes, gradebook] = await Promise.all([
+  const [folders, quizzes, gradebook, news] = await Promise.all([
     route(http, contentRequest(credentials, token, courseId, "dropbox/folders/"), (body) =>
       parseFolders(body, credentials.baseUrl, courseId),
     ),
@@ -129,17 +145,18 @@ async function courseItems(http, credentials, token, courseId) {
       parseQuizzes(body, credentials.baseUrl, courseId),
     ),
     readBody(http, contentRequest(credentials, token, courseId, "grades/")),
+    route(http, contentRequest(credentials, token, courseId, "news/"), parseNews),
   ]);
   if (!folders.ok && !quizzes.ok) {
-    return { ok: false, detail: `${folders.detail}; ${quizzes.detail}` };
+    return { ok: false, detail: `${folders.detail}; ${quizzes.detail}`, news };
   }
   const items = [...(folders.items ?? []), ...(quizzes.items ?? [])];
   const headsUp = gradebook.ok
     ? parseGradebook(gradebook.body, items, credentials.baseUrl, courseId)
     : gradebook;
   return headsUp.ok
-    ? { ok: true, items: [...items, ...headsUp.items] }
-    : { ok: true, items, gradesDetail: headsUp.detail };
+    ? { ok: true, items: [...items, ...headsUp.items], news }
+    : { ok: true, items, gradesDetail: headsUp.detail, news };
 }
 
 /** Fetch one route down to its body, or the reason there is none. */
@@ -365,6 +382,66 @@ function parseGradebook(body, items, baseUrl, courseId) {
   }
   return { ok: true, items: headsUp };
 }
+
+/**
+ * How many of a course's announcements reach the cache. 440703 really carries
+ * 467 of them; a menu bar shows the top few, so the rest are bytes the Swift
+ * side decodes on every refresh and never renders.
+ */
+const ANNOUNCEMENT_LIMIT = 10;
+
+/**
+ * The news route: a BARE ARRAY again, kept down to the three fields a row needs.
+ * Two rules are D2L's, not ours:
+ *
+ *   - An unpublished item is a draft the instructor has not posted. Only
+ *     `IsPublished === false` is excluded — an item that omits the field is a
+ *     shape this tenant has never sent, and reading unknown as unpublished would
+ *     empty the section the day D2L renames it.
+ *   - `StartDate` is when the instructor scheduled the post and is the honest
+ *     answer whenever it exists; `CreatedDate` is the fallback for the ones
+ *     scheduled by nobody. Unreadable and absent are the same answer here — the
+ *     field yielded no date — so both fall through to the same next-best one.
+ *
+ * Sorted here rather than trusted from the server: D2L happens to answer
+ * newest-first today, and a cap applied to an order nobody promised would
+ * quietly keep the ten OLDEST the day that changes.
+ *
+ * Same fatal-id/fatal-title asymmetry as the other parsers, with a smaller blast
+ * radius: a bad row costs the course its announcements, never its assignments.
+ */
+function parseNews(body) {
+  const payload = jsonOf(body);
+  if (!Array.isArray(payload)) return { ok: false, detail: "not a news item array" };
+  const items = [];
+  for (const item of payload) {
+    if (item?.IsPublished === false) continue;
+    if (typeof item?.Id !== "number" || typeof item.Title !== "string") {
+      return { ok: false, detail: "a news item carried no id or no title" };
+    }
+    items.push({
+      id: item.Id,
+      title: item.Title,
+      date: isoSeconds(item.StartDate) ?? isoSeconds(item.CreatedDate),
+    });
+  }
+  return { ok: true, items: items.sort(newestFirst).slice(0, ANNOUNCEMENT_LIMIT) };
+}
+
+/**
+ * Newest first, undated last. The dates are already normalized to whole-second
+ * UTC, so they are fixed-width strings in one zone and compare chronologically
+ * as text. Equal dates return 0 and keep the server's own order, which is what
+ * makes the cap deterministic when a course posts twice in one minute.
+ */
+const newestFirst = (a, b) => {
+  if (a.date === b.date) return 0;
+  // An undated row sorts to the end rather than to 1970, where a null read as
+  // an epoch would put it — ahead of nothing, but behind everything real.
+  if (a.date === null) return 1;
+  if (b.date === null) return -1;
+  return a.date < b.date ? 1 : -1;
+};
 
 /**
  * The deep links, computed from ids alone because D2L sends nothing usable as

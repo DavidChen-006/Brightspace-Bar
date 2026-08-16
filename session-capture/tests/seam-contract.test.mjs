@@ -53,15 +53,20 @@ function rungCases() {
  * Every fetcher implementation, in the three states the ladder branches on.
  * The real one is driven into each state through its HTTP seam and its
  * credentials: an empty root is a dead session, a refused socket is transport.
+ *
+ * Each state is a FACTORY, not an instance: the scripted fake answers from a
+ * one-entry script and would report "script exhausted" to the second test that
+ * asked it the same question — a failure about this file's bookkeeping rather
+ * than about the seam.
  */
 function fetcherCases() {
-  const real = (routes) => createFetcher({ http: fakeHttp(routes) });
+  const real = (routes) => () => createFetcher({ http: fakeHttp(routes) });
   return [
     {
       name: "the scripted fake",
-      succeeding: scriptedFetcher([ok(SAMPLE_DATA)]),
-      expiring: scriptedFetcher([expired()]),
-      failing: scriptedFetcher([{ ok: false, reason: "transport", detail: "ECONNREFUSED" }]),
+      succeeding: () => scriptedFetcher([ok(SAMPLE_DATA)]),
+      expiring: () => scriptedFetcher([expired()]),
+      failing: () => scriptedFetcher([{ ok: false, reason: "transport", detail: "ECONNREFUSED" }]),
       credentials: false,
     },
     {
@@ -121,7 +126,7 @@ for (const { name, succeeding, expiring, failing, credentials } of fetcherCases(
 
   test(`${name} returns the payload without stamping its own fetchedAt`, async (t) => {
     // Arrange / Act
-    const result = await succeeding.fetch(world(t, { withSession: true }));
+    const result = await succeeding().fetch(world(t, { withSession: true }));
 
     // Assert — the orchestrator owns that timestamp.
     assert.equal(result.ok, true);
@@ -130,10 +135,23 @@ for (const { name, succeeding, expiring, failing, credentials } of fetcherCases(
     assert.equal(result.data.fetchedAt, undefined);
   });
 
+  test(`${name} carries an announcements map alongside the assignments one`, async (t) => {
+    // Arrange — the envelope grew a third field, and the fakes the orchestrator
+    // suite is built on have to grow it too. A fake still answering two fields
+    // would let every ladder test pass while the real cache gained a section
+    // nothing had ever written a status for.
+    const result = await succeeding().fetch(world(t, { withSession: true }));
+
+    // Assert
+    assert.equal(result.ok, true);
+    assert.equal(typeof result.data.announcements, "object");
+    assert.ok(!Array.isArray(result.data.announcements), "announcements is keyed by course id");
+  });
+
   test(`${name} spells an expired session exactly sessionExpired`, async (t) => {
     // Arrange — the ONE reason that climbs the ladder. Any other spelling and
     // a re-mintable lapse becomes a permanent error state.
-    const result = await expiring.fetch(world(t, { withSession: false }));
+    const result = await expiring().fetch(world(t, { withSession: false }));
 
     // Assert
     assert.deepStrictEqual(result, { ok: false, reason: "sessionExpired" });
@@ -142,7 +160,7 @@ for (const { name, succeeding, expiring, failing, credentials } of fetcherCases(
   test(`${name} reports a non-session failure under a different reason`, async (t) => {
     // Arrange — anything but sessionExpired here, or the daemon logs a human in
     // to fix a network outage.
-    const result = await failing.fetch(world(t, { withSession: true }));
+    const result = await failing().fetch(world(t, { withSession: true }));
 
     // Assert
     assert.equal(result.ok, false);
