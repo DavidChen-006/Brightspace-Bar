@@ -34,6 +34,9 @@ public actor MenuAdapter: MenuDataSource {
     /// Which zone deadline dates render in. Ambient config belongs in the shell;
     /// the pure layer takes it as a parameter.
     private let timeZone: TimeZone
+    /// SEAM: the announcements half, or nil for a build without the feature —
+    /// the same defaulting pattern as `assignments`, for the same reason.
+    private let announcements: AnnouncementFeed?
     /// SEAM: the countdown's source, or nil for a build without the timer —
     /// same defaulting pattern as `assignments`, for the same reason.
     private let nextRefresh: NextRefreshProvider?
@@ -48,6 +51,7 @@ public actor MenuAdapter: MenuDataSource {
         baseURL: URL,
         clock: any Clock,
         assignments: AssignmentFeed? = nil,
+        announcements: AnnouncementFeed? = nil,
         timeZone: TimeZone = .current,
         nextRefresh: NextRefreshProvider? = nil
     ) {
@@ -56,6 +60,7 @@ public actor MenuAdapter: MenuDataSource {
         self.baseURL = baseURL
         self.clock = clock
         self.assignments = assignments
+        self.announcements = announcements
         self.timeZone = timeZone
         self.nextRefresh = nextRefresh
     }
@@ -122,9 +127,17 @@ public actor MenuAdapter: MenuDataSource {
     /// answer 403 (experiment 6). Failures need no handling here; `AssignmentStore`
     /// preserves what each course already had.
     private func refreshAssignments() async {
-        guard let assignments = self.assignments else { return }
+        // One visibility computation for both halves, so "what we fetch" cannot
+        // disagree between them — and announcements ride the same cadence as
+        // assignments for the same reason: neither is persisted, and both read
+        // the data.json the course fetch already wrote (no extra spawn).
         let visible = MenuTranslation.visibleCourses(await self.cache.courses, now: self.clock.now)
-        _ = await assignments.fetcher.refresh(courses: visible)
+        if let assignments = self.assignments {
+            _ = await assignments.fetcher.refresh(courses: visible)
+        }
+        if let announcements = self.announcements {
+            _ = await announcements.fetcher.refresh(courses: visible)
+        }
     }
 
     /// Warm start: pull the previous run's courses off disk before the first
@@ -147,6 +160,7 @@ public actor MenuAdapter: MenuDataSource {
             now: self.clock.now,
             baseURL: self.baseURL,
             assignments: await self.assignmentStates(for: courses),
+            announcements: await self.announcementStates(for: courses),
             timeZone: self.timeZone,
             nextRefresh: await self.nextRefresh?()
         )
@@ -162,6 +176,19 @@ public actor MenuAdapter: MenuDataSource {
         var states: [Int: AssignmentsState] = [:]
         for course in courses {
             states[course.id] = await assignments.store.state(for: course.id)
+        }
+        return states
+    }
+
+    /// What is known about each course's announcements, keyed by course id.
+    /// The same per-course read as `assignmentStates`, for the same privacy
+    /// reason; absent entries answer `.neverFetched`, which the translation
+    /// renders as no section at all.
+    private func announcementStates(for courses: [Course]) async -> [Int: AnnouncementsState] {
+        guard let announcements = self.announcements else { return [:] }
+        var states: [Int: AnnouncementsState] = [:]
+        for course in courses {
+            states[course.id] = await announcements.store.state(for: course.id)
         }
         return states
     }

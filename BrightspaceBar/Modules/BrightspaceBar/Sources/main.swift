@@ -157,6 +157,13 @@ if ProcessInfo.processInfo.environment["BRIGHTSPACEBAR_STUB"] == "1" {
     // known assignments plus an honest staleness note.
     let assignmentFeed = AssignmentFeed(source: workSource, clock: clock)
 
+    // SEAM: the announcements half — the same pairing argument as
+    // `AssignmentFeed`, over the same `data.json` (its own `announcements`
+    // field, written by the same daemon run; no extra spawn).
+    let announcementFeed = AnnouncementFeed(
+        source: DaemonAnnouncementSource(paths: daemonPaths), clock: clock
+    )
+
     // SEAM: from here down the stack is only ever seen as `MenuDataSource`.
     // `timeZone` is `.current` — read once here, in the shell, because
     // `AssignmentTranslation` must stay pure and take it as a parameter.
@@ -166,6 +173,7 @@ if ProcessInfo.processInfo.environment["BRIGHTSPACEBAR_STUB"] == "1" {
         baseURL: brightspaceBaseURL,
         clock: clock,
         assignments: assignmentFeed,
+        announcements: announcementFeed,
         timeZone: .current,
         // Read live on every snapshot — never a copy — so the countdown row
         // always reflects the timer's actual schedule, tolerance and
