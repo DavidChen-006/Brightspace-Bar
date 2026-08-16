@@ -35,7 +35,7 @@ public struct DaemonPaths: Sendable, Equatable {
     public var statusFile: URL { self.cacheDirectory.appending(path: "status.json") }
 
     /// Where the install lives when `BSB_ROOT` is unset — `paths.mjs`'s
-    /// `DEFAULT_ROOT`, and the directory `Scripts/refresh-session.sh` already uses.
+    /// `DEFAULT_ROOT`, so writer and reader agree without being told.
     private static let defaultSuffix = "/Library/Application Support/BrightspaceBar"
 
     /// The root `environment` asks for.

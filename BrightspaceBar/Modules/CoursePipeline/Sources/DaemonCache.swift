@@ -6,7 +6,7 @@ import Foundation
 /// same `data.json` and the same `status.json`, so the *reading* lives once, in
 /// one place, and each source decodes only its own half of the payload. Every
 /// read is fresh: a daemon run that lands while the app is up takes effect on
-/// the next fetch, with no relaunch (the `FileSessionProvider` precedent).
+/// the next fetch, with no relaunch.
 public enum DaemonCache {
 
     /// The failure `status.json` reports, or nil when it reports none.

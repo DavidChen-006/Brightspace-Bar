@@ -67,12 +67,11 @@ private enum Layout {
 @Suite("Architecture — the contract stays a contract")
 struct ArchitectureTests {
 
-    /// Backend modules. View code may not name any of them — `BrightspaceSession`
-    /// included: a view file holding a credential type is exactly the leak this
-    /// suite exists to prevent.
+    /// Backend modules. View code may not name any of them. (`BrightspaceSession`
+    /// used to be on this list; the module is gone — credentials never cross into
+    /// Swift at all now, so there is no credential type left to leak.)
     private static let backendModules: Set<String> = [
         "MenuAdapter", "CoursePipeline", "AssignmentPipeline", "QuizPipeline",
-        "BrightspaceSession",
     ]
 
     /// The single exemption: the composition root exists precisely to know both

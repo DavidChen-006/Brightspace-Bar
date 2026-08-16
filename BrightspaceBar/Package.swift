@@ -4,15 +4,17 @@ import PackageDescription
 // One package, six modules, each self-contained under Modules/<Name>/ with its
 // own Sources/, Tests/, and Makefile. The dependency arrows that matter:
 //
-//   BrightspaceSession   (the cookie seam: how credentials are obtained)
-//        ↑                            ↑
 //   CoursePipeline  ←──  AssignmentPipeline  (backend: per-course work items)
 //        ↑                            ↑
-//        └──────────────────  QuizPipeline   (the second route for those items)
+//        └──────────────────  QuizPipeline   (quiz parsing + the quiz deep link)
 //        ↑
 //   MenuAdapter ──→ CourseMenu   (the contract: pure values, no AppKit, no network)
 //                       ↑
 //                  BrightspaceBar (the GUI)
+//
+// There is no session module any more: credentials live entirely on the Node
+// daemon's side of the boundary (LADDER-PLAN D7), and the backend's only source
+// of data is the cache the daemon writes.
 //
 // BrightspaceBar depends on CourseMenu ONLY — it cannot see `Course`, cookies,
 // JWTs, or URLSession. That is what lets the GUI be built and tested against
@@ -25,7 +27,6 @@ let package = Package(
     name: "BrightspaceBar",
     platforms: [.macOS(.v15)],
     products: [
-        .library(name: "BrightspaceSession", targets: ["BrightspaceSession"]),
         .library(name: "CoursePipeline", targets: ["CoursePipeline"]),
         .library(name: "AssignmentPipeline", targets: ["AssignmentPipeline"]),
         .library(name: "QuizPipeline", targets: ["QuizPipeline"]),
@@ -34,26 +35,14 @@ let package = Package(
         .executable(name: "BrightspaceBar", targets: ["BrightspaceBar"]),
     ],
     targets: [
-        // ── The cookie seam ──────────────────────────────────────────────────
-        .target(
-            name: "BrightspaceSession",
-            path: "Modules/BrightspaceSession/Sources"
-        ),
-        .testTarget(
-            name: "BrightspaceSessionTests",
-            dependencies: ["BrightspaceSession"],
-            path: "Modules/BrightspaceSession/Tests"
-        ),
-
-        // ── The backend: parse, cache, poll, fetch ───────────────────────────
+        // ── The backend: parse, cache, poll, spawn ───────────────────────────
         .target(
             name: "CoursePipeline",
-            dependencies: ["BrightspaceSession"],
             path: "Modules/CoursePipeline/Sources"
         ),
         .testTarget(
             name: "CoursePipelineTests",
-            dependencies: ["CoursePipeline", "BrightspaceSession"],
+            dependencies: ["CoursePipeline"],
             path: "Modules/CoursePipeline/Tests",
             // Fixtures are read via #filePath (see TestSupport.Fixture), not as
             // bundle resources — excluded so SPM does not complain about them.
@@ -67,12 +56,12 @@ let package = Package(
         // for "the fetch failed, keep what you had" would be two places to sync.
         .target(
             name: "AssignmentPipeline",
-            dependencies: ["CoursePipeline", "BrightspaceSession"],
+            dependencies: ["CoursePipeline"],
             path: "Modules/AssignmentPipeline/Sources"
         ),
         .testTarget(
             name: "AssignmentPipelineTests",
-            dependencies: ["AssignmentPipeline", "CoursePipeline", "BrightspaceSession"],
+            dependencies: ["AssignmentPipeline", "CoursePipeline"],
             path: "Modules/AssignmentPipeline/Tests",
             // Fixtures are read via #filePath (see TestSupport.Fixture), not as
             // bundle resources. Excluding the whole directory also covers the
@@ -84,18 +73,21 @@ let package = Package(
         // ── The backend: the same items, from the quizzes route ───────────────
         //
         // Depends on AssignmentPipeline rather than paralleling it: `QuizParser`
-        // produces `Assignment` values stamped `kind: .quiz`, and
-        // `BrightspaceQuizSource` conforms to `AssignmentSource`, so
-        // `CompositeAssignmentSource` can merge the two routes below the store.
+        // produces `Assignment` values stamped `kind: .quiz`, so one store and one
+        // fetcher serve both kinds. The merge itself is the daemon's job now — it
+        // fetches both routes per course and writes one list — which is why nothing
+        // here fetches any more; what remains is the parser (a test helper against
+        // recorded payloads) and `QuizLink`, the quiz deep-link template the
+        // translation layer still picks per item.
         .target(
             name: "QuizPipeline",
-            dependencies: ["AssignmentPipeline", "CoursePipeline", "BrightspaceSession"],
+            dependencies: ["AssignmentPipeline", "CoursePipeline"],
             path: "Modules/QuizPipeline/Sources"
         ),
         .testTarget(
             name: "QuizPipelineTests",
             dependencies: [
-                "QuizPipeline", "AssignmentPipeline", "CoursePipeline", "BrightspaceSession",
+                "QuizPipeline", "AssignmentPipeline", "CoursePipeline",
             ],
             path: "Modules/QuizPipeline/Tests",
             // Fixtures are read via #filePath (see TestSupport.QuizFixture), not as
@@ -131,8 +123,7 @@ let package = Package(
         .testTarget(
             name: "MenuAdapterTests",
             dependencies: [
-                "MenuAdapter", "CourseMenu", "CoursePipeline",
-                "AssignmentPipeline", "QuizPipeline", "BrightspaceSession",
+                "MenuAdapter", "CourseMenu", "CoursePipeline", "AssignmentPipeline",
             ],
             path: "Modules/MenuAdapter/Tests"
         ),
@@ -143,8 +134,7 @@ let package = Package(
             // The backend modules are here for main.swift ONLY; ArchitectureTests
             // fails the suite if any view file imports them.
             dependencies: [
-                "CourseMenu", "MenuAdapter", "CoursePipeline",
-                "AssignmentPipeline", "QuizPipeline", "BrightspaceSession",
+                "CourseMenu", "MenuAdapter", "CoursePipeline", "AssignmentPipeline",
             ],
             path: "Modules/BrightspaceBar/Sources",
             exclude: ["Info.plist"],
@@ -168,7 +158,7 @@ let package = Package(
             // ArchitectureTests polices Sources/, and this is a test target.
             dependencies: [
                 "BrightspaceBar", "CourseMenu", "MenuAdapter",
-                "CoursePipeline", "AssignmentPipeline", "QuizPipeline",
+                "CoursePipeline", "AssignmentPipeline",
             ],
             path: "Modules/BrightspaceBar/Tests"
         ),
