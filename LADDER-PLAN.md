@@ -417,7 +417,18 @@ routes, verified — but undocumented, so corroborating key only).
 content/discussions and whether graded work arrives via LTI — then re-derive
 the ranking from coverage numbers before building rungs 3-5 of this list.
 
-## BUILD 4 — rung 2 v1: the gradebook diff → "Heads up" section (started 2026-08-16)
+## BUILD 4 — rung 2 v1: the gradebook diff → "Heads up" section (2026-08-16 — **COMPLETE, ALL GREEN in stub mode**)
+
+**Outcome.** Five spikes, four subagents, one afternoon: contract `dac7fad` →
+A1 red `4fe7f72` (18 tests) → A2 green `4eb6ff0` → B1 red `11edf18` (27
+tests) → B2 green `fa0857a` → C1 intent test `b5d381b`. Final tallies, run by
+the orchestrator personally: node 213 pass / Swift 605 pass, zero failures.
+The intent test (GradeOnlyIntentTests + tests/intent/build4-driver.mjs) spawns
+the real node fetcher over scripted HTTP into a temp BSB_ROOT and reads it
+back through the real Swift decode + both translations — the one test that can
+catch the two halves drifting; ungated (stub mode, no network, no credential).
+**Not yet proven live** — no live semester course exists; the live proof and
+the date-ladder decision both wait on the Fall re-probe.
 
 **The story.** The gradebook is the one place graded work casts a shadow before
 it is visible anywhere else. Rung 2 v1: fetch each course's `grades/` alongside
