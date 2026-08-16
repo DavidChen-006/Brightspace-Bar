@@ -15,9 +15,18 @@ public struct MenuAssembler {
     /// clicks would do nothing. One target serves every item; the clicked item's
     /// `representedObject` says which row was chosen.
     private let target: MenuActionTarget
+    /// Injectable clock for the status titles; production is `Date.init`. A
+    /// closure, not a value — the whole point is that it is re-read every time
+    /// a menu opens (experiment 18).
+    private let now: () -> Date
 
-    public init(opener: any URLOpening, onCommand: @escaping @MainActor (MenuCommand) -> Void) {
+    public init(
+        opener: any URLOpening,
+        now: @escaping () -> Date = Date.init,
+        onCommand: @escaping @MainActor (MenuCommand) -> Void
+    ) {
         self.target = MenuActionTarget(opener: opener, onCommand: onCommand)
+        self.now = now
     }
 
     /// Builds a fresh menu with fresh items every call. Never reuses an
@@ -36,15 +45,17 @@ public struct MenuAssembler {
     /// rows, and is genuinely per-call — the top level has none.
     private func menu(_ rows: [MenuRow], leadingWith prefix: [NSMenuItem] = []) -> NSMenu {
         let menu = NSMenu()
-        // Hover unity's delivery mechanism. A view-backed item is never told it
-        // is highlighted — AppKit only tells the menu's delegate — so without
-        // this every course row draws forever unhighlighted. Retained by the
-        // menu itself because `NSMenu.delegate` is WEAK: a delegate merely
-        // assigned here would deallocate before the menu was ever shown.
-        let highlighter = MenuHighlightDelegate()
-        menu.delegate = highlighter
+        // The menu's one delegate, serving both lifecycle jobs: hover unity
+        // (`willHighlight`) and time-row freshness at open (`menuWillOpen`,
+        // experiment 18). A view-backed item is never told it is highlighted —
+        // AppKit only tells the menu's delegate — so without this every course
+        // row draws forever unhighlighted. Retained by the menu itself because
+        // `NSMenu.delegate` is WEAK: a delegate merely assigned here would
+        // deallocate before the menu was ever shown.
+        let lifecycle = MenuLifecycleDelegate(now: self.now)
+        menu.delegate = lifecycle
         objc_setAssociatedObject(
-            menu, &MenuHighlightDelegate.associationKey, highlighter, .OBJC_ASSOCIATION_RETAIN
+            menu, &MenuLifecycleDelegate.associationKey, lifecycle, .OBJC_ASSOCIATION_RETAIN
         )
         // Load-bearing, and needed on submenus too. `action == nil` is what makes
         // inert rows inert, but with autoenabling on (the default) AppKit
@@ -92,6 +103,9 @@ public struct MenuAssembler {
         case .assignment(let assignment):
             return [self.linkItem(title: RowTitle.assignment(assignment), url: assignment.url)]
 
+        case .announcement(let announcement):
+            return [self.linkItem(title: RowTitle.announcement(announcement), url: announcement.url)]
+
         case .command(let command):
             let item = NSMenuItem(
                 title: RowTitle.command(command),
@@ -102,10 +116,23 @@ public struct MenuAssembler {
             item.representedObject = command
             return [item]
 
-        case .sectionHeader(let text), .message(let text), .status(let text):
+        case .sectionHeader(let text), .message(let text):
             // No action (can never be activated) and disabled (looks inert).
             let item = NSMenuItem(title: text, action: nil, keyEquivalent: "")
             item.isEnabled = false
+            return [item]
+
+        case .status(let stamp):
+            // Inert like the above, but the *stamp* travels with the item — that
+            // is what lets `MenuLifecycleDelegate` recompute the title from the
+            // dates on every open. The title set here is only the first paint.
+            let item = NSMenuItem(
+                title: StatusText.title(for: stamp, now: self.now()),
+                action: nil,
+                keyEquivalent: ""
+            )
+            item.isEnabled = false
+            item.representedObject = StatusStampBox(stamp)
             return [item]
 
         case .separator:
@@ -202,6 +229,13 @@ enum RowTitle {
         return row.title + Self.subtitleSeparator + subtitle
     }
 
+    /// Same inversion as assignments, for the same reason: the title is the
+    /// identity you scan for, and the posting date is metadata.
+    static func announcement(_ row: AnnouncementRow) -> String {
+        guard let subtitle = row.subtitle else { return row.title }
+        return row.title + Self.subtitleSeparator + subtitle
+    }
+
     static func command(_ command: MenuCommand) -> String {
         switch command {
         case .refresh: "Refresh"
@@ -210,18 +244,48 @@ enum RowTitle {
     }
 }
 
-/// Turns AppKit's one highlight signal into the flag every component draws from.
+/// Reference wrapper so a value-typed `StatusStamp` can ride in
+/// `representedObject` (which is `Any?` but bridges values through opaque
+/// boxes that `as?` cannot recover reliably across module boundaries).
+final class StatusStampBox: NSObject {
+    let stamp: StatusStamp
+    init(_ stamp: StatusStamp) { self.stamp = stamp }
+}
+
+/// The menu's lifecycle delegate, owning the two signals only a delegate hears.
 ///
-/// It sets the flag on EVERY component, not just the hovered one: `willHighlight`
-/// fires once per change, so a delegate that only lights the new row leaves every
-/// row the pointer passed over still lit. `item` is nil when the pointer leaves
-/// the rows entirely, and is a native row (a command) when it lands on one —
-/// both mean "no component is highlighted", which is what `item === row` says
-/// without a special case.
+/// HIGHLIGHT — turns AppKit's one highlight signal into the flag every component
+/// draws from. It sets the flag on EVERY component, not just the hovered one:
+/// `willHighlight` fires once per change, so a delegate that only lights the new
+/// row leaves every row the pointer passed over still lit. `item` is nil when
+/// the pointer leaves the rows entirely, and is a native row (a command) when it
+/// lands on one — both mean "no component is highlighted", which is what
+/// `item === row` says without a special case.
+///
+/// FRESHNESS (experiment 18) — `menuWillOpen(_:)` is delivered synchronously,
+/// before AppKit draws the menu, so titles set there are what the user sees: no
+/// async hop, no race against display, no per-second timer ticking a menu nobody
+/// is looking at. Only the rows carrying a `StatusStampBox` are touched, because
+/// only they depend on `now` — everything else was already correct, and
+/// `MenuModel`'s Equatable skip-rebuild stays effective.
 @MainActor
-private final class MenuHighlightDelegate: NSObject, NSMenuDelegate {
+private final class MenuLifecycleDelegate: NSObject, NSMenuDelegate {
     /// Address-as-key for the association that keeps this object alive.
     nonisolated(unsafe) static var associationKey = 0
+
+    private let now: () -> Date
+
+    init(now: @escaping () -> Date) {
+        self.now = now
+    }
+
+    func menuWillOpen(_ menu: NSMenu) {
+        let now = self.now()
+        for item in menu.items {
+            guard let box = item.representedObject as? StatusStampBox else { continue }
+            item.title = StatusText.title(for: box.stamp, now: now)
+        }
+    }
 
     func menu(_ menu: NSMenu, willHighlight item: NSMenuItem?) {
         for row in menu.items {

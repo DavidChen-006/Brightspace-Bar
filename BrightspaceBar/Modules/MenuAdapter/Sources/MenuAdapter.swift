@@ -18,6 +18,12 @@ import CoursePipeline
 // and hands them across the seam.
 // ─────────────────────────────────────────────────────────────────────────────
 public actor MenuAdapter: MenuDataSource {
+    /// Asks the scheduler when the next automatic refresh fires; nil when no
+    /// timer is running. `@MainActor` because `Timer` is a run-loop object owned
+    /// there — the adapter awaits the hop on each snapshot, which costs
+    /// microseconds and keeps the date honest (it is read live, never copied).
+    public typealias NextRefreshProvider = @MainActor @Sendable () -> Date?
+
     private let poller: Poller
     private let cache: CourseCache
     private let baseURL: URL
@@ -28,6 +34,9 @@ public actor MenuAdapter: MenuDataSource {
     /// Which zone deadline dates render in. Ambient config belongs in the shell;
     /// the pure layer takes it as a parameter.
     private let timeZone: TimeZone
+    /// SEAM: the countdown's source, or nil for a build without the timer —
+    /// same defaulting pattern as `assignments`, for the same reason.
+    private let nextRefresh: NextRefreshProvider?
 
     /// One disk read per process lifetime, performed lazily on first use so
     /// construction stays effect-free.
@@ -39,7 +48,8 @@ public actor MenuAdapter: MenuDataSource {
         baseURL: URL,
         clock: any Clock,
         assignments: AssignmentFeed? = nil,
-        timeZone: TimeZone = .current
+        timeZone: TimeZone = .current,
+        nextRefresh: NextRefreshProvider? = nil
     ) {
         self.poller = poller
         self.cache = cache
@@ -47,6 +57,7 @@ public actor MenuAdapter: MenuDataSource {
         self.clock = clock
         self.assignments = assignments
         self.timeZone = timeZone
+        self.nextRefresh = nextRefresh
     }
 
     // SEAM: contract method — the GUI's menu-open path. Serves memory/disk only;
@@ -136,7 +147,8 @@ public actor MenuAdapter: MenuDataSource {
             now: self.clock.now,
             baseURL: self.baseURL,
             assignments: await self.assignmentStates(for: courses),
-            timeZone: self.timeZone
+            timeZone: self.timeZone,
+            nextRefresh: await self.nextRefresh?()
         )
     }
 

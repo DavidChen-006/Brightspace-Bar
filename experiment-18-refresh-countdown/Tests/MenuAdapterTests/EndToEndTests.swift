@@ -29,19 +29,11 @@ import MenuAdapter
 // Plus one large, gated on BS_LIVE.
 // ═════════════════════════════════════════════════════════════════════════════
 
-// Mid Fall 2025: the currentness filter makes `now` part of the expected
-// output, so the suite's instant is pinned where RealData's transcribed
-// visible set applies. All clock arithmetic is relative and unaffected.
-private let epoch = RealData.midFall2025
+private let epoch = Date(timeIntervalSince1970: 1_786_230_000)
 
 /// `true` only for `BS_LIVE=1 swift test`. Read once at load, as experiment 4 does,
 /// so the gate cannot change mid-suite.
 private let bsLiveEnabled = ProcessInfo.processInfo.environment["BS_LIVE"] != nil
-
-/// The daemon a live run spawns — the same resolution `main.swift` performs, and
-/// the same one both contract suites use.
-private let liveDaemonCLI = ProcessInfo.processInfo.environment["BSB_REFRESH_CLI"]
-    ?? NSHomeDirectory() + "/PaperShelf/session-capture/src/refresh.mjs"
 
 /// Assembles the real experiment-4 stack around a scripted source.
 ///
@@ -85,7 +77,7 @@ struct EndToEndTests {
 
         // Assert — count, then that the rows are genuinely populated: "27" must not
         // be achievable with twenty-seven blank placeholders.
-        try #require(model.courses.count == RealData.visibleIDsAtMidFall2025.count)
+        try #require(model.courses.count == RealData.totalCourses)
         for row in model.courses {
             #expect(row.id > 0)
             #expect(!row.title.isEmpty)
@@ -93,9 +85,9 @@ struct EndToEndTests {
         }
 
         // And a named spot check, so a systematic id shift cannot pass.
-        let dataStructures = try #require(model.courses.first { $0.id == RealData.dataStructuresID })
-        #expect(dataStructures.title == RealData.dataStructuresName)
-        #expect(dataStructures.subtitle == RealData.dataStructuresShortCode)
+        let compilers = try #require(model.courses.first { $0.id == RealData.compilersID })
+        #expect(compilers.title == RealData.compilersName)
+        #expect(compilers.subtitle == RealData.compilersShortCode)
     }
 
     // ── Priority 1: the menu never waits on the network ──────────────────────
@@ -168,7 +160,7 @@ struct EndToEndTests {
         let model = await adapter.currentMenu()
 
         // Assert
-        #expect(model.courses.count == RealData.visibleIDsAtMidFall2025.count)
+        #expect(model.courses.count == RealData.totalCourses)
         #expect(await source.callCount() == 1, "currentMenu triggered a second fetch")
     }
 
@@ -187,13 +179,13 @@ struct EndToEndTests {
         let (adapter, _) = makeAdapter(source: source, file: scratch.file(), clock: clock)
 
         let before = await adapter.refresh()
-        try #require(before.courses.count == RealData.visibleIDsAtMidFall2025.count)
+        try #require(before.courses.count == RealData.totalCourses)
 
         // Act
         let after = await adapter.refresh()
 
         // Assert — the whole point: a dead session must not empty the dropdown.
-        #expect(after.courses.count == RealData.visibleIDsAtMidFall2025.count)
+        #expect(after.courses.count == RealData.totalCourses)
         #expect(after.courses.map(\.id) == before.courses.map(\.id))
     }
 
@@ -220,7 +212,7 @@ struct EndToEndTests {
         let after = await adapter.refresh()
 
         // Assert
-        #expect(after.courses.count == RealData.visibleIDsAtMidFall2025.count)
+        #expect(after.courses.count == RealData.totalCourses)
     }
 
     @Test("currentMenu still serves the courses after a failed refresh")
@@ -241,7 +233,7 @@ struct EndToEndTests {
         let model = await adapter.currentMenu()
 
         // Assert
-        #expect(model.courses.count == RealData.visibleIDsAtMidFall2025.count)
+        #expect(model.courses.count == RealData.totalCourses)
         #expect(!model.rows.isEmpty)
     }
 
@@ -298,7 +290,7 @@ struct EndToEndTests {
         let model = await second.currentMenu()
 
         // Assert — the courses came off disk, and no fetch was needed to get them.
-        #expect(model.courses.count == RealData.visibleIDsAtMidFall2025.count)
+        #expect(model.courses.count == RealData.totalCourses)
         #expect(await secondRun.callCount() == 0)
     }
 
@@ -347,34 +339,16 @@ struct EndToEndTests {
     // ── The live run: proof the fake did not drift ───────────────────────────
 
     /// Skipped by default so `swift test` stays hermetic — no network, no cookie,
-    /// no daemon. Mirrors experiment 4's gating exactly.
-    ///
-    /// Rewritten in phase 5 onto `DaemonCourseSource`, the source the app actually
-    /// ships: the app no longer holds a cookie or mints a JWT, so a live menu is
-    /// only live if the daemon produced it. The arrangement mirrors
-    /// `CourseSourceContractTests`' `.live` case exactly.
-    ///
-    /// What this claims that the contract suite does not: the contract asks whether
-    /// the SOURCE answers, this asks whether the resulting courses still reach the
-    /// MENU. Between them sits `MenuTranslation.visibleCourses`, and the daemon
-    /// maps every course's `startDate`/`endDate` across a language boundary with no
-    /// compiler checking it — mis-map them and every course reads as not-current, so
-    /// the contract stays green while David's menu goes empty.
+    /// no `session.json`. Mirrors experiment 4's gating exactly.
     @Test("the real tenant produces a clickable menu", .enabled(if: bsLiveEnabled))
     func liveTenantYieldsAClickableMenu() async throws {
-        // Arrange — the real daemon, run cron-safe: no `--allow-full-login`, so
-        // this can never open a browser window mid-suite (D8). Credentials stay on
-        // the daemon's side of the boundary entirely; nothing here reads a session.
+        // Arrange — the real adapter reading the captured session. Never copied
+        // here, never logged.
         let scratch = try ScratchDir()
         let clock = ManualClock(Date())
         let cache = CourseCache(fileURL: scratch.file(), clock: clock, staleAfter: 3600)
         let poller = Poller(
-            source: DaemonCourseSource(runner: DaemonRunner(
-                executable: URL(fileURLWithPath: "/usr/bin/env"),
-                arguments: ["node", liveDaemonCLI],
-                paths: DaemonPaths.resolve(),
-                timeout: 180
-            )),
+            source: try BrightspaceCourseSource(),
             cache: cache,
             policy: PollPolicy(interval: 3600),
             clock: clock

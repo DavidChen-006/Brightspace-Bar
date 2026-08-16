@@ -184,7 +184,7 @@ struct HairlineRenderingTests {
             .hairline, .course(Boundary.course(id: 1)),
             .hairline, .course(Boundary.course(id: 2)),
             .separator,
-            .status("Updated just now"),
+            .status(.updated(nil)),
             .command(.refresh),
             .command(.quit),
         ])
@@ -209,7 +209,7 @@ struct HairlineRenderingTests {
             .hairline, .course(Boundary.course(id: 1)),
             .hairline, .course(Boundary.course(id: 2)),
             .separator,
-            .status("Updated just now"),
+            .status(.updated(nil)),
             .command(.refresh),
             .command(.quit),
         ])

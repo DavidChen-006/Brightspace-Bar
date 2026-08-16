@@ -191,7 +191,7 @@ private enum Graphed {
             .course(Graphed.ungraphedTwin),
             .course(Graphed.plain),
             .separator,
-            .status("Updated just now"),
+            .status(.updated(nil)),
             .command(.refresh),
             .command(.quit),
         ])
@@ -539,7 +539,7 @@ struct MenuAssemblerComponentSemanticsTests {
             .course(Graphed.graphed),
             .course(Graphed.plain),
             .separator,
-            .status("Updated just now"),
+            .status(.updated(nil)),
             .command(.refresh),
             .command(.quit),
         ])
@@ -590,7 +590,7 @@ struct MenuAssemblerComponentSemanticsTests {
             .course(Graphed.graphed),
             .course(Graphed.plain),
             .separator,
-            .status("Updated just now"),
+            .status(.updated(nil)),
             .command(.refresh),
             .command(.quit),
         ]))

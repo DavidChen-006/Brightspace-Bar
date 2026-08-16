@@ -179,7 +179,7 @@ private enum Build {
             .sectionHeader("Other"),
             .course(Build.civics),
             .separator,
-            .status("Updated just now"),
+            .status(.updated(nil)),
             .command(.refresh),
             .command(.quit),
         ])

@@ -1,22 +1,16 @@
 import Foundation
 
-/// The production timer: the thing that makes `PollTrigger.timer` more than a
-/// value only tests ever pass.
+/// The production timer, copied near-verbatim from BrightspaceBar's
+/// `CoursePipeline/RefreshScheduler.swift` (itself RepoBar's), with ONE
+/// addition this experiment exists to prove out: `nextFireDate`.
 ///
-/// A menu-bar app runs for weeks, so every failure mode of a long-lived timer is
-/// cumulative, and each of the three answers here is deliberate (RepoBar's
-/// `RefreshScheduler`, near-verbatim):
+/// The three inherited answers stay deliberate:
 ///
 ///   - `restart` **invalidates first**, always. A restart that left the old timer
-///     running would double the daemon spawn rate silently, and the next one
-///     would triple it.
-///   - `stop` releases the handler as well as the timer. In production the
-///     handler captures the poller, which holds the source, the cache and the
-///     daemon runner; keeping a dead handler keeps all of it for the life of the
-///     process.
-///   - `isRunning` is **derived** from the timer, never stored. A separate bool
-///     drifts out of sync with reality after the first missed invalidate, and
-///     nothing ever notices.
+///     running would double the daemon spawn rate silently.
+///   - `stop` releases the handler as well as the timer, or everything the
+///     handler captures lives for the life of the process.
+///   - `isRunning` is **derived** from the timer, never stored.
 ///
 /// `Timer` is a run-loop object, so this type is `@MainActor` and its tick runs
 /// on the main actor — which is also where the caller wants to be when it
@@ -32,12 +26,12 @@ public final class RefreshScheduler {
     /// Whether a valid timer is scheduled right now.
     public var isRunning: Bool { self.timer?.isValid == true }
 
-    /// When the timer will next fire, or nil when no timer is running. Derived
-    /// from `Timer.fireDate` — never stored — for the same reason `isRunning`
-    /// is: a copy drifts after the first restart, and `fireDate` also tracks
-    /// the *actual* schedule after the system applies tolerance or coalesces a
-    /// fire around sleep. This is the one true source for the menu's
-    /// "Refreshes in N min" line (experiment 18).
+    /// The experiment's addition: when the timer will next fire, or nil when no
+    /// timer is running. Derived from `Timer.fireDate` — never stored — for the
+    /// same reason `isRunning` is: a copy drifts after the first restart, and
+    /// `fireDate` also tracks the *actual* schedule after the system applies
+    /// tolerance or coalesces a fire around sleep. This is the one true source
+    /// for the menu's "Refreshes in N min" line.
     public var nextFireDate: Date? {
         guard let timer, timer.isValid else { return nil }
         return timer.fireDate

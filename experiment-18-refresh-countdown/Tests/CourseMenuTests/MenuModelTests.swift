@@ -46,7 +46,7 @@ struct MenuModelTests {
         let model = MenuModel(rows: [
             .sectionHeader("Term"),
             .course(a),
-            .status(.updated(nil)),
+            .status(.updated(Date(timeIntervalSince1970: 1_786_230_000))),
             .course(b),
             .separator,
             .command(.quit),

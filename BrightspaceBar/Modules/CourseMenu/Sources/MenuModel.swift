@@ -50,6 +50,36 @@ public struct AssignmentRow: Equatable, Sendable, Identifiable {
     }
 }
 
+/// One clickable announcement, inside a course's submenu.
+///
+/// Deliberately the same shape as `AssignmentRow` — id, title, subtitle, url —
+/// so the view layer renders both with one code path and the two cannot drift
+/// apart. `subtitle` is the rendered posting date (e.g. `Aug 10`), pre-formatted
+/// by the pure translation layer for the same reason `AssignmentRow.subtitle`
+/// is: date formatting is policy, and policy does not live in view code.
+public struct AnnouncementRow: Equatable, Sendable, Identifiable {
+    /// D2L news item id. Unique within a course.
+    public let id: Int
+    /// The announcement's title.
+    public let title: String
+    /// The rendered posting date, e.g. `Aug 10`. Nil when D2L sent no date.
+    public let subtitle: String?
+    /// The raw posting date, kept alongside the rendered form because sorting
+    /// and cutoff filtering need the value rather than the text.
+    public let date: Date?
+    /// Where clicking goes — the course's announcements page. Non-optional for
+    /// the same reason as every other row: no destination, no row.
+    public let url: URL
+
+    public init(id: Int, title: String, subtitle: String? = nil, date: Date? = nil, url: URL) {
+        self.id = id
+        self.title = title
+        self.subtitle = subtitle
+        self.date = date
+        self.url = url
+    }
+}
+
 /// What kind of work a day in a course's graph holds, ranked by importance.
 ///
 /// A ranking rather than an intensity scale, because a day with both an
@@ -169,18 +199,47 @@ public enum MenuCommand: String, Equatable, Sendable, CaseIterable {
     case quit
 }
 
+/// A timestamp the GUI renders as a relative time — at *display* time, not at
+/// model-build time (experiment 18).
+///
+/// The row used to carry a baked string ("Updated 3 minutes ago"), which had
+/// two costs:
+///
+///   1. STALE AT OPEN. The string was computed when the model was built
+///      (launch, timer tick, refresh click) — so a menu opened 14 minutes later
+///      still said "Updated just now". The GUI cannot re-derive a fresher
+///      string from a string.
+///   2. FALSE INEQUALITY. `MenuModel`'s `Equatable` exists so an unchanged menu
+///      is not rebuilt, but the baked string changed every minute, so identical
+///      data compared unequal and forced a full rebuild on every timer tick.
+///
+/// Carrying the `Date` fixes both: the model is time-invariant (equal data →
+/// equal model, whenever built), and the GUI formats against a fresh `now` each
+/// time the menu opens (`StatusText`, `menuWillOpen`). RepoBar does exactly
+/// this — an absolute deadline in the model, relative formatting at paint time,
+/// no ticking display timer.
+public enum StatusStamp: Equatable, Sendable {
+    /// When the data was last fetched; nil = never. Renders "Updated N min ago".
+    case updated(Date?)
+    /// When the next automatic refresh fires. Renders "Refreshes in N min".
+    case nextRefresh(Date)
+}
+
 /// One line in the dropdown.
 public enum MenuRow: Equatable, Sendable {
     case course(CourseRow)
     /// One assignment. Appears inside a course's `submenu`, never at top level.
     case assignment(AssignmentRow)
+    /// One announcement. Appears inside a course's `submenu`, never at top level.
+    case announcement(AnnouncementRow)
     /// A group label, e.g. a term name. Not selectable.
     case sectionHeader(String)
     /// Non-actionable prose — the empty state, or an error explanation. This is how
     /// the menu says something instead of appearing broken.
     case message(String)
-    /// Freshness, e.g. `Updated 3 minutes ago`. Not selectable.
-    case status(String)
+    /// Freshness as data. The GUI formats it against `now` when the menu opens
+    /// (see `StatusText`). Not selectable.
+    case status(StatusStamp)
     case separator
     /// A boundary line between courses (NewVertical-3 §3.1). Not selectable.
     ///

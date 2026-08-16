@@ -72,6 +72,13 @@ var launchFetch: (@Sendable () async -> Void)?
 /// `.timer` must reach `PollPolicy` as `.timer`.
 var timerFetch: (@Sendable () async -> Void)?
 
+/// The timer, created up here — before the adapter — so the adapter can be
+/// handed a live `nextFireDate` reader for the menu's "Refreshes in N min" row.
+/// Nothing is scheduled until `restart` at the bottom, so until then the
+/// provider honestly answers nil and the menu shows no countdown. Top-level
+/// `let` keeps it (and its timer) alive for the life of the process.
+let refreshTimer = RefreshScheduler()
+
 // Escape hatch: BRIGHTSPACEBAR_STUB=1 launches against the phase-2 seeded stub —
 // no session file, no network — so the GUI stays demoable offline.
 if ProcessInfo.processInfo.environment["BRIGHTSPACEBAR_STUB"] == "1" {
@@ -159,7 +166,11 @@ if ProcessInfo.processInfo.environment["BRIGHTSPACEBAR_STUB"] == "1" {
         baseURL: brightspaceBaseURL,
         clock: clock,
         assignments: assignmentFeed,
-        timeZone: .current
+        timeZone: .current,
+        // Read live on every snapshot — never a copy — so the countdown row
+        // always reflects the timer's actual schedule, tolerance and
+        // sleep-coalescing included.
+        nextRefresh: { refreshTimer.nextFireDate }
     )
 
     // SEAM: the launch trigger. `MenuAdapter.launch()` — NOT
@@ -219,11 +230,10 @@ Task { @MainActor in
     await controller.reload()          // repaint only if the model actually changed
 }
 
-// The production timer, at last: until now `.timer` was a trigger only tests
-// ever fired, so the app refreshed at launch and on a click and otherwise sat
-// there going stale. Top-level `let` keeps it (and its timer) alive for the life
-// of the process.
-let refreshTimer = RefreshScheduler()
+// The production timer's schedule (the `RefreshScheduler` itself is created at
+// the top of this file, so the adapter could capture its `nextFireDate`).
+// Scheduling is synchronous and top-level, so it happens before the launch
+// Task's body ever runs — the very first repaint already has a countdown.
 if let timerFetch {
     refreshTimer.restart(interval: pollInterval) {
         // The tick handler stays synchronous — a `Timer` cannot await — and hands

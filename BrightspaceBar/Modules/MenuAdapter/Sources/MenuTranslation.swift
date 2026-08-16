@@ -30,13 +30,18 @@ public enum MenuTranslation {
     ///   - timeZone: which zone deadline dates are rendered in. A parameter for
     ///     the same reason `now` is — a pure function may not read ambient state.
     ///     `.current` belongs in the composition root.
+    ///   - nextRefresh: when the next automatic refresh fires, or nil for a
+    ///     build with no timer (the stub path, most tests). Emitted as a date,
+    ///     never a string: status rows carry `StatusStamp`s and the GUI formats
+    ///     them against its own fresh `now` at menu-open (experiment 18).
     public static func menu(
         courses: [Course],
         lastFetch: Date?,
         now: Date,
         baseURL: URL,
         assignments: [Int: AssignmentsState] = [:],
-        timeZone: TimeZone = .current
+        timeZone: TimeZone = .current,
+        nextRefresh: Date? = nil
     ) -> MenuModel {
         // Cold start — nothing loaded, nothing fetched — is exactly the
         // placeholder, so the GUI's `Equatable` skip-rebuild sees one value.
@@ -62,7 +67,10 @@ public enum MenuTranslation {
             ))
         }
         rows.append(.separator)
-        rows.append(.status(self.statusText(lastFetch: lastFetch, now: now)))
+        rows.append(.status(.updated(lastFetch)))
+        if let nextRefresh {
+            rows.append(.status(.nextRefresh(nextRefresh)))
+        }
         rows.append(.command(.refresh))
         rows.append(.command(.quit))
         return MenuModel(rows: rows)
@@ -235,20 +243,8 @@ public enum MenuTranslation {
         return s.allSatisfy(\.isNumber) && s.allSatisfy(\.isASCII)
     }
 
-    // MARK: - Status
-
-    /// Freshness line. Negative age folds into "just now": experiment 4 already
-    /// treats a future timestamp as untrustworthy, and the menu must not display
-    /// arithmetic ("Updated -3 minutes ago") at the user.
-    private static func statusText(lastFetch: Date?, now: Date) -> String {
-        guard let lastFetch else { return "Never updated" }
-        let age = now.timeIntervalSince(lastFetch)
-        if age < 60 { return "Updated just now" }
-        if age < 3600 {
-            let m = Int(age / 60)
-            return "Updated \(m) minute\(m == 1 ? "" : "s") ago"
-        }
-        let h = Int(age / 3600)
-        return "Updated \(h) hour\(h == 1 ? "" : "s") ago"
-    }
+    // The status-string rules that lived here moved to `CourseMenu.StatusText`:
+    // baking "Updated 3 minutes ago" into the model at build time is exactly what
+    // made the menu stale at open. The translation now emits dates; the GUI
+    // formats them when the menu actually opens (experiment 18).
 }

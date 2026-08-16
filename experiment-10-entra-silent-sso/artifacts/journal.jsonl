@@ -6,3 +6,4 @@
 {"ts":"2026-08-12T02:41:05.679Z","event":"attempt","profile":"profile","hoursSinceSeed":0,"visitedMicrosoft":true,"campusClicked":true,"kmsiClicked":false,"outcome":"silent-sso","xsrfFound":true,"jwtMintStatus":200,"whoamiStatus":200}
 {"ts":"2026-08-12T02:41:13.333Z","event":"attempt","profile":"profile-old","hoursSinceSeed":0,"visitedMicrosoft":true,"campusClicked":true,"kmsiClicked":false,"outcome":"silent-sso","xsrfFound":true,"jwtMintStatus":200,"whoamiStatus":200}
 {"ts":"2026-08-12T14:16:02.780Z","event":"attempt","profile":"profile","hoursSinceSeed":11.6,"visitedMicrosoft":true,"campusClicked":true,"kmsiClicked":false,"outcome":"silent-sso","xsrfFound":true,"jwtMintStatus":200,"whoamiStatus":200}
+{"ts":"2026-08-14T02:21:24.465Z","event":"attempt","profile":"profile","hoursSinceSeed":47.7,"visitedMicrosoft":true,"campusClicked":true,"kmsiClicked":true,"outcome":"stalled","xsrfFound":null,"jwtMintStatus":null,"whoamiStatus":null}

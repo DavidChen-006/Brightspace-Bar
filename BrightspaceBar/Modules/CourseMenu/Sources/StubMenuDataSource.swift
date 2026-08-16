@@ -123,7 +123,12 @@ public struct StubMenuDataSource: MenuDataSource {
         // row would demo an interaction model the app can no longer reach.
         .course(CourseRow(id: 412_690, title: "Purdue Civics Knowledge Test", subtitle: nil, url: url(412_690), submenu: [.message("No assignments")], graph: strip([:]), graphMonths: months)),
         .separator,
-        .status("Updated just now"),
+        // Real dates, stamped once at seed time. A long-running stub demo shows
+        // the whole behaviour arc for free: "Updated just now" ages, the
+        // countdown counts down, and past the deadline it clamps to
+        // "Refreshes soon" — all with no backend.
+        .status(.updated(Date())),
+        .status(.nextRefresh(Date().addingTimeInterval(15 * 60))),
         .command(.refresh),
         .command(.quit),
     ])

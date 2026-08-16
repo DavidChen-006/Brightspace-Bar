@@ -89,7 +89,7 @@ struct HairlineContractTests {
             .sectionHeader("202610"),
             .hairline, .course(a),
             .hairline, .course(b),
-            .separator, .status("Updated just now"),
+            .separator, .status(.updated(nil)),
         ])
 
         // Act
