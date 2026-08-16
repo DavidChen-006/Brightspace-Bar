@@ -12,11 +12,11 @@ make run          # build, bundle, ad-hoc sign, launch into the menu bar
 ```
 
 No session yet? The app still runs and serves whatever is cached, with a
-staleness line. To give it a live session:
+staleness line. Logging in belongs to the Node daemon next door, and a headed
+login only ever happens with you present:
 
 ```sh
-make refresh-session               # copy the latest experiment-1 capture
-./Scripts/refresh-session.sh --capture   # or log in fresh (browser + MFA)
+cd ../session-capture && npm run refresh -- --allow-full-login
 ```
 
 Stub mode (no network, seeded fake courses — the GUI demo):
@@ -28,14 +28,14 @@ BRIGHTSPACEBAR_STUB=1 ./Scripts/run.sh
 ## Test it
 
 ```sh
-make test         # 131 hermetic tests — no network, no cookie, <1s
-make live         # + live-tenant contract tests (needs a fresh session)
+make test         # 518 hermetic tests — no network, no daemon, ~2s
+make live         # + live-tenant tests, which spawn the real daemon
 make smoke        # launch and verify the process survives
 make -C Modules/CoursePipeline test   # one module's slice
 ```
 
 ## Understand it
 
-Read [ARCHITECTURE.md](ARCHITECTURE.md). Short version: five modules under
-`Modules/`, GUI sees only the `CourseMenu` contract, credentials come through the
-`BrightspaceSession` seam, and a failed fetch can never blank the menu.
+Read [ARCHITECTURE.md](ARCHITECTURE.md). Short version: six modules under
+`Modules/`, GUI sees only the `CourseMenu` contract, credentials never cross into
+Swift at all (the daemon owns them), and a failed fetch can never blank the menu.
