@@ -88,6 +88,21 @@ public actor MenuAdapter: MenuDataSource {
         await self.refreshAssignments()
     }
 
+    /// SEAM: the production timer's path. Separate from `refresh()` because
+    /// `.manual` always fetches — a timer wired through it would spawn the daemon
+    /// every interval whether or not anything could have changed — and separate
+    /// from `launch()` because the trigger is part of the meaning.
+    ///
+    /// Assignments refresh unconditionally, even when the policy declines the
+    /// courses: they are not persisted, so nothing else can bring them back
+    /// mid-session, and the fan-out costs no spawn (`DaemonAssignmentSource` reads
+    /// the cache the course fetch already wrote). Same asymmetry as `launch()`.
+    public func timerTick() async {
+        await self.loadIfNeeded()
+        _ = await self.poller.tick(.timer)
+        await self.refreshAssignments()
+    }
+
     /// One request per course that will actually render.
     ///
     /// The course list is filtered through the same `visibleCourses` the menu uses,

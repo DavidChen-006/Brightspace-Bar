@@ -36,8 +36,8 @@ private let pollInterval: TimeInterval = 15 * 60
 private let brightspaceBaseURL = URL(string: "https://purdue.brightspace.com")!
 
 /// The daemon CLI this app spawns: `BSB_REFRESH_CLI` when set — which is how a
-/// test or a moved checkout points elsewhere, the `SESSION_JSON` precedent —
-/// otherwise David's own `session-capture` package.
+/// test or a moved checkout points elsewhere — otherwise David's own
+/// `session-capture` package.
 ///
 /// Run through `/usr/bin/env` so `node` is found on PATH rather than pinned to
 /// one installation.
@@ -165,13 +165,14 @@ if ProcessInfo.processInfo.environment["BRIGHTSPACEBAR_STUB"] == "1" {
     // Assignments always fetch, because nothing on disk can supply them.
     launchFetch = { await adapter.launch() }
 
-    // SEAM: the timer trigger, driving the poller directly. NOT
+    // SEAM: the timer trigger. `MenuAdapter.timerTick()` — NOT
     // `MenuDataSource.refresh()`, which maps to `.manual` and always fetches:
     // `.timer` is the trigger `PollPolicy` may decline when the cache is still
     // fresh, and the whole point of a trigger is that it reaches the policy
-    // intact. Courses only — the assignment fan-out lives behind `MenuAdapter`
-    // and still runs at launch and on a manual refresh.
-    timerFetch = { _ = await poller.tick(.timer) }
+    // intact. Both halves refresh: driving the poller directly would refresh
+    // courses only, leaving a laptop left open all day showing submenus from
+    // whenever it was last clicked.
+    timerFetch = { await adapter.timerTick() }
 
     dataSource = adapter
 }
