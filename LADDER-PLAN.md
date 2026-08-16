@@ -225,8 +225,9 @@ exit codes) are the load-bearing decisions.
 - main.swift wiring: `/usr/bin/env node <cli>`, cli = env `BSB_REFRESH_CLI` else
   `$HOME/PaperShelf/session-capture/src/refresh.mjs`; spawn timeout 180s; no
   extra argv ever (D8; refresh.mjs rejects unknown argv anyway).
-- The timer refreshes COURSES ONLY — assignments refresh at launch/manual
-  (`MenuAdapter.timerTick()` is phase-5 work).
+- ~~The timer refreshes COURSES ONLY~~ DONE in phase 5: `MenuAdapter.timerTick()`
+  drives courses (policy-gated) + assignments (unconditional — they cost no
+  spawn and nothing else restores them mid-session). main.swift timer uses it.
 - `open -n` does NOT inherit shell env: E2E must use `open -n --env BSB_ROOT=…`
   or run the built binary directly.
 - `BS_LIVE=1 swift test` now spawns the real daemon (cron-safe) twice — it IS
@@ -291,6 +292,15 @@ exit codes) are the load-bearing decisions.
 - The orchestrator (main session) verifies red/green personally by running the
   suites before advancing a phase — an agent's claim is never sufficient.
 
+### Phase 5 outcomes (2026-08-16 — BUILD COMPLETE)
+- All 5 phases + tiered E2E green. Tier 2 cost exactly one MFA; tiers 1/0 ran
+  with zero human input (27 courses). App verified live in the menu bar.
+- Deleted: the entire Swift network path INCLUDING the BrightspaceSession
+  module (Package.swift down to six modules), refresh-session.sh, SESSION_JSON.
+  Kept: EnrollmentParser/QuizParser (test helpers), QuizLink (production).
+- Suite: 518 tests / 68 suites, green hermetic AND under BS_LIVE=1
+  (live cases spawn the real daemon; needs a seeded BSB_ROOT).
+
 ## Open items / not in scope now
 - Wake-from-sleep trigger (`NSWorkspace.didWakeNotification`) — add after E2E greens.
 - Menu-open trigger (`.menuOpened` exists in `PollTrigger` but is unwired in
@@ -300,3 +310,9 @@ exit codes) are the load-bearing decisions.
 - Overrides layer (`overrides.json`, rotate tool) — separate build; schema
   already reserves the seam (data.json is fetched-layer only).
 - Breadth endpoints (grades, announcements…) — later, behind the fetcher seam.
+- `make live` now spawns the real daemon 5× (courses contract, assignments
+  contract, fixture pin, quiz live, live menu — each self-contained by phase-3
+  convention). If too slow, memoize one daemon run per invocation behind a
+  lazily-initialized actor; every live case is happy with one run's cache.
+- Known coverage gap (named, accepted): no concurrency witness on the daemon's
+  two per-course routes — Node's Promise.all fan-out has no high-water-mark test.
