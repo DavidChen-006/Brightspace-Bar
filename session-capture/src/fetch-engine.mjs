@@ -1,6 +1,6 @@
 /**
- * The real fetcher: session.json → JWT → enrollments → per-course assignments
- * and quizzes → the data.json contract.
+ * The real fetcher: session.json → JWT → enrollments → per-course assignments,
+ * quizzes and gradebook → the data.json contract.
  *
  * A port of David's own proven Swift path (`BrightspaceCourseSource`,
  * `EnrollmentParser`, `BrightspaceAssignmentSource`/`AssignmentParser`,
@@ -68,8 +68,16 @@ export function createFetcher({ http = nodeHttp } = {}) {
         const outcome = await courseItems(http, credentials, mint.token, course.id);
         // A course with no key means "unknown", which is what lets the app keep
         // whatever it already had; an empty list would claim it owes nothing.
-        if (outcome.ok) assignments[course.id] = outcome.items;
-        else log(`course ${course.id}: no assignments or quizzes (${outcome.detail})`);
+        if (!outcome.ok) {
+          log(`course ${course.id}: no assignments or quizzes (${outcome.detail})`);
+          continue;
+        }
+        assignments[course.id] = outcome.items;
+        // A heads-up section missing from one course is invisible on its own —
+        // the rows it lost are the ones nothing else in the menu knows about.
+        if (outcome.gradesDetail) {
+          log(`course ${course.id}: no gradebook heads-up rows (${outcome.gradesDetail})`);
+        }
       }
       log(`fetched ${enrolled.courses.length} courses`);
 
@@ -103,32 +111,50 @@ async function send(http, request) {
 }
 
 /**
- * One course's two content routes, in parallel, merged assignments-first.
- * Half the data beats none: a failing quiz route must not regress the
- * assignments that already worked. Only when BOTH fail is the course unknown.
+ * One course's three routes, in parallel, merged content-first. Half the data
+ * beats none: a failing quiz route must not regress the assignments that already
+ * worked. Only when BOTH content routes fail is the course unknown — the
+ * gradebook never votes, it only adds its own rows or reports why it could not.
+ *
+ * The gradebook is fetched with the others but read after them: a heads-up row
+ * is a column NOTHING the content routes returned matched, so the diff cannot be
+ * decided until they have answered.
  */
 async function courseItems(http, credentials, token, courseId) {
-  const [folders, quizzes] = await Promise.all([
+  const [folders, quizzes, gradebook] = await Promise.all([
     route(http, contentRequest(credentials, token, courseId, "dropbox/folders/"), (body) =>
       parseFolders(body, credentials.baseUrl, courseId),
     ),
     route(http, contentRequest(credentials, token, courseId, "quizzes/"), (body) =>
       parseQuizzes(body, credentials.baseUrl, courseId),
     ),
+    readBody(http, contentRequest(credentials, token, courseId, "grades/")),
   ]);
   if (!folders.ok && !quizzes.ok) {
     return { ok: false, detail: `${folders.detail}; ${quizzes.detail}` };
   }
-  return { ok: true, items: [...(folders.items ?? []), ...(quizzes.items ?? [])] };
+  const items = [...(folders.items ?? []), ...(quizzes.items ?? [])];
+  const headsUp = gradebook.ok
+    ? parseGradebook(gradebook.body, items, credentials.baseUrl, courseId)
+    : gradebook;
+  return headsUp.ok
+    ? { ok: true, items: [...items, ...headsUp.items] }
+    : { ok: true, items, gradesDetail: headsUp.detail };
 }
 
-/** Fetch one content route and hand the body to its parser. */
-async function route(http, request, parse) {
+/** Fetch one route down to its body, or the reason there is none. */
+async function readBody(http, request) {
   const answer = await send(http, request);
   if (!answer.ok) return { ok: false, detail: answer.detail };
   // 403 is the expected steady state for last term's courses, not an exception.
   if (!isSuccess(answer.status)) return { ok: false, detail: `HTTP ${answer.status}` };
-  return parse(answer.body);
+  return { ok: true, body: answer.body };
+}
+
+/** Fetch one content route and hand the body to its parser. */
+async function route(http, request, parse) {
+  const answer = await readBody(http, request);
+  return answer.ok ? parse(answer.body) : answer;
 }
 
 /**
@@ -300,6 +326,46 @@ function parseQuizzes(body, baseUrl, courseId) {
   return { ok: true, items };
 }
 
+/** The four types a student is scored on: numeric, passfail, selectbox, text. */
+const STUDENT_SCORED = new Set([1, 2, 3, 4]);
+
+/**
+ * The gradebook, as a BARE ARRAY again, kept down to the columns that describe
+ * work no other route already offered: student-scored AND matching no fetched
+ * item. "Unlinked only" is the wrong second half — a released midterm's column
+ * IS linked, to a quiz the student's own `quizzes/` call cannot see, and that
+ * column is the whole reason this section exists. The bookkeeping types
+ * (category, calculated, formula, final) are excluded before anything is read
+ * off them, so one nameless category cannot veto a course's heads-up rows.
+ *
+ * Same asymmetry as the folders, applied to the kept rows only: no id or no name
+ * fails the whole gradebook, because a nameless row is a blank line in the menu
+ * and an id-less one can never be clicked.
+ */
+function parseGradebook(body, items, baseUrl, courseId) {
+  const payload = jsonOf(body);
+  if (!Array.isArray(payload)) return { ok: false, detail: "not a grade object array" };
+  const fetched = new Set(items.map((item) => item.id));
+  const headsUp = [];
+  for (const column of payload) {
+    if (!STUDENT_SCORED.has(column?.GradeObjectTypeId)) continue;
+    if (fetched.has(column.AssociatedTool?.ToolItemId)) continue;
+    if (typeof column.Id !== "number" || typeof column.Name !== "string") {
+      return { ok: false, detail: "a grade column carried no id or no name" };
+    }
+    headsUp.push({
+      id: column.Id,
+      title: column.Name,
+      // Always null in v1: a date ladder is a Fall decision, to be designed from
+      // logged real column names rather than guessed now.
+      dueDate: null,
+      url: gradebookUrl(baseUrl, courseId),
+      kind: "gradeOnly",
+    });
+  }
+  return { ok: true, items: headsUp };
+}
+
 /**
  * The deep links, computed from ids alone because D2L sends nothing usable as
  * one. Both templates were harvested from Brightspace's own markup and then
@@ -312,6 +378,10 @@ const assignmentUrl = (baseUrl, courseId, folderId) =>
 
 const quizUrl = (baseUrl, courseId, quizId) =>
   `${baseUrl}/d2l/lms/quizzing/user/quiz_summary.d2l?qi=${quizId}&ou=${courseId}`;
+
+/** The gradebook has no per-column page a student may open: one link per course. */
+const gradebookUrl = (baseUrl, courseId) =>
+  `${baseUrl}/d2l/lms/grades/my_grades/main.d2l?ou=${courseId}`;
 
 /**
  * D2L sends `2026-03-01T04:59:00.000Z` and, inconsistently, `2026-09-15T23:59:00Z`.
