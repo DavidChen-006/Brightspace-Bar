@@ -7,7 +7,6 @@ import BrightspaceBar
 import CourseMenu
 import CoursePipeline
 import MenuAdapter
-import QuizPipeline
 
 // ═════════════════════════════════════════════════════════════════════════════
 // THE FULL VERTICAL SLICE — fixture bytes in, a visible strip out.
@@ -23,18 +22,26 @@ import QuizPipeline
 // PRIORITIES:
 //
 //   1. NO TEST DOUBLES PAST THE BYTES. The only fake here is where the bytes
-//      come from (a fixture file instead of a socket — the same boundary the
-//      live app crosses). EnrollmentParser, AssignmentParser, QuizParser,
-//      CompositeAssignmentSource, AssignmentStore, AssignmentFetcher,
-//      MenuTranslation, GraphTranslation, and MenuAssembler are all the real
-//      objects, assembled the way `main.swift` assembles them.
+//      come from (files on disk instead of a socket — the same boundary the live
+//      app crosses). EnrollmentParser, DaemonAssignmentSource, AssignmentStore,
+//      AssignmentFetcher, MenuTranslation, GraphTranslation, and MenuAssembler
+//      are all the real objects, assembled the way `main.swift` assembles them.
 //
-//   2. THE INTERESTING DATES ARE REAL. `dropbox-folders-with-due-date.json`
-//      and `quizzes-with-due-date.json` both carry `2026-03-01T04:59:00.000Z`
-//      — which is Feb 28, 23:59 LOCAL in Indiana. One instant exercises the
-//      11 PM boundary (a UTC-Sunday deadline bucketing to local Saturday) and,
-//      because an assignment and a quiz share it, highest-tier-wins — end to
-//      end, not as a unit rule.
+//      Phase 5 moved the assignment half of that boundary. The app no longer
+//      parses D2L's own dropbox and quiz payloads — the Node daemon does, and
+//      merges both kinds into ONE list per course in `cache/data.json`. So the
+//      bytes this suite feeds in are a canned daemon cache rather than two
+//      captured D2L payloads through `AssignmentParser`/`QuizParser`, and
+//      `CompositeAssignmentSource` (which merged them in Swift) is gone.
+//
+//   2. THE INTERESTING DATES ARE REAL. Both an assignment and a quiz carry
+//      `2026-03-01T04:59:00.000Z` — which is Feb 28, 23:59 LOCAL in Indiana, and
+//      is the instant the retired captures carried, transcribed verbatim. One
+//      instant exercises the 11 PM boundary (a UTC-Sunday deadline bucketing to
+//      local Saturday) and, because an assignment and a quiz share it,
+//      highest-tier-wins — end to end, not as a unit rule. The fractional
+//      seconds are kept deliberately: they exercise the daemon decoder's
+//      two-attempt date path on the way through.
 //
 // CULLED: pixels (colour, outline geometry — visual, verified in stub mode),
 // polling, disk persistence, and the network itself (BS_LIVE covers the
@@ -62,17 +69,26 @@ private struct FixedClock: Clock {
     let now: Date
 }
 
-/// An `AssignmentSource` whose network is a dictionary of captured payloads —
-/// the byte-level seam. Parsing happens with the REAL parser on every fetch,
-/// exactly where `BrightspaceAssignmentSource` would do it. A course with no
-/// entry answers `[]`, like a course whose route has nothing.
-private struct FixtureSource: AssignmentSource {
-    let bytes: [Int: Data]
-    let parse: @Sendable (Data, Int) throws -> [Assignment]
+/// A temp `BSB_ROOT` holding one canned `cache/data.json` — the file the daemon
+/// writes after a successful climb, and the only thing the app's assignment
+/// source ever reads. Deletes itself when the test that built it goes away.
+private final class CannedCache {
+    let paths: DaemonPaths
+    private let root: URL
 
-    func fetchAssignments(courseId: Int) async throws -> [Assignment] {
-        guard let data = self.bytes[courseId] else { return [] }
-        return try self.parse(data, courseId)
+    init(_ dataJSON: String) throws {
+        self.root = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appending(path: "graph-e2e-\(UUID().uuidString)")
+            .standardizedFileURL
+        self.paths = DaemonPaths(root: self.root)
+        try FileManager.default.createDirectory(
+            at: self.paths.cacheDirectory, withIntermediateDirectories: true
+        )
+        try Data(dataJSON.utf8).write(to: self.paths.dataFile)
+    }
+
+    deinit {
+        try? FileManager.default.removeItem(at: self.root)
     }
 }
 
@@ -107,7 +123,41 @@ struct GraphEndToEndTests {
     private static let scholarly = 440_703
     private static let civics = 412_690
 
-    /// The whole chain, shared by both tests: bytes → parsers → composite →
+    /// One `cache/data.json` exactly as the daemon writes it (LADDER-PLAN, "File
+    /// contracts"): every course the fan-out will visit is present, a course with
+    /// no work carries `[]` — which is DATA — and each item is `id`/`title`/
+    /// `dueDate`/`kind`, with both kinds in ONE list per course, assignments
+    /// before quizzes.
+    ///
+    /// Written by hand rather than generated, so an expected value can never be
+    /// derived the way the code derives it. The three shapes that matter:
+    /// the SHARED deadline (an assignment and a quiz on the same instant, which is
+    /// how tier precedence becomes observable), an out-of-window deadline, and an
+    /// unparseable date — which must cost its own cell and nothing else.
+    private static let daemonCache = """
+        {
+          "fetchedAt": "2026-02-24T17:00:00Z",
+          "courses": [],
+          "assignments": {
+            "\(scholarly)": [
+              { "id": 700001, "title": "Homework 3", "dueDate": "2026-03-01T04:59:00.000Z", "kind": "assignment" },
+              { "id": 700002, "title": "Group Project Milestone", "dueDate": "2026-09-15T23:59:00Z", "kind": "assignment" },
+              { "id": 700003, "title": "Assignment With A Broken Date", "dueDate": "not-a-date", "kind": "assignment" },
+              { "id": 900101, "title": "Midterm Exam", "dueDate": "2026-03-01T04:59:00.000Z", "kind": "quiz" },
+              { "id": 900102, "title": "Final Exam", "dueDate": "2026-09-15T23:59:00Z", "kind": "quiz" },
+              { "id": 900103, "title": "Quiz With A Broken Date", "dueDate": "not-a-date", "kind": "quiz" }
+            ],
+            "\(civics)": [
+              { "id": 700001, "title": "Homework 3", "dueDate": "2026-03-01T04:59:00.000Z", "kind": "assignment" },
+              { "id": 700002, "title": "Group Project Milestone", "dueDate": "2026-09-15T23:59:00Z", "kind": "assignment" },
+              { "id": 700003, "title": "Assignment With A Broken Date", "dueDate": "not-a-date", "kind": "assignment" }
+            ],
+            "1487623": [], "1488325": [], "1488428": [], "1495427": [], "1498777": []
+          }
+        }
+        """
+
+    /// The whole chain, shared by both tests: bytes → daemon cache → source →
     /// store → translation. Returns the finished `MenuModel`.
     private func translatedModel() async throws -> MenuModel {
         // 1. Enrollment bytes → [Course], with the REAL parser.
@@ -126,27 +176,21 @@ struct GraphEndToEndTests {
             1_487_623, 1_488_325, 1_488_428, 1_495_427, 1_498_777,
         ])
 
-        // 3. Captured payloads through the real composite → store → fetcher.
-        //    Scholarly gets BOTH routes (its Feb 28 collides assignment vs quiz);
-        //    Civics gets only the assignment route (its Feb 28 stays a plain
-        //    assignment) — so both tiers are observable in one menu.
-        let assignmentBytes = try fixture("AssignmentPipeline", "dropbox-folders-with-due-date.json")
-        let quizBytes = try fixture("QuizPipeline", "quizzes-with-due-date.json")
+        // 3. A canned daemon cache through the real source → fetcher → store.
+        //    Scholarly holds BOTH kinds (its Feb 28 collides assignment vs quiz);
+        //    Civics holds assignments only (its Feb 28 stays a plain assignment) —
+        //    so both tiers are observable in one menu. The other five courses are
+        //    present with empty lists, as the daemon writes them.
+        let cache = try CannedCache(Self.daemonCache)
         let store = AssignmentStore(clock: FixedClock(now: Self.now))
         let fetcher = AssignmentFetcher(
-            source: CompositeAssignmentSource(sources: [
-                FixtureSource(
-                    bytes: [Self.scholarly: assignmentBytes, Self.civics: assignmentBytes],
-                    parse: { try AssignmentParser.parse($0, courseId: $1) }
-                ),
-                FixtureSource(
-                    bytes: [Self.scholarly: quizBytes],
-                    parse: { try QuizParser.parse($0, courseId: $1) }
-                ),
-            ]),
+            source: DaemonAssignmentSource(paths: cache.paths),
             store: store
         )
         _ = await fetcher.refresh(courses: visible)
+        // The temp root must outlive every read of it, and the last mention of
+        // `cache` above is the source's construction.
+        withExtendedLifetime(cache) {}
 
         var states: [Int: AssignmentsState] = [:]
         for course in visible {

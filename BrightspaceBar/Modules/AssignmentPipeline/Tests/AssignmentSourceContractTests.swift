@@ -1,6 +1,5 @@
 import Foundation
 import Testing
-import BrightspaceSession
 import CoursePipeline
 import AssignmentPipeline
 
@@ -138,13 +137,23 @@ struct AssignmentSourceContractTests {
 
     /// Pins the exact live payload against the fixture, so a fixture that silently
     /// stops matching reality is caught while these courses are still reachable.
+    ///
+    /// Phase 5: rewritten onto the daemon, which is now the only thing that talks
+    /// to the tenant. Two consequences, both deliberate. The arrangement runs the
+    /// real `refresh.mjs` (cron-safe) rather than reading a session file — that is
+    /// what "live" means now. And the daemon serves ONE merged list per course,
+    /// assignments first and then quizzes, so the pin filters to `.assignment`
+    /// before comparing: the claim worth keeping is that these three folders, with
+    /// these names, in this order, are still on the tenant — not that the course
+    /// holds nothing else.
     @Test("the live tenant still returns exactly the three captured assignments", .enabled(if: bsLiveEnabled))
     func liveDataStillMatchesTheFixture() async throws {
-        // Arrange
-        let source = BrightspaceAssignmentSource(provider: FileSessionProvider.standard)
+        // Arrange — one real daemon run against the real `BSB_ROOT`.
+        let source = try await SourceCase.live.make()
 
         // Act
-        let assignments = try await source.fetchAssignments(courseId: Truth.scholarlyID)
+        let items = try await source.fetchAssignments(courseId: Truth.scholarlyID)
+        let assignments = items.filter { $0.kind == .assignment }
 
         // Assert — the same ids and names the fixture was built from.
         #expect(assignments.map(\.id) == [Truth.citiID, Truth.purcID, Truth.ideationID])

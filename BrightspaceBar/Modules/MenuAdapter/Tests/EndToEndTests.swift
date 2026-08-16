@@ -1,7 +1,6 @@
 import Foundation
 import Testing
 
-import BrightspaceSession
 import CourseMenu
 import CoursePipeline
 import MenuAdapter
@@ -38,6 +37,11 @@ private let epoch = RealData.midFall2025
 /// `true` only for `BS_LIVE=1 swift test`. Read once at load, as experiment 4 does,
 /// so the gate cannot change mid-suite.
 private let bsLiveEnabled = ProcessInfo.processInfo.environment["BS_LIVE"] != nil
+
+/// The daemon a live run spawns — the same resolution `main.swift` performs, and
+/// the same one both contract suites use.
+private let liveDaemonCLI = ProcessInfo.processInfo.environment["BSB_REFRESH_CLI"]
+    ?? NSHomeDirectory() + "/PaperShelf/session-capture/src/refresh.mjs"
 
 /// Assembles the real experiment-4 stack around a scripted source.
 ///
@@ -339,16 +343,34 @@ struct EndToEndTests {
     // ── The live run: proof the fake did not drift ───────────────────────────
 
     /// Skipped by default so `swift test` stays hermetic — no network, no cookie,
-    /// no `session.json`. Mirrors experiment 4's gating exactly.
+    /// no daemon. Mirrors experiment 4's gating exactly.
+    ///
+    /// Rewritten in phase 5 onto `DaemonCourseSource`, the source the app actually
+    /// ships: the app no longer holds a cookie or mints a JWT, so a live menu is
+    /// only live if the daemon produced it. The arrangement mirrors
+    /// `CourseSourceContractTests`' `.live` case exactly.
+    ///
+    /// What this claims that the contract suite does not: the contract asks whether
+    /// the SOURCE answers, this asks whether the resulting courses still reach the
+    /// MENU. Between them sits `MenuTranslation.visibleCourses`, and the daemon
+    /// maps every course's `startDate`/`endDate` across a language boundary with no
+    /// compiler checking it — mis-map them and every course reads as not-current, so
+    /// the contract stays green while David's menu goes empty.
     @Test("the real tenant produces a clickable menu", .enabled(if: bsLiveEnabled))
     func liveTenantYieldsAClickableMenu() async throws {
-        // Arrange — the real adapter reading the captured session. Never copied
-        // here, never logged.
+        // Arrange — the real daemon, run cron-safe: no `--allow-full-login`, so
+        // this can never open a browser window mid-suite (D8). Credentials stay on
+        // the daemon's side of the boundary entirely; nothing here reads a session.
         let scratch = try ScratchDir()
         let clock = ManualClock(Date())
         let cache = CourseCache(fileURL: scratch.file(), clock: clock, staleAfter: 3600)
         let poller = Poller(
-            source: BrightspaceCourseSource(provider: FileSessionProvider.standard),
+            source: DaemonCourseSource(runner: DaemonRunner(
+                executable: URL(fileURLWithPath: "/usr/bin/env"),
+                arguments: ["node", liveDaemonCLI],
+                paths: DaemonPaths.resolve(),
+                timeout: 180
+            )),
             cache: cache,
             policy: PollPolicy(interval: 3600),
             clock: clock

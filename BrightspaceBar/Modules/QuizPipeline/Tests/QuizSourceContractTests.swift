@@ -1,13 +1,16 @@
 import Foundation
 import Testing
 import AssignmentPipeline
-import BrightspaceSession
 import CoursePipeline
 import QuizPipeline
 
 /// `true` only when the operator asks for a live run: `BS_LIVE=1 swift test`.
 /// Read once at load so the gate cannot change mid-suite.
 private let bsLiveEnabled = ProcessInfo.processInfo.environment["BS_LIVE"] != nil
+
+/// The daemon a live run spawns — the same resolution `main.swift` performs.
+private let liveDaemonCLI = ProcessInfo.processInfo.environment["BSB_REFRESH_CLI"]
+    ?? NSHomeDirectory() + "/PaperShelf/session-capture/src/refresh.mjs"
 
 // ═════════════════════════════════════════════════════════════════════════════
 // THE CONTRACT every quiz source must satisfy — written exactly once.
@@ -41,15 +44,13 @@ private struct SourceCase: Sendable, CustomStringConvertible {
             QuizTruth.scholarlyID: try QuizFixture.scholarly,
         ])
     }
-
-    static let live = SourceCase(name: "BrightspaceQuizSource") {
-        BrightspaceQuizSource(provider: FileSessionProvider.standard)
-    }
 }
 
-private func assertQuizSourceContract(_ source: any AssignmentSource, courseId: Int) async throws {
-    let quizzes = try await source.fetchAssignments(courseId: courseId)
-
+/// Every claim about a quiz, over a list that has already been narrowed to
+/// quizzes. Split out from the source-level check in phase 5, because the live
+/// source is no longer quiz-only: the daemon merges a course's assignments and
+/// quizzes into one list before it ever reaches disk.
+private func assertQuizContract(_ quizzes: [Assignment], courseId: Int) {
     // The anti-drift canary: if the live tenant yields nothing while the fixture
     // yields three, the drift surfaces here rather than as an empty submenu.
     #expect(!quizzes.isEmpty, "a quiz source must yield at least one quiz for course \(courseId)")
@@ -77,20 +78,50 @@ struct QuizSourceContractTests {
     @Test("a hermetic quiz source satisfies the contract")
     func hermeticSourceSatisfiesTheContract() async throws {
         let source = try SourceCase.fixture.make()
-        try await assertQuizSourceContract(source, courseId: QuizTruth.civicsID)
-        try await assertQuizSourceContract(source, courseId: QuizTruth.scholarlyID)
+        assertQuizContract(
+            try await source.fetchAssignments(courseId: QuizTruth.civicsID),
+            courseId: QuizTruth.civicsID
+        )
+        assertQuizContract(
+            try await source.fetchAssignments(courseId: QuizTruth.scholarlyID),
+            courseId: QuizTruth.scholarlyID
+        )
     }
 
     /// The anti-drift run. Skipped by default so `swift test` stays hermetic and
-    /// needs no network, no cookie, and no `session.json`.
+    /// needs no network, no cookie, and no daemon.
     ///
     /// Only works while these two administrative shells remain accessible —
     /// experiment 6 proved every ended course answers 403, so this case cannot be
     /// pointed at a semester course until Fall 2026 goes live.
-    @Test("the real Brightspace quiz source satisfies the same contract", .enabled(if: bsLiveEnabled))
+    ///
+    /// Phase 5: the live quiz source is the daemon. There is no `BrightspaceQuizSource`
+    /// in the app any more — quizzes ride the same `cache/data.json` list as
+    /// assignments, marked `kind: "quiz"` by the Node fetcher. So the arrangement runs
+    /// the real `refresh.mjs` once (cron-safe, no `--allow-full-login`, D8) and the
+    /// merged list is narrowed to quizzes before the contract is applied.
+    ///
+    /// This is the ONLY live test that would notice the daemon's quiz route dying:
+    /// `AssignmentSourceContractTests` keeps passing on the assignment half alone,
+    /// and the quizzes would simply stop appearing in the menu.
+    @Test("the real daemon still serves this course's quizzes", .enabled(if: bsLiveEnabled))
     func liveSourceSatisfiesTheContract() async throws {
-        let source = try SourceCase.live.make()
-        try await assertQuizSourceContract(source, courseId: QuizTruth.civicsID)
+        // Arrange — one real daemon run against the real `BSB_ROOT`, then its cache
+        // read exactly as the app reads it.
+        let paths = DaemonPaths.resolve()
+        _ = await DaemonRunner(
+            executable: URL(fileURLWithPath: "/usr/bin/env"),
+            arguments: ["node", liveDaemonCLI],
+            paths: paths,
+            timeout: 180
+        ).run()
+        let source = DaemonAssignmentSource(paths: paths)
+
+        // Act
+        let items = try await source.fetchAssignments(courseId: QuizTruth.civicsID)
+
+        // Assert
+        assertQuizContract(items.filter { $0.kind == .quiz }, courseId: QuizTruth.civicsID)
     }
 
     @Test("a course with no quizzes is not an error")
