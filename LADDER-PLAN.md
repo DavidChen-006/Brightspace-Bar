@@ -353,9 +353,25 @@ pipe. `cache/mfa.json` is ephemeral STATUS: not course data, not a secret
   he is remote; he types it into Authenticator on his phone) → assert success
   path deletes mfa.json, status fresh, icon back to logo (screencapture of the
   menu bar as evidence). Costs one MFA, re-seeds the wristband.
-- Not in scope: running the full rung headless (works headed today; headless
-  flag is the follow-up once the icon replaces the window), resend-on-expiry
-  policy (designed earlier: one resend max, then degrade).
+- ~~Not in scope: running the full rung headless~~ DONE — BUILD 3 (below).
+- Not in scope: resend-on-expiry policy (designed earlier: one resend max,
+  then degrade).
+
+## BUILD 3 — headless full login (2026-08-16 — **COMPLETE, E2E GREEN**)
+
+The icon replaced the window, so the window is gone. Full rung is now headless
+by default (`BSB_FULL_HEADED=1` = debugging escape hatch); blind 2s sleeps
+replaced by readiness polling (fillWhenReady/clickWhenReady/autofillCredentials,
+FIELD_POLL_MS=250, FIELD_TIMEOUT_MS=30s), which also kills the red-validation
+stutter David observed. Autofill fails PROMPTLY (~30-90s, exit 2) if a field
+never appears instead of hanging to the 5-min MFA timeout.
+Live acceptance (scripts/e2e-icon.sh, one MFA): NO window opened; number "68"
+published 68s in; status item 30pt→62pt→30pt; login done 16s after the phone
+tap; fresh, rungUsed full, 27 courses, wristband re-seeded. Suite 199 (195/4).
+Seam: `launchOptionsFor(kind, env)` — silent always headless, full headless
+unless BSB_FULL_HEADED=1; cron/silent can NEVER open a window regardless.
+NOTE: this repo now drives the interactive Entra form headless for the first
+time and it works (proven live); watch for tenant UA/conditional-access changes.
 
 ## Open items / not in scope now
 - Wake-from-sleep trigger (`NSWorkspace.didWakeNotification`) — add after E2E greens.
