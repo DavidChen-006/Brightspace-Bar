@@ -87,10 +87,12 @@ click is the proof of presence).
   his endpoints only; the fork can be swapped in later behind the fetcher seam).
 - **D2 — Rungs are seams.** A rung is a value implementing one interface (below);
   swap-in/swap-out is data, not surgery. Login/security surfaces change; seams absorb it.
-- **D3 — Rung 2 (current implementation)** = the proven `auto-capture.mjs` behavior:
-  headed browser, autofills `BS_EMAIL`/`BS_PASSWORD`, David reads the MFA number
-  from the browser and types it into his phone. NOT headless, NOT the fork's
-  no-autofill entra-auth.
+- **D3 (amended by BUILD 3, 2026-08-16)** — Rung 2 autofills `BS_EMAIL`/
+  `BS_PASSWORD` and is **HEADLESS by default** (`BSB_FULL_HEADED=1` is the
+  debugging escape hatch): with the number on the status icon (BUILD 2), the
+  browser window is redundant — the product moment is icon-shows-number →
+  phone tap → icon reverts, nothing else visible. Original D3 (headed, number
+  read from the window) applied only while the window was the display.
 - **D4 — The Swift pipeline survives intact.** No changes to `Poller`, `PollPolicy`,
   `CourseCache`, `MenuAdapter`, `CourseMenu`, or any contract in `Contracts.swift`
   (that file is frozen — its header says so). The daemon enters as new
