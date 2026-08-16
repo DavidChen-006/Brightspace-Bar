@@ -12,17 +12,26 @@ import CoursePipeline
 
 /// Which D2L entity an item is.
 ///
-/// The two kinds share everything the pipeline does — fan-out, folding,
-/// success-replaces/failure-preserves, orphan cleanup — and differ only in three
-/// places: the route they are fetched from, the decoder that reads them, and the
-/// deep-link template they open. So the kind travels as a *field* rather than as a
-/// second type, and the only code that switches on it is the link builder.
+/// The kinds share everything the pipeline does — fan-out, folding,
+/// success-replaces/failure-preserves, orphan cleanup — and differ only in where
+/// they come from and how they are presented: the route they are fetched from, the
+/// decoder that reads them, the deep-link template they open, and what the row says
+/// about a deadline. So the kind travels as a *field* rather than as a second type,
+/// and the only code that switches on it is the translation layer.
 ///
-/// `CaseIterable` so a future third kind (a graded discussion, a checklist) is
+/// `CaseIterable` so a future kind (a graded discussion, a checklist) is
 /// discoverable rather than hidden inside a switch.
 public enum ItemKind: Equatable, Sendable, CaseIterable {
     case assignment
     case quiz
+    /// A student-scored gradebook column that matches no fetched assignment or
+    /// quiz — the daemon's gradebook diff, and often the only trace graded work
+    /// leaves before it becomes visible anywhere else.
+    ///
+    /// Inferred rather than fetched, which is why it behaves unlike the other two:
+    /// `dueDate` is null by contract, there is no page of its own to open, and it
+    /// says nothing about any day.
+    case gradeOnly
 }
 
 /// One piece of work the student owes in a course — a dropbox assignment or a quiz.
@@ -38,8 +47,10 @@ public enum ItemKind: Equatable, Sendable, CaseIterable {
 /// churn every existing call site for no behavioural gain, so the debt is noted
 /// rather than paid.
 public struct Assignment: Equatable, Sendable, Identifiable {
-    /// D2L dropbox folder id, or quiz id. Unique within a course *and kind*, and
-    /// the id half of the deep link — `db=` for an assignment, `qi=` for a quiz.
+    /// D2L dropbox folder id, quiz id, or `GradeObjectId`. Unique within a course
+    /// *and kind*, and the id half of the deep link — `db=` for an assignment,
+    /// `qi=` for a quiz. A gradebook column's id reaches no URL: D2L's gradebook is
+    /// one page per course.
     public let id: Int
     /// The org unit this was fetched for — the `ou=` half of the deep link.
     ///

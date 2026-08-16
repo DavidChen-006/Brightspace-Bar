@@ -44,10 +44,13 @@ public enum AssignmentTranslation {
     /// A list rather than a switch so the order is stated once, in one place, and
     /// cannot drift from the labels. Assignments come first: they are the kind that
     /// shipped, they are what a dropbox deadline usually means, and a stable order
-    /// matters more than which order.
+    /// matters more than which order. Heads up comes last because it is the least
+    /// certain — a gradebook column is inferred from a score rather than fetched as
+    /// a piece of work, so it sits below everything the student can actually open.
     private static let sections: [(kind: ItemKind, header: String)] = [
         (.assignment, "Assignments"),
         (.quiz, "Quizzes"),
+        (.gradeOnly, "Heads up"),
     ]
 
     // MARK: - The submenu
@@ -104,10 +107,11 @@ public enum AssignmentTranslation {
     /// Visible items, grouped by kind into optionally-labelled sections, each in
     /// menu order.
     ///
-    /// Headers appear **only when both kinds have visible rows**. A header exists to
-    /// disambiguate, and with one kind present there is nothing to disambiguate — so
-    /// a lone "Quizzes" label would be noise, and a lone "Assignments" label would
-    /// add a row to every submenu that shipped without one. A kind whose only items
+    /// Headers appear **only when more than one kind has visible rows**. A header
+    /// exists to disambiguate, and with one kind present there is nothing to
+    /// disambiguate — so a lone "Quizzes" label would be noise, and a lone
+    /// "Assignments" label would add a row to every submenu that shipped without one
+    /// (as would a lone "Heads up"). A kind whose only items
     /// are hidden therefore contributes no header either: labelling it would imply
     /// the student is missing something.
     ///
@@ -158,7 +162,7 @@ public enum AssignmentTranslation {
             // formatting is policy (which zone, which wording) and policy lives
             // here. Nil, never "", so the GUI's "title — subtitle" join cannot
             // produce a dangling separator.
-            subtitle: self.dueLabel(item.dueDate, now: now, timeZone: timeZone),
+            subtitle: self.subtitle(for: item, now: now, timeZone: timeZone),
             // The raw value travels alongside the rendered one: sorting and any
             // future "due soon" filter need the instant, not the text.
             dueDate: item.dueDate,
@@ -170,15 +174,19 @@ public enum AssignmentTranslation {
     ///
     ///     .assignment  →  …/dropbox/user/folder_submit_files.d2l?db={id}&grpid=0&ou={courseId}
     ///     .quiz        →  …/quizzing/user/quiz_summary.d2l?qi={id}&ou={courseId}
+    ///     .gradeOnly   →  …/grades/my_grades/main.d2l?ou={courseId}
     ///
-    /// Both browser-verified. Every way of choosing wrong yields a *real* Brightspace
-    /// page that is the wrong one, and nothing downstream can catch it because
-    /// `MenuAssembler` opens whatever URL it is handed. Two structural defences:
+    /// The first two are browser-verified; the third is the course gradebook, which
+    /// is where a heads-up row's column lives and the only page it has. Every way of
+    /// choosing wrong yields a *real* Brightspace page that is the wrong one, and
+    /// nothing downstream can catch it because `MenuAssembler` opens whatever URL it
+    /// is handed. Two structural defences:
     ///
-    /// - The switch is exhaustive with no `default`, so adding a third `ItemKind` is a
-    ///   compile error here rather than a silently mistemplated row.
-    /// - Neither builder can produce the other's parameters: `AssignmentLink` names no
-    ///   quizzing path and `QuizLink` names no `db` or `grpid`. `grpid` on a quiz is
+    /// - The switch is exhaustive with no `default`, so a new `ItemKind` is a compile
+    ///   error here rather than a silently mistemplated row.
+    /// - No builder can produce another's parameters: `AssignmentLink` names no
+    ///   quizzing path, `QuizLink` names no `db` or `grpid`, and `GradebookLink` takes
+    ///   no item id at all. `grpid` on a quiz, and `db=` on a gradebook column, are
     ///   unreachable rather than merely untested.
     ///
     /// `ou` comes from `courseId` — the course whose submenu this is — never from
@@ -190,6 +198,8 @@ public enum AssignmentTranslation {
             AssignmentLink.url(courseId: courseId, assignmentId: item.id, baseURL: baseURL)
         case .quiz:
             QuizLink.url(courseId: courseId, quizId: item.id, baseURL: baseURL)
+        case .gradeOnly:
+            GradebookLink.url(courseId: courseId, baseURL: baseURL)
         }
     }
 
@@ -224,6 +234,30 @@ public enum AssignmentTranslation {
     }
 
     // MARK: - The deadline line
+
+    /// What a gradebook column says instead of a deadline.
+    ///
+    /// Fixed for every row of that kind, and never `dueLabel`: the column has no due
+    /// date by contract, so a date line would state a deadline the daemon never saw
+    /// — and a student cannot tell that apart from a real one. The line also says
+    /// where the row came from, which is the only explanation the section gets when
+    /// it is the sole populated one and therefore carries no header.
+    static let gradebookSubtitle = "In gradebook — no due date"
+
+    /// The line under a row's title: the deadline for work the student can open, and
+    /// for a gradebook column the fixed line above.
+    ///
+    /// Exhaustive with no `default`, for the same reason `clickTarget` is: a new kind
+    /// has to state its own wording rather than inherit a date line that may not
+    /// describe it.
+    private static func subtitle(for item: Assignment, now: Date, timeZone: TimeZone) -> String? {
+        switch item.kind {
+        case .assignment, .quiz:
+            self.dueLabel(item.dueDate, now: now, timeZone: timeZone)
+        case .gradeOnly:
+            Self.gradebookSubtitle
+        }
+    }
 
     /// Fixed English abbreviations, indexed by month number.
     ///

@@ -86,15 +86,21 @@ public struct DaemonAssignmentSource: AssignmentSource {
             )
         }
 
-        /// `kind` decides which of the two deep-link templates a row opens, so an
-        /// unrecognized one (a graded discussion, a checklist) may not default to
-        /// `.assignment` — that renders a `db=` link to a page that does not
-        /// exist, and looks completely normal doing it. Failing preserves the last
-        /// known list until the Swift side learns the new kind.
+        /// `kind` decides which deep-link template a row opens, so an unrecognized
+        /// one (a graded discussion, a checklist) may not default to `.assignment`
+        /// — that renders a `db=` link to a page that does not exist, and looks
+        /// completely normal doing it. Failing preserves the last known list until
+        /// the Swift side learns the new kind.
+        ///
+        /// `"gradeOnly"` is one more accepted string, matched exactly, and not a
+        /// looser rule: a prefix or case-insensitive match would wave through the
+        /// near misses of a kind the daemon renamed, and strip the deadline off
+        /// real work while pointing it at a gradebook.
         private static func parseKind(_ raw: String) throws -> ItemKind {
             switch raw {
             case "assignment": return .assignment
             case "quiz": return .quiz
+            case "gradeOnly": return .gradeOnly
             default: throw CourseSourceError.malformedBody("unknown item kind \"\(raw)\"")
             }
         }

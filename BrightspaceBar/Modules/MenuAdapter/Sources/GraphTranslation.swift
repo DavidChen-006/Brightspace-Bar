@@ -67,11 +67,11 @@ public enum GraphTranslation {
         var tiers: [Int: CellTier] = [:]
         for item in state.assignments where !item.isHidden {
             guard
+                let tier = Self.tier(of: item.kind),
                 let dueDate = item.dueDate,
                 let offset = self.dayOffset(from: windowStart, to: dueDate, in: calendar),
                 (0..<Self.windowDays).contains(offset)
             else { continue }
-            let tier = Self.tier(of: item.kind)
             tiers[offset] = Swift.max(tiers[offset] ?? tier, tier)
         }
 
@@ -169,12 +169,25 @@ public enum GraphTranslation {
     }
 
     /// The kind→tier mapping, in the one place the contract's vocabulary is
-    /// entered. Exhaustive with no `default`, so a third `ItemKind` is a compile
+    /// entered. Exhaustive with no `default`, so a new `ItemKind` is a compile
     /// error here rather than a silently unrendered day.
-    private static func tier(of kind: ItemKind) -> CellTier {
+    ///
+    /// Nil is an answer rather than a missing one: a gradebook column has no
+    /// deadline to draw, so it reaches no cell. Saying that by KIND — in the same
+    /// guard as `isHidden` and the missing due date — rather than leaning on the
+    /// null date the contract sends today is what keeps the abstention true if a
+    /// date ladder is ever added: a square drawn from an inferred deadline is
+    /// indistinguishable from one drawn from a real one.
+    ///
+    /// A `CellTier` case would be the other way to say it, and the wrong one. It
+    /// would put a colour on a deadline calendar for something with no deadline,
+    /// and force a ranking against the real work sharing that day — a question with
+    /// no right answer.
+    private static func tier(of kind: ItemKind) -> CellTier? {
         switch kind {
         case .assignment: .assignment
         case .quiz: .quiz
+        case .gradeOnly: nil
         }
     }
 }
