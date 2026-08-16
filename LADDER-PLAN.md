@@ -301,6 +301,44 @@ exit codes) are the load-bearing decisions.
 - Suite: 518 tests / 68 suites, green hermetic AND under BS_LIVE=1
   (live cases spawn the real daemon; needs a seeded BSB_ROOT).
 
+## BUILD 2 — the MFA number on the icon (started 2026-08-16)
+
+The finished form of the login story: during a full login, the status-bar icon
+becomes the verification number; the human types it into Authenticator on their
+phone; the icon returns to the logo. No visible browser needed eventually.
+
+Pipeline: full rung scrapes `#idRichContext_DisplaySign` (proven in
+experiment-10/prove-number.mjs, plain DOM text) → writes `cache/mfa.json`
+`{"number":"20","mintedAt":"<ISO>"}` (single writer; deleted on every exit
+path) → Swift watcher on cache/ → `StatusBarController.show(code:)` (flip
+proven 1-4ms in experiment 12) → icon = PURE FUNCTION of
+(mfa.json exists && now-mintedAt < 60s) — stateless; TTL at render time means
+a crashed rung can never wedge a stale number.
+
+Why a file, not stdout events: D8 — the app is not always the spawner
+(terminal-initiated full login), so the transport must not assume a parent
+pipe. `cache/mfa.json` is ephemeral STATUS: not course data, not a secret
+(the number is display-by-design and useless without the phone).
+
+- Experiment 17 (experiment-17-mfa-icon-watch/): measures file-write→icon
+  latency for kqueue DispatchSource vs FSEventStream vs 500ms poll; picks the
+  render pickup technique. FINDINGS in its README.
+- Phase A (daemon): test-writer pins the mfa.json contract in the full rung —
+  written on scrape (mintedAt from clock), deleted on success/expiry/error/
+  crash-path, never any credential material; hermetic via the rung's injected
+  browser. Builder ports the prove-number scrape into full-login.mjs.
+- Phase B (Swift): test-writer pins the icon pure function + watcher (canned
+  cache roots; technique per exp 17) + StatusBarController.show(code:) wiring.
+  Builder implements.
+- Phase C (E2E, test-writer only): wipe root → `refresh.mjs --allow-full-login`
+  → assert mfa.json appears (orchestrator relays the number to David in chat —
+  he is remote; he types it into Authenticator on his phone) → assert success
+  path deletes mfa.json, status fresh, icon back to logo (screencapture of the
+  menu bar as evidence). Costs one MFA, re-seeds the wristband.
+- Not in scope: running the full rung headless (works headed today; headless
+  flag is the follow-up once the icon replaces the window), resend-on-expiry
+  policy (designed earlier: one resend max, then degrade).
+
 ## Open items / not in scope now
 - Wake-from-sleep trigger (`NSWorkspace.didWakeNotification`) — add after E2E greens.
 - Menu-open trigger (`.menuOpened` exists in `PollTrigger` but is unwired in
