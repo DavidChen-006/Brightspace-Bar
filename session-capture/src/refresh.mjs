@@ -22,7 +22,7 @@ const USAGE = `Usage: node src/refresh.mjs [--allow-full-login]
 Climbs the session ladder and writes the course cache under BSB_ROOT
 (default ~/Library/Application Support/BrightspaceBar).
 
-  --allow-full-login  permit the headed login rung, which needs a human
+  --allow-full-login  permit the full login rung, which needs a human
                       present to approve the MFA prompt. Omit it for
                       unattended runs (timer, launch).
   --help              print this and exit

@@ -1,12 +1,13 @@
 /**
- * Rung 2 — the headed login. Kind "full": it puts a browser in front of a human
- * who reads the MFA number off the screen and types it into their phone, so the
- * orchestrator only climbs it when the caller proved a human is present
- * (`--allow-full-login`, passed by the manual Refresh click).
+ * Rung 2 — the full login. Kind "full": it needs a human at their phone to
+ * approve a number-match, so the orchestrator only climbs it when the caller
+ * proved a human is present (`--allow-full-login`, passed by the manual Refresh
+ * click). Nothing is shown to that human except the number on the status-bar
+ * icon — the browser itself runs headless (D3 as amended by BUILD 3).
  *
- * The mechanics are `auto-capture.mjs`'s, per D3: headed, autofilling
- * BS_EMAIL/BS_PASSWORD, generous MFA wait. Everything playwright is in
- * `browser.mjs`; everything about the credential file is in `capture-rung.mjs`.
+ * The mechanics are `auto-capture.mjs`'s: autofilling BS_EMAIL/BS_PASSWORD,
+ * generous MFA wait. Everything playwright is in `browser.mjs`; everything
+ * about the credential file is in `capture-rung.mjs`.
  *
  * This rung owns one more thing, because it is the only rung a human watches:
  * `cache/mfa.json`, the number on its way to the status-bar icon. The capture
