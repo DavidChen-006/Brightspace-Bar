@@ -6,6 +6,14 @@
 #         ./Scripts/run.sh --smoke   build, launch, verify alive, kill
 #         ./Scripts/run.sh --shoot   launch with the menu popped open (for
 #                                    `screencapture` from another shell)
+#         ./Scripts/run.sh --selftest  headless popup geometry + deep links
+#         ./Scripts/run.sh --probe   open the menu and interrogate it from
+#                                    inside its own tracking loop; writes
+#                                    artifacts/probe.log
+#         ./Scripts/run.sh --render  redraw artifacts/popup.png
+#
+# PROCESS_PATTERN is anchored on "Exp9.app/Contents/MacOS/Exp9" so `pkill -f`
+# here can never match BrightspaceBar or any other menu-bar app.
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
@@ -24,6 +32,26 @@ pkill -f "${PROCESS_PATTERN}" 2>/dev/null || true
 log "swift build (${CONFIG})"
 swift build -c "${CONFIG}" --package-path "${ROOT_DIR}"
 [ -x "${EXE}" ] || { echo "ERROR: no executable at ${EXE}" >&2; exit 1; }
+
+# The headless modes need the executable, not the bundle, because they report
+# on stdout and `open` would send it nowhere.
+if [ "${MODE}" = "--selftest" ]; then
+    log "Self-test (headless)"
+    exec env EXP9_SELFTEST=1 "${EXE}"
+fi
+
+if [ "${MODE}" = "--probe" ]; then
+    mkdir -p "${ROOT_DIR}/artifacts"
+    log "Overlay probe — the menu will open by itself for ~3s and the cursor"
+    log "will be borrowed briefly, then put back."
+    exec env EXP9_PROBE=1 EXP9_PROBE_LOG="${ROOT_DIR}/artifacts/probe.log" "${EXE}"
+fi
+
+if [ "${MODE}" = "--render" ]; then
+    mkdir -p "${ROOT_DIR}/artifacts"
+    log "Rendering artifacts/popup.png"
+    exec env EXP9_POPUP_RENDER="${ROOT_DIR}/artifacts/popup.png" "${EXE}"
+fi
 
 log "Assembling ${APP_NAME}.app"
 mkdir -p "${APP}/Contents/MacOS"

@@ -125,21 +125,54 @@ func componentItem(view: NSView, submenu: NSMenu?) -> NSMenuItem {
 
 // ── The legos: each row built and named, chemistry kept out of the diagram ──
 
-/// Seeds for the hover-popup experiment: every marked cell carries the NAME of
-/// the thing it represents, laid out like a real Multivariable Calculus
-/// semester, so hovering the graph answers "what is that red cell?".
+/// Seeds for the hover-popup experiment: every marked cell carries the real
+/// WORK due that day — title, kind, and a Brightspace deep link — laid out like
+/// a Multivariable Calculus semester, so hovering the graph answers "what is
+/// that red cell?" and clicking the answer opens the page.
+///
+/// `MA 26100` uses org-unit 412690, one of the two courses experiment 7
+/// verified links against; the item ids are stubs in the same shape.
+let davidCourseId = 412690
+
+func assignment(_ id: Int, _ title: String) -> WorkItem {
+    WorkItem(kind: .assignment, title: title, url: WorkLink.assignment(courseId: davidCourseId, assignmentId: id))
+}
+
+func quiz(_ id: Int, _ title: String) -> WorkItem {
+    WorkItem(kind: .quiz, title: title, url: WorkLink.quiz(courseId: davidCourseId, quizId: id))
+}
+
+func test(_ id: Int, _ title: String) -> WorkItem {
+    WorkItem(kind: .test, title: title, url: WorkLink.quiz(courseId: davidCourseId, quizId: id))
+}
+
+/// A day carries a LIST; the cell's tier is the most severe thing on it, which
+/// is what a real renderer would have to do too — one cell, many items.
+func day(_ items: [WorkItem], isToday: Bool = false) -> DayCell {
+    DayCell(items.map(\.kind).max(), isToday: isToday, items: items)
+}
+
 func davidCells(columns: Int) -> [DayCell] {
     var cells = (0..<(columns * 7)).map { _ in DayCell(nil) }
-    cells[2] = DayCell(.assignment, isToday: true, name: "HW 3 — Vector Fields (due today)")
-    cells[5] = DayCell(.quiz, name: "Quiz 4 — Chain Rule")
-    cells[9] = DayCell(.assignment, name: "HW 4 — Partial Derivatives")
-    cells[16] = DayCell(.test, name: "Midterm 1 — Chapters 1–4")
-    cells[23] = DayCell(.assignment, name: "HW 5 — Gradients")
-    cells[30] = DayCell(.quiz, name: "Quiz 5 — Lagrange Multipliers")
-    cells[44] = DayCell(.assignment, name: "HW 6 — Double Integrals")
-    cells[61] = DayCell(.test, name: "Midterm 2 — Chapters 5–8")
-    cells[75] = DayCell(.quiz, name: "Quiz 6 — Surface Area")
-    cells[104] = DayCell(.test, name: "Final Exam — cumulative")
+    cells[2] = day([assignment(648911, "HW 3 — Vector Fields")], isToday: true)
+    cells[5] = day([quiz(619243, "Quiz 4 — Chain Rule")])
+    cells[9] = day([assignment(648912, "HW 4 — Partial Derivatives")])
+    cells[16] = day([test(619244, "Midterm 1 — Chapters 1–4")])
+    // ── The list case: one day, an assignment AND a quiz. ──
+    cells[23] = day([
+        assignment(648913, "HW 5 — Gradients"),
+        quiz(619245, "Quiz 5 — Lagrange Multipliers"),
+    ])
+    cells[30] = day([quiz(619246, "Quiz 6 — Directional Derivatives")])
+    // ── And the crowded day: three items, to show the card grow. ──
+    cells[44] = day([
+        assignment(648914, "HW 6 — Double Integrals"),
+        quiz(619247, "Quiz 7 — Polar Coordinates"),
+        test(619248, "Lab Practical 2"),
+    ])
+    cells[61] = day([test(619249, "Midterm 2 — Chapters 5–8")])
+    cells[75] = day([quiz(619250, "Quiz 8 — Surface Area")])
+    cells[104] = day([test(619251, "Final Exam — cumulative")])
     return cells
 }
 
@@ -275,6 +308,139 @@ if let renderPath = ProcessInfo.processInfo.environment["EXP9_RENDER"] {
     let png = NSBitmapImageRep(data: tiff)!.representation(using: .png, properties: [:])!
     try! png.write(to: URL(fileURLWithPath: renderPath))
     exit(0)
+}
+
+// EXP9_POPUP_RENDER=<path>: the David row with the hover popup forced open,
+// once for the two-item day and once for the three-item day, drawn offscreen.
+// Not the real menu — but it proves the card's layout, clamping, row highlight
+// and swatches in an environment where menus cannot be screenshotted.
+if let renderPath = ProcessInfo.processInfo.environment["EXP9_POPUP_RENDER"] {
+    let width: CGFloat = 340
+    // (anchor cell, hovered row) — cell 23 holds 2 items, cell 44 holds 3.
+    let states: [(Int, Int?)] = [(23, 1), (44, 0)]
+    let views: [DavidComponentView] = states.map { anchor, row in
+        let view = DavidComponentView(
+            title: "DAVID 10000 — Rendering Playground",
+            cells: davidCells(columns: 16)
+        )
+        view.frame.size.width = width
+        view.showPopup(forCell: anchor, row: row)
+        return view
+    }
+    let gap: CGFloat = 8
+    let totalHeight = views.map(\.frame.height).reduce(0, +) + gap * CGFloat(views.count + 1)
+    let image = NSImage(size: NSSize(width: width + 16, height: totalHeight))
+    image.lockFocus()
+    NSColor.windowBackgroundColor.setFill()
+    NSBezierPath(rect: NSRect(x: 0, y: 0, width: width + 16, height: totalHeight)).fill()
+    var y = gap
+    for view in views.reversed() {
+        let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds)!
+        view.cacheDisplay(in: view.bounds, to: rep)
+        rep.draw(in: NSRect(x: 8, y: y, width: view.frame.width, height: view.frame.height))
+        y += view.frame.height + gap
+    }
+    image.unlockFocus()
+    let tiff = image.tiffRepresentation!
+    let png = NSBitmapImageRep(data: tiff)!.representation(using: .png, properties: [:])!
+    try! png.write(to: URL(fileURLWithPath: renderPath))
+    exit(0)
+}
+
+// EXP9_SELFTEST=1: headless checks on everything about the popup that is pure
+// arithmetic — the row hit-testing inverse, the clamp that keeps the card
+// inside the row, the deep links, and the clipping that forces the clamp.
+// Event DELIVERY is not testable here; that is what --probe and a human are for.
+if ProcessInfo.processInfo.environment["EXP9_SELFTEST"] == "1" {
+    var failures: [String] = []
+    func check(_ condition: Bool, _ name: String) {
+        print("\(condition ? "PASS" : "FAIL")  \(name)")
+        if !condition { failures.append(name) }
+    }
+
+    let view = DavidComponentView(title: "selftest", cells: davidCells(columns: 16))
+    view.frame.size.width = 340
+
+    // 1. Every seeded day with work has a card, and every row of that card
+    //    hit-tests back to its own index — the inverse the click path relies on.
+    let seeded = [2, 5, 9, 16, 23, 30, 44, 61, 75, 104]
+    for cell in seeded {
+        guard let geometry = view.popupGeometry(forCell: cell) else {
+            check(false, "cell \(cell) produces a popup"); continue
+        }
+        let items = view.items(forCell: cell)
+        check(geometry.rows.count == items.count, "cell \(cell): \(items.count) rows for \(items.count) items")
+        for (row, rect) in geometry.rows.enumerated() {
+            let hit = geometry.rows.firstIndex { $0.contains(CGPoint(x: rect.midX, y: rect.midY)) }
+            check(hit == row, "cell \(cell) row \(row): centre hit-tests to itself")
+        }
+        // 2. The clamp: the card never leaves the row it is drawn in, including
+        //    for the last column (104) where "to the right" does not fit.
+        check(view.bounds.contains(geometry.frame), "cell \(cell): card stays inside the row's bounds")
+    }
+
+    // 3. The list case actually exists — an assignment AND a quiz on one day.
+    let multi = view.items(forCell: 23)
+    check(multi.count == 2 && multi[0].kind == .assignment && multi[1].kind == .quiz,
+          "cell 23 is the list case: one assignment + one quiz")
+    check(view.items(forCell: 44).count == 3, "cell 44 holds three items")
+
+    // 4. The deep links are the shapes experiment 7 verified.
+    check(multi[0].url.absoluteString
+        == "https://purdue.brightspace.com/d2l/lms/dropbox/user/folder_submit_files.d2l?db=648913&grpid=0&ou=412690",
+        "assignment link shape")
+    check(multi[1].url.absoluteString
+        == "https://purdue.brightspace.com/d2l/lms/quizzing/user/quiz_summary.d2l?qi=619245&ou=412690",
+        "quiz link shape")
+
+    // 5. Does a view's drawing survive outside its own frame? The card is
+    //    clamped inside the row either way, but the answer decides whether
+    //    overhanging is a lever the production port may pull.
+    DavidComponentView.drawsOutOfBoundsProbe = true
+    let host = NSView(frame: NSRect(x: 0, y: 0, width: 360, height: 200))
+    let clipped = DavidComponentView(title: "clip", cells: davidCells(columns: 16))
+    clipped.frame = NSRect(x: 10, y: 60, width: 340, height: clipped.frame.height)
+    host.addSubview(clipped)
+    let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds)!
+    host.cacheDisplay(in: host.bounds, to: rep)
+    DavidComponentView.drawsOutOfBoundsProbe = false
+    // The bitmap is Retina — 2 pixels per point — so a view-space y maps to
+    // scale * (host.height - (view.frame.minY + y)). Sampling in points is the
+    // mistake that made an earlier version of this check pass vacuously.
+    let scale = CGFloat(rep.pixelsHigh) / host.bounds.height
+    func bandIsPainted(atViewY y: CGFloat) -> Bool {
+        let row = Int(scale * (host.bounds.height - (clipped.frame.minY + y)))
+        return stride(from: 20, to: 340, by: 20).contains { x in
+            (rep.colorAt(x: Int(CGFloat(x) * scale), y: row)?.alphaComponent ?? 0) > 0.01
+        }
+    }
+    let inside = bandIsPainted(atViewY: 8)
+    let outside = bandIsPainted(atViewY: -8)
+    // Control: if the INSIDE band is missing, the sampling is wrong and the
+    // result below means nothing.
+    check(inside, "control: a band inside the view's bounds IS sampled")
+    // The finding, pinned so a future OS default change fails here loudly.
+    // macOS 15 ships clipsToBounds = false, so a view CAN paint outside its
+    // own frame; the card is clamped by choice, not by force.
+    print("      clipsToBounds=\(clipped.clipsToBounds), out-of-bounds band painted=\(outside)")
+    check(outside == !clipped.clipsToBounds,
+          "out-of-bounds drawing follows clipsToBounds (false on macOS 15 → NOT clipped)")
+
+    print(failures.isEmpty
+        ? "\nSELFTEST PASS — \(seeded.count) seeded days, geometry inverse and links verified"
+        : "\nSELFTEST FAIL — \(failures.count): \(failures.joined(separator: ", "))")
+    exit(failures.isEmpty ? 0 : 1)
+}
+
+// EXP9_PROBE=1: open the menu without a human and interrogate it from inside
+// its own tracking loop — can our code run there, can a panel float above it,
+// can a popover show at all? Writes artifacts/probe.log.
+if ProcessInfo.processInfo.environment["EXP9_PROBE"] == "1" {
+    let logPath = ProcessInfo.processInfo.environment["EXP9_PROBE_LOG"] ?? "probe.log"
+    Task { @MainActor in
+        try? await Task.sleep(for: .seconds(1))
+        MenuOverlayProbe.drive(menu: menu, anchor: davidRow.view, logPath: logPath)
+    }
 }
 
 app.run()

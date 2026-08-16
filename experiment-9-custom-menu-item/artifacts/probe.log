@@ -1,0 +1,21 @@
+[exp9probe] === exp9 menu-overlay probe — 2026-08-16 19:46:00 +0000 ===
+[exp9probe] z-order (before the menu opens) — front to back, this process only:
+[exp9probe]     #10952 layer=25 ["X": 1187, "Width": 32, "Height": 38, "Y": 0] Item-0
+[exp9probe] popping the menu open at (400, 1047.0)
+[exp9probe] Q1 mid-tracking execution: FIRED. runLoopMode=NSEventTrackingRunLoopMode
+[exp9probe] Q1 menu.highlightedItem=nil anchorWindow=NSPopupMenuWindow
+[exp9probe] Q2 panel: isVisible=true level=102 (menu level is 101) occlusion=occluded windowNumber=10954
+[exp9probe] Q3 popover: isShown=true contentWindow=10955@level101
+[exp9probe] z-order (after both overlays shown) — front to back, this process only:
+[exp9probe]     #10953 layer=101 ["X": 400, "Y": 55, "Width": 340, "Height": 416] 
+[exp9probe]     #10952 layer=25 ["X": 1187, "Y": 0, "Width": 32, "Height": 38] Item-0
+[exp9probe] Q4 before warp: hoveredCell=nil popupAnchor=nil popupRow=nil
+[exp9probe] Q4 warping cursor to cell 23: view(66.0, 50.0) → screen(466.0, 899.0) → CG(466.0, 208.0)
+[exp9probe] Q4 after warp:  hoveredCell=nil popupAnchor=nil popupRow=nil
+[exp9probe] Q4 cursor now at (466.0, 899.0)
+[exp9probe] Q5 posting mouseMoved into our own queue at window(66.0, 263.0)
+[exp9probe] Q5 after injected mouseMoved: hoveredCell=23 popupAnchor=23 popupRow=nil
+[exp9probe] Q5 posting leftMouseDown+Up on popup row 1 at window(181.849365234375, 253.0)
+[exp9probe] popUp returned — menu tracking has ended
+[exp9probe] cursor returned to (513.0, 1057.0)
+[exp9probe] teardown complete
