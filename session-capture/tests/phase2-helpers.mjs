@@ -124,6 +124,7 @@ const MINT_MARK = "/d2l/lp/auth/oauth2/token";
 const ENROLLMENTS_MARK = "/enrollments/myenrollments";
 const DROPBOX_MARK = "/dropbox/folders";
 const QUIZZES_MARK = "/quizzes";
+const GRADES_MARK = "/grades/";
 
 /** The org-unit id out of a per-course route, so a router can answer per course. */
 export const courseIdOf = (url) => Number(url.match(/\/d2l\/api\/le\/[\d.]+\/(\d+)\//)?.[1] ?? 0);
@@ -145,6 +146,7 @@ export function fakeHttp(routes = {}) {
     enrollments = raw(fixture("myenrollments-200.json")),
     dropbox = {},
     quizzes = {},
+    grades = {},
   } = routes;
 
   const answer = async (route, request) => {
@@ -165,6 +167,9 @@ export function fakeHttp(routes = {}) {
     if (url.includes(ENROLLMENTS_MARK)) return answer(enrollments, request);
     if (url.includes(DROPBOX_MARK)) return perCourse(dropbox, request, json([]));
     if (url.includes(QUIZZES_MARK)) return perCourse(quizzes, request, json({ Objects: [], Next: null }));
+    // A gradebook of no columns is the quiet default: every test that is not
+    // about the diff must keep answering this route without saying so.
+    if (url.includes(GRADES_MARK)) return perCourse(grades, request, json([]));
     throw new Error(`the fake was asked for an unrouted URL: ${url}`);
   };
   http.requests = [];
@@ -186,6 +191,7 @@ export const MARKS = {
   enrollments: ENROLLMENTS_MARK,
   dropbox: DROPBOX_MARK,
   quizzes: QUIZZES_MARK,
+  grades: GRADES_MARK,
 };
 
 // ---------------------------------------------------------------------------
