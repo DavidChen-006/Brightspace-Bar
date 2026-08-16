@@ -22,8 +22,8 @@
  * file, and every log line is composed from names and reasons this module owns
  * — never from a fetched or captured value.
  */
-import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
-import path from "node:path";
+import { readFileSync } from "node:fs";
+import { writeJsonAtomic } from "./atomic-write.mjs";
 
 /**
  * A rung: takes the world, tries to produce live credentials, reports honestly.
@@ -175,25 +175,6 @@ function readLastSuccessAt(statusFile) {
     return typeof previous.lastSuccessAt === "string" ? previous.lastSuccessAt : null;
   } catch {
     return null;
-  }
-}
-
-/**
- * Write via a temp file in the SAME directory then rename, so a reader in the
- * Swift app only ever sees a whole file (rename is atomic within a filesystem).
- * The temp file never outlives the call: a failed rename cleans up after itself
- * rather than leaving debris in the directory the app watches.
- */
-function writeJsonAtomic(file, value) {
-  const dir = path.dirname(file);
-  mkdirSync(dir, { recursive: true });
-  const temp = path.join(dir, `.${path.basename(file)}.${process.pid}.tmp`);
-  try {
-    writeFileSync(temp, `${JSON.stringify(value, null, 2)}\n`);
-    renameSync(temp, file);
-  } catch (error) {
-    rmSync(temp, { force: true });
-    throw error;
   }
 }
 

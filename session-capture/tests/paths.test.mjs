@@ -31,6 +31,7 @@ test("lays the four daemon locations out under BSB_ROOT", () => {
     cacheDir: path.join(root, "cache"),
     dataFile: path.join(root, "cache", "data.json"),
     statusFile: path.join(root, "cache", "status.json"),
+    mfaFile: path.join(root, "cache", "mfa.json"),
   });
 });
 

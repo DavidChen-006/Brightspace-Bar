@@ -35,6 +35,12 @@ const EMAIL_SELECTORS = ["input[type=email]", "input[name=loginfmt]"];
 const PASSWORD_SELECTORS = ["input[type=password]", "input[name=passwd]"];
 const SUBMIT_SELECTORS = ["#idSIButton9", "input[type=submit]", "button[type=submit]"];
 
+/**
+ * Entra's number-match digits. Plain DOM text, no screenshot and no OCR —
+ * proven against the live tenant in experiment-10/src/prove-number.mjs.
+ */
+const DISPLAY_SIGN_SELECTOR = "#idRichContext_DisplaySign";
+
 /** Generous: a human has to find their phone and approve the number-match. */
 const MFA_TIMEOUT_MS = 5 * 60 * 1000;
 const POLL_MS = 2000;
@@ -49,8 +55,14 @@ export async function silentCapture({ profileDir, baseUrl, log }) {
   });
 }
 
-/** The headed login. Silent first — credentials are only touched once it fails. */
-export async function fullLoginCapture({ profileDir, baseUrl, log }) {
+/**
+ * The headed login. Silent first — credentials are only touched once it fails.
+ *
+ * `onMfaNumber` is optional and is how the number reaches the status-bar icon:
+ * it is awaited, so by the time this capture goes back to waiting for the human
+ * the icon is already showing the digits. The rung owns what happens to it.
+ */
+export async function fullLoginCapture({ profileDir, baseUrl, log, onMfaNumber }) {
   return withBrowser({ profileDir, headless: false }, async ({ page, context }) => {
     if (await trySilentLogin(page, context, baseUrl, log)) {
       log("silent SSO covered it — credentials never touched");
@@ -71,7 +83,19 @@ export async function fullLoginCapture({ profileDir, baseUrl, log }) {
 
     log(">>> approve the number-match on your PHONE — up to 5 minutes <<<");
     const deadline = Date.now() + MFA_TIMEOUT_MS;
+    let announced = null;
     while (Date.now() < deadline) {
+      // Read the number BEFORE the auth check: the digits are on the screen
+      // while the page is still unauthenticated, and the check costs a round
+      // trip the human should not be waiting behind.
+      const number = await readDisplaySign(page);
+      if (number && number !== announced) {
+        // Only on a CHANGE — Entra re-mints on resend, and re-announcing the
+        // same digits every 2s would restart the icon's TTL forever.
+        announced = number;
+        log(`number-match code on screen: ${number} — type it into your phone`);
+        await onMfaNumber?.(number);
+      }
       if (await isAuthenticated(page, context, baseUrl)) {
         return harvest({ page, context, baseUrl, log });
       }
@@ -106,6 +130,21 @@ async function harvest({ page, context, baseUrl, log }) {
   const csrfToken = await extractXsrf(page);
   log(csrfToken ? "XSRF token extracted" : "XSRF token NOT found");
   return { ok: true, cookies, csrfToken, landedUrl: page.url() };
+}
+
+/**
+ * The number-match digits, or null when Entra is not showing any.
+ *
+ * Non-retrying on purpose: `isVisible` answers immediately rather than waiting
+ * out a timeout, so the runs where this element NEVER appears — a password-only
+ * tenant, or a silent SSO that already succeeded — pay one cheap DOM query per
+ * poll and the MFA wait keeps its 2s rhythm.
+ */
+async function readDisplaySign(page) {
+  const sign = page.locator(DISPLAY_SIGN_SELECTOR).first();
+  if (!(await sign.isVisible().catch(() => false))) return null;
+  const text = await sign.textContent().catch(() => null);
+  return text?.trim() || null;
 }
 
 /** Fill the first visible selector from the list. */
