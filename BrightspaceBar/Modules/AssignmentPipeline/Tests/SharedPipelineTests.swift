@@ -165,10 +165,12 @@ struct ItemKindTests {
         #expect(asAssignment != asQuiz)
     }
 
-    @Test("both kinds exist and are distinct")
-    func bothKindsExist() {
-        // Arrange / Act / Assert — `CaseIterable` so a future third kind (a graded
-        // discussion, a checklist) is discoverable rather than hidden in a switch.
-        #expect(Set(ItemKind.allCases) == [.assignment, .quiz])
+    @Test("all three kinds exist and are distinct")
+    func allKindsExist() {
+        // Arrange / Act / Assert — `CaseIterable` so a new kind is discoverable
+        // rather than hidden in a switch, and pinned as an EXACT set so adding one
+        // is a deliberate edit here rather than a silent widening. `.gradeOnly` is
+        // the gradebook diff: a student-scored column matching no fetched item.
+        #expect(Set(ItemKind.allCases) == [.assignment, .quiz, .gradeOnly])
     }
 }
