@@ -45,7 +45,7 @@ public struct ChromiumURLOpener: URLOpening {
 
     public static var defaultCLI: String {
         ProcessInfo.processInfo.environment["BSB_OPEN_CLI"]
-            ?? NSHomeDirectory() + "/PaperShelf/session-capture/src/browser-open.mjs"
+            ?? NSHomeDirectory() + "/Developer/BrightspaceBar/session-capture/src/browser-open.mjs"
     }
 
     public func open(_ url: URL) {
@@ -54,6 +54,16 @@ public struct ChromiumURLOpener: URLOpening {
         // app spawns the refresh daemon.
         process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
         process.arguments = ["node", self.openCLI, url.absoluteString]
+        // Launched from Finder/`open`, the app inherits launchd's bare PATH,
+        // which has no Homebrew — and `/usr/bin/env node` then finds nothing
+        // and the click dies silently. Same augmentation as `DaemonRunner`.
+        var environment = ProcessInfo.processInfo.environment
+        let path = environment["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin"
+        for extra in ["/opt/homebrew/bin", "/usr/local/bin"]
+        where !path.split(separator: ":").contains(Substring(extra)) {
+            environment["PATH"] = (environment["PATH"] ?? path) + ":" + extra
+        }
+        process.environment = environment
         try? process.run()
     }
 }
