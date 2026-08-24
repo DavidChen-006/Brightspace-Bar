@@ -70,9 +70,20 @@ export async function clickThroughSilentSurfaces(page, log) {
     }
   }
   // "Stay signed in?" — answering Yes is what keeps the wristband persistent.
+  // The page must PROVE it is the KMSI page before the click: #idSIButton9 is
+  // Microsoft's id for the primary button on EVERY sign-in page — "Next" on
+  // email entry, "Sign in" on password — and clicking it there submits an
+  // empty form once a second while the log claims "Yes" (live bug,
+  // 2026-08-24: a fresh profile looped on the email page for the whole
+  // budget). The KMSI checkbox is the marker unique to that page.
   if (page.url().includes("login.microsoftonline.com")) {
+    // Two markers because tenant policy can hide the "Don't show this again"
+    // checkbox: the checkbox when present, the page title otherwise.
+    const onKmsiPage =
+      (await page.locator("#KmsiCheckboxField").isVisible().catch(() => false))
+      || (await page.getByText("Stay signed in?").first().isVisible().catch(() => false));
     const kmsiYes = page.locator("#idSIButton9");
-    if (await kmsiYes.isVisible().catch(() => false)) {
+    if (onKmsiPage && (await kmsiYes.isVisible().catch(() => false))) {
       await kmsiYes.click().catch(() => {});
       log('clicked Yes on "Stay signed in?"');
       return true;
@@ -93,6 +104,16 @@ export async function trySilentLogin(page, context, baseUrl, log, timeoutMs = 30
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (await isAuthenticated(page, context, baseUrl)) return true;
+    // A visible email-entry field is Microsoft asking WHO you are — a page no
+    // amount of silent waiting ever gets past. Fail at once so the ladder
+    // climbs to the credential rung instead of burning the whole budget
+    // (a fresh profile otherwise stalls 30s here, twice: once in the silent
+    // rung, once in the full rung's own silent-first pass).
+    const emailField = page.locator("input[type=email], input[name=loginfmt]").first();
+    if (await emailField.isVisible().catch(() => false)) {
+      log("silent SSO cannot pass an email prompt — a credential login is needed");
+      return false;
+    }
     await clickThroughSilentSurfaces(page, log);
     await page.waitForTimeout(1000);
   }
