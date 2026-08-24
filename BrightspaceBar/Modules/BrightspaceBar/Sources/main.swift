@@ -275,6 +275,25 @@ mfaWatcher.start { state in
     }
 }
 
+// SEAM: the prompt reload. The one-command start flow launches this app first
+// and runs the login/fetch afterwards, so the freshest `data.json` lands on
+// disk minutes after the launch read below — and the 30-minute timer is the
+// only other thing that would notice. The watcher fires when the daemon renames
+// a new `data.json` into place, and the reaction is the poll's own reload path:
+// cheap and idempotent, repainting only when the model actually changed.
+//
+// Wired in both modes for the same reasons as `mfaWatcher` — a reader of one
+// directory, spawns nothing (D8) — and top-level `let` for the same reason too:
+// a watcher bound inside a branch is deallocated at the end of it. The callback
+// is synchronous by contract; the async reload goes in a Task, which is what
+// keeps this file a sync main.
+let dataWatcher = DataWatcher(paths: daemonPaths)
+dataWatcher.start {
+    Task { @MainActor in
+        await controller.reload()
+    }
+}
+
 // The controller's own init already pulls `currentMenu()`, which serves the
 // cache off disk — so courses appear without waiting for the network. This Task
 // adds the launch fetch on top and repaints if it changed anything.
