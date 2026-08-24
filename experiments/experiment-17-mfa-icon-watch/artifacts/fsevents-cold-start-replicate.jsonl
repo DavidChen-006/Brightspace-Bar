@@ -1,7 +1,0 @@
-{"cpuMs":22.117000000000004,"event":"idle-cpu","technique":"fsevents","wallSeconds":60.001718997955322}
-{"detectedAtEpochMs":1786852026439.4651,"event":"update","latencyMs":257.42236328125,"number":"36","seq":1,"t0EpochMs":1786852026182.0427,"technique":"fsevents"}
-{"detectedAtEpochMs":1786852027677.4941,"event":"update","latencyMs":15.921875,"number":"20","seq":2,"t0EpochMs":1786852027661.5723,"technique":"fsevents"}
-{"detectedAtEpochMs":1786852029874.905,"event":"update","latencyMs":12.786376953125,"number":"12","seq":3,"t0EpochMs":1786852029862.1187,"technique":"fsevents"}
-{"detectedAtEpochMs":1786852032604.1201,"event":"update","latencyMs":14.8486328125,"number":"21","seq":4,"t0EpochMs":1786852032589.2715,"technique":"fsevents"}
-{"detectedAtEpochMs":1786852034106.519,"doomedFileWatchArmed":false,"doomedFileWatchEvents":0,"doomedFileWatchFlags":"","event":"delete","spuriousSoFar":0,"technique":"fsevents"}
-{"technique":"fsevents","event":"delete-latency","latencyMs":13.092529296875}

@@ -1,3 +1,0 @@
-{"ts":"2026-08-12T03:13:50.693Z","event":"totp-probe","reachedSecurityInfo":false,"addMethodOpened":false,"offeredMethods":[],"totpOffered":null,"outcome":"reauth-required"}
-{"ts":"2026-08-12T03:14:35.291Z","event":"totp-probe","reachedSecurityInfo":true,"addMethodOpened":false,"offeredMethods":[],"totpOffered":null,"outcome":"add-button-not-found"}
-{"ts":"2026-08-12T03:15:16.566Z","event":"totp-probe","reachedSecurityInfo":true,"addMethodOpened":false,"offeredMethods":[],"totpOffered":null,"outcome":"add-button-not-found"}

@@ -1,2 +1,0 @@
-STATUS 401
-{"type":"http://docs.valence.desire2learn.com/res/apiprop.html#invalid-token","title":"Unauthorized","status":401,"detail":"Couldn't parse token"}

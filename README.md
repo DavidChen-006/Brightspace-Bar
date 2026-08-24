@@ -67,8 +67,11 @@ once more.
 | --- | --- |
 | `BrightspaceBar/` | The Swift package: the menu-bar app and its modules (`Modules/<Name>/`), tests included |
 | `session-capture/` | The Node daemon: login ladder, data fetch, deep-link opener |
-| `experiments/` | Numbered probes that de-risked each design decision — kept as engineering notes |
 | `docs/` | Design documents |
+
+The numbered `experiment-*` probes that de-risked each design decision live on
+the [`experiments` branch](https://github.com/DavidChen-006/BrightspaceBar/tree/experiments/experiments)
+— kept as engineering notes, off the main tree.
 
 Architecture rules (enforced by tests): the GUI imports only the `CourseMenu`
 contract module; adapters translate between pipelines and the menu model; the

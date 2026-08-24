@@ -4,7 +4,7 @@
  * wait for the human's MFA approval — then harvest the cookie.
  *
  * Provenance: the autofill flow originates in
- * `../experiments/experiment-1-fresh-cookie/src/acquire-session.mjs`, where it was written
+ * `experiment-1-fresh-cookie/src/acquire-session.mjs`, where it was written
  * and proven. That folder is a frozen experiment record; this is the live
  * port, upgraded with the persistent profile + silent SSO from experiment 10.
  *
