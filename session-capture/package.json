@@ -16,6 +16,6 @@
     "postinstall": "playwright install chromium"
   },
   "devDependencies": {
-    "playwright": "1.58.2"
+    "playwright": "1.62.1"
   }
 }
