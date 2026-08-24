@@ -494,9 +494,17 @@ struct SectionedStateTests {
             assignments: [Real.civicsID: .loaded(civicsItems)], timeZone: Pinned.utc
         )
 
-        // Assert
+        // Assert — since Intent 1 the whole-course translation no longer calls
+        // the sectioned listing at all: the submenu is the add-forms (plus any
+        // announcements), and `AssignmentTranslation.submenu` — everything the
+        // rest of this suite pins — survives as the pure function it always
+        // was, no longer joined here. What this end-of-chain test now pins is
+        // exactly that: no section headers and no work rows leak through.
         let course = try #require(model.courses.first { $0.id == Real.civicsID })
-        #expect(headers(course.submenu) == [Pinned.assignmentsHeader, Pinned.quizzesHeader])
-        #expect(course.submenu.assignments.count == 2)
+        #expect(headers(course.submenu).isEmpty)
+        #expect(course.submenu.assignments.isEmpty)
+        #expect(course.submenu == AddItemKind.allCases.map {
+            .addForm(AddItemFormRow(courseId: Real.civicsID, kind: $0))
+        })
     }
 }

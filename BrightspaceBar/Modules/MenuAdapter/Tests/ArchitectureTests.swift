@@ -72,6 +72,9 @@ struct ArchitectureTests {
     /// Swift at all now, so there is no credential type left to leak.)
     private static let backendModules: Set<String> = [
         "MenuAdapter", "CoursePipeline", "AssignmentPipeline", "QuizPipeline",
+        // Storage is backend too: the GUI hands an `AddItemDraft` up the seam
+        // and must never name the store or the manual-item type itself.
+        "ManualItems",
     ]
 
     /// The single exemption: the composition root exists precisely to know both

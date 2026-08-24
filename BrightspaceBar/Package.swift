@@ -33,6 +33,8 @@ let package = Package(
         .library(name: "CourseMenu", targets: ["CourseMenu"]),
         .library(name: "MenuAdapter", targets: ["MenuAdapter"]),
         .library(name: "ManualItems", targets: ["ManualItems"]),
+        .library(name: "WeekStats", targets: ["WeekStats"]),
+        .library(name: "AggregateGraph", targets: ["AggregateGraph"]),
         .executable(name: "BrightspaceBar", targets: ["BrightspaceBar"]),
     ],
     targets: [
@@ -115,6 +117,38 @@ let package = Package(
             path: "Modules/ManualItems/Tests"
         ),
 
+        // ── Pure logic: N per-course graph strips → one "All classes" strip ──
+        //
+        // Depends on CourseMenu ONLY: it speaks the contract's graph vocabulary
+        // (GraphCell, CellTier, GraphDayItem) on the way in and its own
+        // aggregate types on the way out. No pipeline, no clock — the wiring
+        // (MenuAdapter) will call it later.
+        .target(
+            name: "AggregateGraph",
+            dependencies: ["CourseMenu"],
+            path: "Modules/AggregateGraph/Sources"
+        ),
+        .testTarget(
+            name: "AggregateGraphTests",
+            dependencies: ["AggregateGraph", "CourseMenu"],
+            path: "Modules/AggregateGraph/Tests"
+        ),
+
+        // ── Pure logic: the "This week" stats block ──────────────────────────
+        //
+        // Foundation only. Defines its own minimal WeekWorkItem input (CourseMenu's
+        // GraphDayItem carries no due date, so it is not the right contract type);
+        // the adapter maps into it later, WorkMerge-style.
+        .target(
+            name: "WeekStats",
+            path: "Modules/WeekStats/Sources"
+        ),
+        .testTarget(
+            name: "WeekStatsTests",
+            dependencies: ["WeekStats"],
+            path: "Modules/WeekStats/Tests"
+        ),
+
         // ── The contract between backend and GUI ─────────────────────────────
         .target(
             name: "CourseMenu",
@@ -135,13 +169,17 @@ let package = Package(
             // `AssignmentLink`. QuizPipeline is here for the same reason — the
             // translation layer is the one place that chooses between the two
             // deep-link templates, so it needs `QuizLink`.
-            dependencies: ["CourseMenu", "CoursePipeline", "AssignmentPipeline", "QuizPipeline"],
+            // ManualItems joined for Intent 1: the translation layer is the pure
+            // merge point where the student's own items enter the same menu and
+            // graph values fetched items do.
+            dependencies: ["CourseMenu", "CoursePipeline", "AssignmentPipeline", "QuizPipeline", "ManualItems"],
             path: "Modules/MenuAdapter/Sources"
         ),
         .testTarget(
             name: "MenuAdapterTests",
             dependencies: [
                 "MenuAdapter", "CourseMenu", "CoursePipeline", "AssignmentPipeline",
+                "ManualItems",
             ],
             path: "Modules/MenuAdapter/Tests"
         ),
@@ -153,6 +191,7 @@ let package = Package(
             // fails the suite if any view file imports them.
             dependencies: [
                 "CourseMenu", "MenuAdapter", "CoursePipeline", "AssignmentPipeline",
+                "ManualItems",
             ],
             path: "Modules/BrightspaceBar/Sources",
             exclude: ["Info.plist"],

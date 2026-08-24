@@ -62,6 +62,13 @@ public struct StubMenuDataSource: MenuDataSource {
         ))
     }
 
+    /// The three add-forms every course submenu leads with (Intent 1), seeded
+    /// exactly as `MenuTranslation` emits them: one per `AddItemKind`, in
+    /// `allCases` order, stamped with this course's id.
+    private static func addForms(course: Int) -> [MenuRow] {
+        AddItemKind.allCases.map { .addForm(AddItemFormRow(courseId: course, kind: $0)) }
+    }
+
     /// Every announcement in a course opens the same page — its announcements
     /// list. D2L offers no per-item deep link worth trusting, so one destination
     /// per course is the design rather than a stub simplification.
@@ -119,13 +126,13 @@ public struct StubMenuDataSource: MenuDataSource {
         // running app even though no reachable real course has a due date yet.
         .course(CourseRow(
             id: 1_498_777, title: "Data Engineering", subtitle: "CS 17600", url: url(1_498_777),
-            submenu: [
-                assignment(2_001, "Project 1: ETL Pipeline", due: "Due Sep 12", dueDate: Date(timeIntervalSince1970: 1_789_516_800), course: 1_498_777),
-                assignment(2_002, "Lab 3 Write-up", due: "Due Sep 19", dueDate: Date(timeIntervalSince1970: 1_790_121_600), course: 1_498_777),
+            // The redesigned submenu (Intent 1): the add-forms lead — the
+            // fetched work listing is gone; the heatmap popup is the browsing
+            // surface — then the announcements section, exactly as before.
+            submenu: addForms(course: 1_498_777) + [
                 // The announcements section, seeded exactly as `MenuTranslation`
                 // appends it: a separator, a mandatory label, then the recent
-                // posts newest first. The label is what stops these rows from
-                // reading as two more assignments.
+                // posts newest first.
                 .separator,
                 .sectionHeader("Announcements"),
                 announcement(3_001, "Project 1 spec updated — see §4", daysAgo: 2, course: 1_498_777),
@@ -140,10 +147,7 @@ public struct StubMenuDataSource: MenuDataSource {
         // today, and the case where a naive formatter ships the literal "nil".
         .course(CourseRow(
             id: 1_415_558, title: "Multivariate Calculus", subtitle: "MA 26100", url: url(1_415_558),
-            submenu: [
-                assignment(2_101, "Homework 1", course: 1_415_558),
-                assignment(2_102, "Homework 2", course: 1_415_558),
-                assignment(2_103, "Written Reflection on Vector Fields", course: 1_415_558),
+            submenu: addForms(course: 1_415_558) + [
                 // A second course with announcements, so the demo shows two
                 // sections side by side and a cross-wired `ou=` would be visible
                 // rather than merely untested.
@@ -160,11 +164,11 @@ public struct StubMenuDataSource: MenuDataSource {
             graph: strip([4: .quiz, 8: .assignment, 11: .quiz, 111: .assignment]), graphMonths: months
         )),
         .hairline,
-        // The empty state: a course fetched successfully with zero assignments.
-        // Says so rather than opening onto a blank box.
+        // A course with no announcements: the submenu is the add-forms alone,
+        // which is the common shape and the smallest one a course can have.
         .course(CourseRow(
             id: 1_452_301, title: "Computer Graphics Technology", subtitle: "CGT 11800", url: url(1_452_301),
-            submenu: [.message("No assignments")],
+            submenu: addForms(course: 1_452_301),
             // "Nothing due" drawn honestly: a full-width window of empty cells. Under
             // always-emit this is the only kind of empty there is, and the common
             // case, which is why the Civics row below seeds it a second time.
@@ -177,14 +181,16 @@ public struct StubMenuDataSource: MenuDataSource {
         // week that have already gone by, on either side of the opening Sunday.
         .course(CourseRow(
             id: 1_460_912, title: "Transformative Texts: Critical Thinking", subtitle: "SCLA 10100", url: url(1_460_912),
-            submenu: [.message("No assignments")],
-            graph: strip([0: .assignment, 1: .quiz]), graphMonths: months
+            submenu: addForms(course: 1_460_912),
+            // Index 9 seeds the manual-test tier, so the renderer's darkest
+            // square is reviewable in the stub before a real manual item exists.
+            graph: strip([0: .assignment, 1: .quiz, 9: .test]), graphMonths: months
         )),
         .hairline,
         // No subtitle on purpose — `subtitle` is optional and must render cleanly nil.
         // It still gets a submenu and a window, because every course does: a bare
         // row would demo an interaction model the app can no longer reach.
-        .course(CourseRow(id: 412_690, title: "Purdue Civics Knowledge Test", subtitle: nil, url: url(412_690), submenu: [.message("No assignments")], graph: strip([:]), graphMonths: months)),
+        .course(CourseRow(id: 412_690, title: "Purdue Civics Knowledge Test", subtitle: nil, url: url(412_690), submenu: addForms(course: 412_690), graph: strip([:]), graphMonths: months)),
         .separator,
         // A real date, stamped once at seed time. A long-running stub demo shows
         // the countdown count down and, past the deadline, clamp to "Refreshes

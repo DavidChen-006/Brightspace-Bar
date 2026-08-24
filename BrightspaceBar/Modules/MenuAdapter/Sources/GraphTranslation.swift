@@ -1,6 +1,7 @@
 import Foundation
 import AssignmentPipeline
 import CourseMenu
+import ManualItems
 import QuizPipeline
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -57,13 +58,22 @@ public enum GraphTranslation {
     ///   - courseLabel: what the caption names the course as ("CS 25200");
     ///     nil drops the " · course" half, never the caption.
     ///   - baseURL: the deep links' host. Nil disables details like `courseId`.
+    ///   - manual: the student's own items for THIS course (Intent 1), already
+    ///     filtered by course — this function buckets, it never groups. They
+    ///     ride the SAME fold as fetched items: the same window guard, the same
+    ///     highest-tier-wins accumulation, the same one bucketing feeding both
+    ///     the square and its popup — which is the whole requirement, since a
+    ///     manual test that coloured a cell but vanished from its popup would
+    ///     be a square nothing can explain. Defaulted `[]` so every
+    ///     pre-existing call site (and its output) is untouched.
     public static func strip(
         state: AssignmentsState,
         now: Date,
         timeZone: TimeZone,
         courseId: Int? = nil,
         courseLabel: String? = nil,
-        baseURL: URL? = nil
+        baseURL: URL? = nil,
+        manual: [ManualItem] = []
     ) -> [GraphCell] {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = timeZone
@@ -83,7 +93,7 @@ public enum GraphTranslation {
         // The SAME guard as the tier fold, accumulated alongside it, so the
         // popup and the square are two readings of one bucketing — a day whose
         // cell is filled has items, and a day whose cell is empty has none.
-        var dueByDay: [Int: [(item: Assignment, tier: CellTier)]] = [:]
+        var dueByDay: [Int: [(work: DayWork, tier: CellTier)]] = [:]
         for item in state.assignments where !item.isHidden {
             guard
                 let tier = Self.tier(of: item.kind),
@@ -92,7 +102,20 @@ public enum GraphTranslation {
                 (0..<Self.windowDays).contains(offset)
             else { continue }
             tiers[offset] = Swift.max(tiers[offset] ?? tier, tier)
-            dueByDay[offset, default: []].append((item, tier))
+            dueByDay[offset, default: []].append((.fetched(item), tier))
+        }
+        // The student's own items, through the SAME window guard and the SAME
+        // two accumulators — one bucketing, two readings, exactly as above. No
+        // hidden-flag and no missing-date branch, because a manual item has
+        // neither by construction (`ManualItem.due` is non-optional).
+        for item in manual {
+            guard
+                let offset = self.dayOffset(from: windowStart, to: item.due, in: calendar),
+                (0..<Self.windowDays).contains(offset)
+            else { continue }
+            let tier = Self.tier(of: item.kind)
+            tiers[offset] = Swift.max(tiers[offset] ?? tier, tier)
+            dueByDay[offset, default: []].append((.manual(item), tier))
         }
 
         // Always the full window: an exclusion empties a cell, it never shortens
@@ -113,11 +136,26 @@ public enum GraphTranslation {
 
     // MARK: - The hover detail
 
+    /// One entry of a day's bucket: fetched or the student's own. Private and
+    /// local rather than `MergedWorkItem` because that type carries the merge's
+    /// own ordering vocabulary; this file's order is the popup's, stated below.
+    private enum DayWork {
+        case fetched(Assignment)
+        case manual(ManualItem)
+
+        var name: String {
+            switch self {
+            case .fetched(let item): item.name
+            case .manual(let item): item.name
+            }
+        }
+    }
+
     /// The popup content for one day, or nil — for an empty day, and for any
     /// strip built without link context, which degrades to exactly the strip
     /// this function produced before details existed.
     private static func detail(
-        for due: [(item: Assignment, tier: CellTier)],
+        for due: [(work: DayWork, tier: CellTier)],
         dayOffset: Int,
         windowStart: Date,
         calendar: Calendar,
@@ -130,24 +168,67 @@ public enum GraphTranslation {
             let day = calendar.date(byAdding: .day, value: dayOffset, to: windowStart)
         else { return nil }
 
-        // Name then id, a total order for the same reason the submenu's is:
-        // network-derived input must not reshuffle an unchanged popup, or
+        // Name then identity, a total order for the same reason the submenu's
+        // was: input order must not reshuffle an unchanged popup, or
         // `MenuModel`'s `Equatable` skip-rebuild compares unequal on identical
-        // data. Not tier-grouped — a day holds a handful of items at most, and
-        // the kind is on every row anyway.
+        // data. Fetched before manual on a name tie (the official item first),
+        // then each side's own stable id. Not tier-grouped — a day holds a
+        // handful of items at most, and the kind is on every row anyway.
         let rows = due
-            .sorted { ($0.item.name, $0.item.id) < ($1.item.name, $1.item.id) }
+            .sorted { Self.precedes($0.work, $1.work) }
             .map { entry in
                 GraphDayItem(
-                    title: entry.item.name,
+                    title: entry.work.name,
                     tier: entry.tier,
-                    // The SAME templates the submenu rows use, chosen by the
-                    // same exhaustive switch shape — a popup row and its
-                    // submenu row cannot lead to different pages.
-                    url: self.deepLink(for: entry.item, courseId: courseId, baseURL: baseURL)
+                    url: self.url(for: entry.work, courseId: courseId, baseURL: baseURL)
                 )
             }
         return GraphDayDetail(caption: self.caption(for: day, courseLabel: courseLabel, in: calendar), items: rows)
+    }
+
+    private static func precedes(_ a: DayWork, _ b: DayWork) -> Bool {
+        if a.name != b.name { return a.name < b.name }
+        switch (a, b) {
+        case (.fetched(let l), .fetched(let r)): return l.id < r.id
+        case (.manual(let l), .manual(let r)): return l.id.uuidString < r.id.uuidString
+        case (.fetched, .manual): return true
+        case (.manual, .fetched): return false
+        }
+    }
+
+    /// A popup row's destination, per side of the merge. Fetched items use the
+    /// SAME templates the submenu rows used, chosen by the same exhaustive
+    /// switch shape. A manual item's destination is the string the student
+    /// pasted — opaque by contract — parsed at the last moment; a string
+    /// `URL.init` cannot swallow falls back to the course home rather than
+    /// dropping the row, because `GraphDayItem.url` is non-optional for the
+    /// good reason that a listed item must be clickable.
+    private static func url(for work: DayWork, courseId: Int, baseURL: URL) -> URL {
+        switch work {
+        case .fetched(let item):
+            self.deepLink(for: item, courseId: courseId, baseURL: baseURL)
+        case .manual(let item):
+            // Scheme required, not merely parseable: modern Foundation
+            // percent-encodes almost ANY string into a relative URL, and a
+            // "URL" like `see%20syllabus%20§3` opens nothing. A real pasted
+            // link always carries its scheme.
+            if let url = URL(string: item.link), url.scheme != nil {
+                url
+            } else {
+                baseURL.appending(path: "d2l/home/\(courseId)")
+            }
+        }
+    }
+
+    /// The manual kinds' tiers — total, unlike `tier(of: ItemKind)`, because a
+    /// manual item always has a deadline (its whole reason to exist), so every
+    /// kind reaches a cell. Exhaustive with no `default` for the usual reason.
+    private static func tier(of kind: ManualItem.Kind) -> CellTier {
+        switch kind {
+        case .assignment: .assignment
+        case .quiz: .quiz
+        case .test: .test
+        }
     }
 
     /// "Thu Aug 27 · CS 25200", or just "Thu Aug 27" with no course label.

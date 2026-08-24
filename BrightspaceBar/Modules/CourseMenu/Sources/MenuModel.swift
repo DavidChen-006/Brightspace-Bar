@@ -93,6 +93,11 @@ public struct AnnouncementRow: Equatable, Sendable, Identifiable {
 public enum CellTier: Int, Comparable, Equatable, Sendable, CaseIterable {
     case assignment = 1
     case quiz = 2
+    /// The slot the pinning above reserved. Only *manual* items carry it today —
+    /// D2L reports no tests as a distinct kind — but the tier is contract
+    /// vocabulary, not a manual-item detail: a cell drawn from a manual test and
+    /// one drawn from a hypothetical fetched test must be the same cell.
+    case test = 3
 
     public static func < (lhs: Self, rhs: Self) -> Bool { lhs.rawValue < rhs.rawValue }
 }
@@ -287,6 +292,13 @@ public enum StatusStamp: Equatable, Sendable {
 /// One line in the dropdown.
 public enum MenuRow: Equatable, Sendable {
     case course(CourseRow)
+    /// One inline "add an item" mini-form, inside a course's submenu (Intent 1).
+    /// The row is pure DATA — which course, which kind — because everything the
+    /// form displays (its heading) and everything it produces (`AddItemDraft`)
+    /// is derivable from those two facts plus what the student types. The GUI
+    /// hosts the fields; the kind is decided by which section the form is,
+    /// never asked.
+    case addForm(AddItemFormRow)
     /// One assignment. Appears inside a course's `submenu`, never at top level.
     case assignment(AssignmentRow)
     /// One announcement. Appears inside a course's `submenu`, never at top level.

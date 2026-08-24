@@ -167,10 +167,13 @@ struct StubGraphSeedTests {
         // like any other filled cell, and only a seed makes that visible.
         let course = try seededCourse(1_460_912)
 
-        // Assert
+        // Assert — index 9 also seeds the `.test` tier (Intent 1's manual-item
+        // kind), so the darkest square is reviewable in the stub before any
+        // real manual item exists.
         #expect(course.graph.map(\.tier) == window([
             0: .assignment,
             1: .quiz,
+            9: .test,
         ]))
     }
 
