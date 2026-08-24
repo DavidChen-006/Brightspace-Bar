@@ -93,6 +93,7 @@ private func shape(_ rows: [MenuRow]) -> [String] {
         case .separator: "separator"
         case .command: "command"
         case .hairline: "hairline"
+        case .addForm: "addForm"
         }
     }
 }

@@ -74,9 +74,13 @@ private enum Work {
     static let id = 445_296
     static let name = "Upload your CITI Certificate to Complete Module 2"
 
+    // Dated since Intent 1: the submenu no longer lists fetched work, so the
+    // place freshness is user-visible is the graph — and only a dated item
+    // reaches a cell. A day into the window keeps it clear of `epoch`'s own
+    // cell.
     static let item = Assignment(
         id: id, courseId: courseID, name: name,
-        dueDate: nil, isHidden: false, groupTypeId: nil
+        dueDate: epoch.addingTimeInterval(24 * 60 * 60), isHidden: false, groupTypeId: nil
     )
 }
 
@@ -157,12 +161,12 @@ struct TimerTickTests {
         await adapter.timerTick()
         let model = await adapter.currentMenu()
 
-        // Assert — the row is in the course's submenu, named, so an empty submenu
-        // or a submenu of placeholders cannot pass.
+        // Assert — since Intent 1 fetched work is user-visible in the GRAPH
+        // (the submenu lists add-forms and announcements only), so the claim is
+        // observed there: the item's day carries a named, clickable detail row.
         let course = try #require(model.courses.first { $0.id == Work.courseID })
-        let rows = course.submenu.assignments
-        #expect(rows.map(\.id) == [Work.id])
-        #expect(rows.first?.title == Work.name)
+        let items = course.graph.compactMap(\.detail).flatMap(\.items)
+        #expect(items.map(\.title) == [Work.name])
     }
 
     // ── Priority 2: the timer is still governed by PollPolicy ────────────────

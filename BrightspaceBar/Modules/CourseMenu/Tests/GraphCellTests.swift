@@ -94,14 +94,16 @@ struct CellTierTests {
         #expect(quizFirst.max() == .quiz)
     }
 
-    @Test("the raw values are 1 and 2, leaving room for a higher tier above")
+    @Test("the raw values are 1, 2 and 3, with test the highest tier")
     func rawValuesArePinned() {
-        // Arrange / Act / Assert — the extensibility contract. A future
-        // `case test = 3` must be addable with no other change, which requires the
-        // existing ranks to be these numbers and nothing to sit above `quiz`.
+        // Arrange / Act / Assert — the extensibility contract, exercised: the
+        // reserved `case test = 3` arrived with Intent 1 (manual items), and
+        // slotted in above `quiz` exactly as the pinning promised. These ranks
+        // are what `max()`-based aggregation reads, so they stay pinned.
         #expect(CellTier.assignment.rawValue == 1)
         #expect(CellTier.quiz.rawValue == 2)
-        #expect(CellTier.allCases.max() == .quiz)
+        #expect(CellTier.test.rawValue == 3)
+        #expect(CellTier.allCases.max() == .test)
     }
 }
 

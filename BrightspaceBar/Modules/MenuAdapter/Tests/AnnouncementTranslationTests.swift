@@ -694,10 +694,11 @@ struct AnnouncementWiringTests {
         #expect(announcements(civics.submenu).isEmpty)
     }
 
-    @Test("the section sits after the assignment rows, not among them")
-    func theSectionFollowsTheAssignments() throws {
-        // Arrange — a course with both halves populated, which is the shape the
-        // whole submenu is designed around: what you owe first, then what was said.
+    @Test("the section sits after the add-forms, not among them")
+    func theSectionFollowsTheAddForms() throws {
+        // Arrange — a course with both halves populated. Since Intent 1 the
+        // leading half is the three add-forms (the fetched listing moved to
+        // the heatmap popup); the announcements stay the suffix they were.
         let announced = AnnouncementsState.loaded([announcement(id: 1, date: Instant.aug10)])
 
         // Act
@@ -708,10 +709,10 @@ struct AnnouncementWiringTests {
 
         // Assert
         let rows = try #require(model.course(id: Real.scholarlyID)?.submenu)
-        let lastAssignment = try #require(rows.lastIndex { if case .assignment = $0 { true } else { false } })
+        let lastForm = try #require(rows.lastIndex { if case .addForm = $0 { true } else { false } })
         let header = try #require(rows.firstIndex(of: .sectionHeader(Pinned.header)))
         let firstAnnouncement = try #require(rows.firstIndex { if case .announcement = $0 { true } else { false } })
-        #expect(lastAssignment < header)
+        #expect(lastForm < header)
         #expect(header < firstAnnouncement)
     }
 

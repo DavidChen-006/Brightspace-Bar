@@ -246,14 +246,16 @@ struct GraphGradeOnlyTests {
 
     @Test("the grid's vocabulary gains no tier for this kind")
     func cellTierGainsNoCase() {
-        // Arrange / Act — stated directly because it is a decision, not a detail:
-        // a third `CellTier` would put a colour on a deadline calendar for
-        // something with no deadline, and would force an unanswerable ranking
-        // question on any day it shared with real work. `CaseIterable` makes the
-        // claim assertable.
+        // Arrange / Act — the decision this pins is unchanged: a gradebook
+        // column has no deadline, so no tier may exist FOR IT. The vocabulary
+        // did grow — `.test` arrived with Intent 1's manual items — but that
+        // case belongs to work with a real deadline, never to this kind, which
+        // `tier(of: .gradeOnly) == nil` (asserted throughout this suite via
+        // empty cells) keeps true. What remains assertable here is that the
+        // ranked cases are exactly the deadline-bearing kinds.
         let tiers = CellTier.allCases
 
         // Assert
-        #expect(tiers == [.assignment, .quiz])
+        #expect(tiers == [.assignment, .quiz, .test])
     }
 }

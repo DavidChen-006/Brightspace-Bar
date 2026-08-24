@@ -682,22 +682,19 @@ struct AssignmentWiringEndToEndTests {
         // Act
         let model = try self.realMenu(assignments: [RealAssignments.hostAID: state])
 
-        // Assert — the course renders, and its submenu carries all three
-        // assignments with the exact names and the verified URL template.
+        // Assert — the course renders, and since Intent 1 its submenu is the
+        // redesigned shape: the three add-forms (in the pinned kind order,
+        // stamped with THIS course), and NO fetched listing — the heatmap
+        // popup is the browsing surface for fetched work now. The store's
+        // items are deliberately absent from the submenu even though the
+        // state plainly holds them.
         let course = try #require(model.course(id: RealAssignments.hostAID))
         #expect(course.title == RealAssignments.hostAName)
 
-        let rows = course.submenu.assignments
-        try #require(rows.count == 3)
-        #expect(rows.map(\.id) == RealAssignments.scholarlyIDsInMenuOrder)
-
-        let byID = Dictionary(uniqueKeysWithValues: rows.map { ($0.id, $0) })
-        #expect(byID[RealAssignments.citiID]?.title == RealAssignments.citiName)
-        #expect(byID[RealAssignments.citiID]?.url.absoluteString == Pinned.citiURL)
-        #expect(byID[RealAssignments.purcID]?.title == RealAssignments.purcName)
-        #expect(byID[RealAssignments.purcID]?.url.absoluteString == Pinned.purcURL)
-        #expect(byID[RealAssignments.ideationID]?.title == RealAssignments.ideationName)
-        #expect(byID[RealAssignments.ideationID]?.url.absoluteString == Pinned.ideationURL)
+        #expect(course.submenu == AddItemKind.allCases.map {
+            .addForm(AddItemFormRow(courseId: RealAssignments.hostAID, kind: $0))
+        })
+        #expect(course.submenu.assignments.isEmpty)
     }
 
     @Test("every assignment carries its OWN course in ou, never a neighbour's")
@@ -722,42 +719,46 @@ struct AssignmentWiringEndToEndTests {
         let model = try self.realMenu(assignments: states)
 
         // Assert — checked per course, so a failure names which one leaked.
+        // The cross-course guarantee moved with the rows: fetched deep links
+        // are pinned per course in `GraphDayDetailTests` now, and what remains
+        // HERE is the same guarantee for the add-forms — a form in course A's
+        // submenu must create course A's item, structurally.
         for courseId in [RealAssignments.hostAID, RealAssignments.hostBID] {
             let course = try #require(model.course(id: courseId))
-            let rows = course.submenu.assignments
-            try #require(!rows.isEmpty, "course \(courseId) rendered no assignments")
-            for row in rows {
+            let forms = course.submenu.compactMap { row -> AddItemFormRow? in
+                if case .addForm(let form) = row { form } else { nil }
+            }
+            try #require(!forms.isEmpty, "course \(courseId) rendered no add-forms")
+            for form in forms {
                 #expect(
-                    row.url.absoluteString.contains("ou=\(courseId)"),
-                    "assignment \(row.id) in course \(courseId) points at another course"
-                )
-                #expect(
-                    row.url.absoluteString.contains("db=\(row.id)"),
-                    "assignment \(row.id) does not point at itself"
+                    form.courseId == courseId,
+                    "an add-form in course \(courseId) would create course \(form.courseId)'s item"
                 )
             }
         }
     }
 
-    @Test("the second host gets exactly the URL template experiment 7 verified")
-    func theOtherCourseGetsItsVerifiedURL() async throws {
-        // Arrange — the second host course, asserted against a full literal so
-        // a systematic id shift cannot pass. (The civics shell that originally
-        // carried this assignment is hidden since 2026-08-24 — pinned below.)
+    @Test("fetched work never renders as submenu rows, whatever the store holds")
+    func fetchedWorkStaysOutOfTheSubmenu() async throws {
+        // Arrange — the removal pin of the Intent-1 redesign, stated as its own
+        // test so a future edit cannot quietly resurrect the listing: even a
+        // store demonstrably holding real fetched items contributes NO
+        // `.assignment` rows to any submenu. The state itself stays fully
+        // alive — the graph join reads it — which is why this asserts on the
+        // submenu specifically and not on the store.
         let store = AssignmentStore(clock: ManualClock(RealData.midFall2025))
         _ = await store.apply(
             courseId: RealAssignments.hostBID, result: .success(try AssignmentFixture.civicsOnHostB)
         )
         let state = await store.state(for: RealAssignments.hostBID)
+        try #require(!state.assignments.isEmpty)
 
         // Act
         let model = try self.realMenu(assignments: [RealAssignments.hostBID: state])
 
         // Assert
         let course = try #require(model.course(id: RealAssignments.hostBID))
-        let row = try #require(course.submenu.assignments.first)
-        #expect(row.title == RealAssignments.untitledName)
-        #expect(row.url.absoluteString == Pinned.untitledURL)
+        #expect(course.submenu.assignments.isEmpty)
     }
 
     @Test("the hidden shells never render, even when assignment state exists for them")
@@ -818,12 +819,16 @@ struct AssignmentWiringEndToEndTests {
             timeZone: Pinned.utc
         )
 
-        // Assert — the succeeding course is fully populated…
-        let succeeded = try #require(model.course(id: RealAssignments.hostAID))
-        #expect(succeeded.submenu.assignments.count == 3)
-        // …and the failing one says so rather than silently claiming emptiness.
-        let failed = try #require(model.course(id: RealAssignments.hostBID))
-        #expect(messages(failed.submenu) == [Pinned.loadFailed])
+        // Assert — both courses render the SAME redesigned submenu: the
+        // add-forms, with no listing to populate and no failure note to show.
+        // A partial failure is a graph-and-store fact now; the submenu has
+        // nothing left that could differ between the two.
+        for id in [RealAssignments.hostAID, RealAssignments.hostBID] {
+            let course = try #require(model.course(id: id))
+            #expect(course.submenu == AddItemKind.allCases.map {
+                .addForm(AddItemFormRow(courseId: id, kind: $0))
+            })
+        }
     }
 
     @Test("with no assignment state at all, every course still gets a submenu")
@@ -835,13 +840,19 @@ struct AssignmentWiringEndToEndTests {
         let model = try self.realMenu(assignments: [:])
 
         // Assert — the currentness expectations are unchanged, and no course is
-        // left as a bare row.
+        // left as a bare row: every submenu is the three add-forms, which exist
+        // precisely so the submenu has a job before any fetch (or any typing)
+        // has happened.
         #expect(Set(model.courses.map(\.id)) == RealData.visibleIDsAtMidFall2025)
-        #expect(model.courses.allSatisfy { $0.submenu == [.message(Pinned.noAssignments)] })
+        #expect(model.courses.allSatisfy { course in
+            course.submenu == AddItemKind.allCases.map {
+                .addForm(AddItemFormRow(courseId: course.id, kind: $0))
+            }
+        })
     }
 
-    @Test("supplying assignments adds rows only to the courses that have them")
-    func onlyTheNamedCourseGainsAssignmentRows() async throws {
+    @Test("supplying assignments changes no submenu, anywhere")
+    func assignmentStateNeverChangesASubmenu() async throws {
         // Arrange
         let store = AssignmentStore(clock: ManualClock(RealData.midFall2025))
         _ = await store.apply(
@@ -849,24 +860,35 @@ struct AssignmentWiringEndToEndTests {
         )
         let state = await store.state(for: RealAssignments.hostAID)
 
-        // Act
-        let model = try self.realMenu(assignments: [RealAssignments.hostAID: state])
+        // Act — the same menu twice, with and without the state.
+        let with = try self.realMenu(assignments: [RealAssignments.hostAID: state])
+        let without = try self.realMenu(assignments: [:])
 
-        // Assert — seven courses visible, all with submenus, exactly one of which
-        // holds real assignment rows. The others say "No assignments" rather than
-        // vanishing as a submenu.
-        #expect(Set(model.courses.map(\.id)) == RealData.visibleIDsAtMidFall2025)
-        #expect(model.courses.allSatisfy { !$0.submenu.isEmpty })
-        let withAssignments = model.courses.filter { !$0.submenu.assignments.isEmpty }.map(\.id)
-        #expect(withAssignments == [RealAssignments.hostAID])
+        // Assert — since Intent 1 assignment state feeds the GRAPH only, so
+        // the submenus must be byte-identical either way (this fixture's items
+        // are undated, so the graphs agree too and the whole models compare).
+        #expect(Set(with.courses.map(\.id)) == RealData.visibleIDsAtMidFall2025)
+        #expect(with.courses.allSatisfy { !$0.submenu.isEmpty })
+        #expect(with.courses.map(\.submenu) == without.courses.map(\.submenu))
     }
 
     @Test("translation is deterministic even when the assignments arrive shuffled")
     func shuffledAssignmentsYieldTheSameModel() async throws {
         // Arrange — `MenuModel`'s `Equatable` is what lets the GUI skip
-        // rebuilding an unchanged menu, so an order-dependent submenu would make
+        // rebuilding an unchanged menu, so order-dependent output would make
         // identical data compare unequal and rebuild the menu on every open.
-        let real = try AssignmentFixture.scholarlyOnHostA
+        // The real fixture's items are undated, and undated work reaches no
+        // graph cell — so they are DATED here (one shared day, the sort's
+        // hardest case) to keep this test observing real output: since
+        // Intent 1 the order-sensitive surface is the day detail, not the
+        // submenu.
+        let real = try AssignmentFixture.scholarlyOnHostA.map {
+            Assignment(
+                id: $0.id, courseId: $0.courseId, name: $0.name,
+                dueDate: RealData.midFall2025.addingTimeInterval(24 * 60 * 60),
+                isHidden: $0.isHidden, groupTypeId: $0.groupTypeId
+            )
+        }
         try #require(real.count == 3)
 
         // Act
@@ -876,8 +898,9 @@ struct AssignmentWiringEndToEndTests {
         // Assert — the count guard is load-bearing: two empty models are
         // trivially equal, so without it this passes against a translation that
         // renders nothing.
-        try #require(a.course(id: RealAssignments.hostAID)?.submenu.assignments.count == 3)
-        #expect(a == b, "submenu order depends on input order")
+        let details = a.course(id: RealAssignments.hostAID)?.graph.compactMap(\.detail).flatMap(\.items)
+        try #require(details?.count == 3)
+        #expect(a == b, "graph detail order depends on input order")
     }
 
     @Test("assignments appear only inside submenus, never at the top level")

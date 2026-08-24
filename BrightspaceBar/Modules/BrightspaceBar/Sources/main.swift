@@ -2,6 +2,7 @@ import AppKit
 import AssignmentPipeline
 import CourseMenu
 import CoursePipeline
+import ManualItems
 import MenuAdapter
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -64,6 +65,10 @@ let app = NSApplication.shared
 app.setActivationPolicy(.accessory)
 
 let dataSource: any MenuDataSource
+/// Set only in the live path: what an add-form's Add click persists. Nil in
+/// stub mode, where there is no `$BSB_ROOT` worth writing user data into —
+/// the forms render, and Add degrades to closing the menu.
+var addItem: (@MainActor (AddItemDraft) -> Void)?
 /// Set only in the live path: the launch fetch needs the poller directly, and it
 /// must not go through `MenuDataSource.refresh()`, which maps to `.manual`.
 var launchFetch: (@Sendable () async -> Void)?
@@ -164,6 +169,28 @@ if ProcessInfo.processInfo.environment["BRIGHTSPACEBAR_STUB"] == "1" {
         source: DaemonAnnouncementSource(paths: daemonPaths), clock: clock
     )
 
+    // SEAM: the student's own items (Intent 1). The store is stateless — a
+    // path plus codecs at `$BSB_ROOT/manual-items.json` — and the adapter reads
+    // it fresh on every snapshot, so an add is visible on the very next menu
+    // build with nothing to invalidate. The GUI never sees the store: it hands
+    // a contract-typed draft up, and this is the one place the draft's words
+    // (`AddItemKind`) are translated into the storage module's (`ManualItem`).
+    let manualStore = ManualItemStore(paths: daemonPaths)
+    addItem = { draft in
+        let kind: ManualItem.Kind = switch draft.kind {
+        case .assignment: .assignment
+        case .quiz: .quiz
+        case .test: .test
+        }
+        guard let item = ManualItem(
+            courseId: draft.courseId, kind: kind,
+            name: draft.name, link: draft.link, due: draft.due
+        ) else { return }   // empty link — the form already refuses this
+        // A failed write keeps the old file intact (temp+rename); there is no
+        // better recovery here than serving what the file still holds.
+        _ = try? manualStore.add(item)
+    }
+
     // SEAM: from here down the stack is only ever seen as `MenuDataSource`.
     // `timeZone` is `.current` — read once here, in the shell, because
     // `AssignmentTranslation` must stay pure and take it as a parameter.
@@ -178,7 +205,10 @@ if ProcessInfo.processInfo.environment["BRIGHTSPACEBAR_STUB"] == "1" {
         // Read live on every snapshot — never a copy — so the countdown row
         // always reflects the timer's actual schedule, tolerance and
         // sleep-coalescing included.
-        nextRefresh: { refreshTimer.nextFireDate }
+        nextRefresh: { refreshTimer.nextFireDate },
+        // Read fresh on every snapshot too, for the same reason: the file is
+        // the truth, and an add between snapshots must land on the next one.
+        manualItems: { manualStore.load() }
     )
 
     // SEAM: the launch trigger. `MenuAdapter.launch()` — NOT
@@ -211,7 +241,8 @@ if ProcessInfo.processInfo.environment["BRIGHTSPACEBAR_STUB"] == "1" {
 // of the process.
 let controller = StatusBarController(
     dataSource: dataSource,
-    opener: BrowserTarget.resolve().makeOpener()
+    opener: BrowserTarget.resolve().makeOpener(),
+    onAddItem: addItem
 )
 
 // SEAM: the login challenge. The daemon writes the Entra verification number to

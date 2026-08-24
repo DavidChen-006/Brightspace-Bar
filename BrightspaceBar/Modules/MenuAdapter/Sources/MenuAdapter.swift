@@ -2,6 +2,7 @@ import Foundation
 import AssignmentPipeline
 import CourseMenu
 import CoursePipeline
+import ManualItems
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SEAM: this actor is where the two packages meet.
@@ -40,6 +41,13 @@ public actor MenuAdapter: MenuDataSource {
     /// SEAM: the countdown's source, or nil for a build without the timer —
     /// same defaulting pattern as `assignments`, for the same reason.
     private let nextRefresh: NextRefreshProvider?
+    /// SEAM: the student's own items (Intent 1), or nil for a build without the
+    /// feature. A closure rather than the store type so this actor stays an
+    /// imperative shell: it reads the facts on each snapshot — the store is
+    /// stateless and reads its file fresh, so an add lands on the very next
+    /// menu build with no cache to invalidate — and `MenuTranslation` decides
+    /// what they mean.
+    private let manualItems: (@Sendable () -> [ManualItem])?
 
     /// One disk read per process lifetime, performed lazily on first use so
     /// construction stays effect-free.
@@ -53,7 +61,8 @@ public actor MenuAdapter: MenuDataSource {
         assignments: AssignmentFeed? = nil,
         announcements: AnnouncementFeed? = nil,
         timeZone: TimeZone = .current,
-        nextRefresh: NextRefreshProvider? = nil
+        nextRefresh: NextRefreshProvider? = nil,
+        manualItems: (@Sendable () -> [ManualItem])? = nil
     ) {
         self.poller = poller
         self.cache = cache
@@ -63,6 +72,7 @@ public actor MenuAdapter: MenuDataSource {
         self.announcements = announcements
         self.timeZone = timeZone
         self.nextRefresh = nextRefresh
+        self.manualItems = manualItems
     }
 
     // SEAM: contract method — the GUI's menu-open path. Serves memory/disk only;
@@ -161,6 +171,9 @@ public actor MenuAdapter: MenuDataSource {
             baseURL: self.baseURL,
             assignments: await self.assignmentStates(for: courses),
             announcements: await self.announcementStates(for: courses),
+            // Grouped by course here — one dictionary build per snapshot — so
+            // the pure layer never has to filter someone else's course out.
+            manualItems: Dictionary(grouping: self.manualItems?() ?? [], by: \.courseId),
             timeZone: self.timeZone,
             nextRefresh: await self.nextRefresh?()
         )

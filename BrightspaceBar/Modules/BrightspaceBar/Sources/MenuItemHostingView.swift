@@ -536,13 +536,19 @@ final class GraphRasterNSView: NSView {
             switch tier {
             case .none: return base.withAlphaComponent(0.25)
             case .assignment: return base.withAlphaComponent(0.6)
-            case .quiz: return base.withAlphaComponent(0.95)
+            case .quiz: return base.withAlphaComponent(0.8)
+            case .test: return base.withAlphaComponent(1.0)
             }
         }
         switch tier {
         case .none: return .quaternaryLabelColor
         case .assignment: return NSColor.controlAccentColor.withAlphaComponent(0.45)
         case .quiz: return .controlAccentColor
+        // Darker than the accent itself, continuing the "darker means more
+        // important" ramp — a test outranks a quiz in the tier contract, so it
+        // must read as the heavier square.
+        case .test: return NSColor.controlAccentColor
+            .blended(withFraction: 0.35, of: .black) ?? .controlAccentColor
         }
     }
 }

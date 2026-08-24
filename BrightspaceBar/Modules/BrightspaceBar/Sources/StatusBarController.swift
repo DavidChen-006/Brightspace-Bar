@@ -11,18 +11,37 @@ public final class StatusBarController {
 
     private let dataSource: any MenuDataSource
     private let opener: any URLOpening
+    /// Persists a draft the student typed into an add-form, or nil for a build
+    /// without the feature (the stub path). Injected as a contract-typed
+    /// closure because this file may not import a storage module; the
+    /// composition root owns what "persist" means.
+    private let onAddItem: (@MainActor (AddItemDraft) -> Void)?
     private let statusItem: NSStatusItem
     private var shownModel: MenuModel?
 
     /// `lazy` so the `onCommand` closure can capture `self`, which an initializer
     /// stored property cannot.
-    private lazy var assembler = MenuAssembler(opener: self.opener) { [weak self] command in
+    private lazy var assembler = MenuAssembler(
+        opener: self.opener,
+        onAddItem: { [weak self] draft in
+            guard let self else { return }
+            self.onAddItem?(draft)
+            // Re-pull immediately: the data source reads manual items fresh on
+            // every snapshot, so the next menu open shows the new item's square.
+            Task { await self.reload() }
+        }
+    ) { [weak self] command in
         self?.handle(command)
     }
 
-    public init(dataSource: any MenuDataSource, opener: any URLOpening) {
+    public init(
+        dataSource: any MenuDataSource,
+        opener: any URLOpening,
+        onAddItem: (@MainActor (AddItemDraft) -> Void)? = nil
+    ) {
         self.dataSource = dataSource
         self.opener = opener
+        self.onAddItem = onAddItem
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         self.statusItem.button?.image = Self.logoImage
         Self.warmUp()

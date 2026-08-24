@@ -2,6 +2,7 @@ import Foundation
 import AssignmentPipeline
 import CourseMenu
 import CoursePipeline
+import ManualItems
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SEAM: backend → frontend, as a pure function.
@@ -39,6 +40,11 @@ public enum MenuTranslation {
     ///     build with no timer (the stub path, most tests). Emitted as a date,
     ///     never a string: status rows carry `StatusStamp`s and the GUI formats
     ///     them against its own fresh `now` at menu-open (experiment 18).
+    ///   - manualItems: the student's own items, keyed by course id (Intent 1).
+    ///     A course absent from the map simply has none — the `[:]` default
+    ///     changes nothing about which rows exist, only which graph cells fill,
+    ///     because the add-forms appear for every course regardless: the whole
+    ///     point of the form is to exist before any item does.
     public static func menu(
         courses: [Course],
         lastFetch: Date?,
@@ -46,6 +52,7 @@ public enum MenuTranslation {
         baseURL: URL,
         assignments: [Int: AssignmentsState] = [:],
         announcements: [Int: AnnouncementsState] = [:],
+        manualItems: [Int: [ManualItem]] = [:],
         timeZone: TimeZone = .current,
         nextRefresh: Date? = nil
     ) -> MenuModel {
@@ -69,7 +76,8 @@ public enum MenuTranslation {
             }
             rows.append(contentsOf: self.groupedCourseRows(
                 visible, baseURL: baseURL, assignments: assignments,
-                announcements: announcements, now: now, timeZone: timeZone
+                announcements: announcements, manualItems: manualItems,
+                now: now, timeZone: timeZone
             ))
         }
         rows.append(.separator)
@@ -142,6 +150,7 @@ public enum MenuTranslation {
         baseURL: URL,
         assignments: [Int: AssignmentsState],
         announcements: [Int: AnnouncementsState],
+        manualItems: [Int: [ManualItem]],
         now: Date,
         timeZone: TimeZone
     ) -> [MenuRow] {
@@ -179,6 +188,9 @@ public enum MenuTranslation {
                     // all — so a menu built without announcements is byte-identical
                     // to the one this function produced before they existed.
                     announcements: announcements[course.id] ?? .neverFetched,
+                    // Absent key == none typed yet, which is every course's
+                    // state until the student uses a form.
+                    manualItems: manualItems[course.id] ?? [],
                     now: now, timeZone: timeZone
                 ))]
             }
@@ -200,6 +212,7 @@ public enum MenuTranslation {
         baseURL: URL,
         assignments: AssignmentsState,
         announcements: AnnouncementsState,
+        manualItems: [ManualItem],
         now: Date,
         timeZone: TimeZone
     ) -> CourseRow {
@@ -211,19 +224,28 @@ public enum MenuTranslation {
             title: course.name,
             subtitle: self.subtitle(from: course.code),
             url: self.url(id: course.id, baseURL: baseURL),
-            // SEAM: the two submenu joins. Each translation owns every decision
-            // inside its own half; this only says which course they are for,
-            // which is what guarantees a row can never carry another course's id.
+            // SEAM: the submenu, redesigned (Intent 1). The fetched work
+            // listing is GONE from here — the heatmap popup is the browsing
+            // surface for what is due, so the submenu's job narrowed to what
+            // only it can do: the three add-forms, then what was said. The
+            // fetch and its translation stay fully alive; the graph join below
+            // still reads the same state.
             //
-            // Two translations rather than one because the halves answer two
-            // different questions — what you owe, then what was said — and the
-            // work leads because it is the half a student acts on. The
-            // announcements section is a pure SUFFIX: with nothing recent to show
-            // it is `[]`, and the submenu is exactly what it was before.
-            submenu: AssignmentTranslation.submenu(
-                state: assignments, courseId: course.id,
-                now: now, baseURL: baseURL, timeZone: timeZone
-            ) + AnnouncementTranslation.section(
+            // Shape: [addForm ×3][announcements section]. The assembler
+            // prepends "Open Course Home" + separator, so the on-screen order
+            // is exactly the redesign's: home, separator, the three add
+            // sections, then — because `AnnouncementTranslation.section` leads
+            // with its own `.separator` whenever it has rows — a separator and
+            // the announcements, exactly as they rendered before.
+            //
+            // The forms are stamped with THIS course's id, the same guarantee
+            // every other join makes: a form in course A's submenu structurally
+            // cannot create course B's item. One form per `AddItemKind`, in
+            // `allCases` order, so the section order is stated once, in the
+            // contract.
+            submenu: AddItemKind.allCases.map {
+                .addForm(AddItemFormRow(courseId: course.id, kind: $0))
+            } + AnnouncementTranslation.section(
                 state: announcements, courseId: course.id,
                 now: now, baseURL: baseURL, timeZone: timeZone
             ),
@@ -236,7 +258,11 @@ public enum MenuTranslation {
             graph: GraphTranslation.strip(
                 state: assignments, now: now, timeZone: timeZone,
                 courseId: course.id, courseLabel: self.subtitle(from: course.code),
-                baseURL: baseURL
+                baseURL: baseURL,
+                // The student's own items ride the SAME fold as fetched work,
+                // so an added test fills its square and lists in the popup on
+                // the very next menu build.
+                manual: manualItems
             ),
             // The headings for that same window, from the same `now` and zone —
             // two clocks here would head one menu with columns and another with

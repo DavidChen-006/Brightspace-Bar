@@ -24,14 +24,21 @@ public struct MenuAssembler {
     /// a menu opens (experiment 18).
     private let now: () -> Date
 
+    /// Where an add-form's draft goes on Add, or nil for a build without the
+    /// feature (stubs, most tests) — the Add button then closes the menu and
+    /// discards, which is the honest degradation for a seam nobody wired.
+    private let onAddItem: (@MainActor (AddItemDraft) -> Void)?
+
     public init(
         opener: any URLOpening,
         now: @escaping () -> Date = Date.init,
+        onAddItem: (@MainActor (AddItemDraft) -> Void)? = nil,
         onCommand: @escaping @MainActor (MenuCommand) -> Void
     ) {
         self.target = MenuActionTarget(opener: opener, onCommand: onCommand)
         self.opener = opener
         self.now = now
+        self.onAddItem = onAddItem
     }
 
     /// Builds a fresh menu with fresh items every call. Never reuses an
@@ -111,6 +118,16 @@ public struct MenuAssembler {
 
         case .assignment(let assignment):
             return [self.linkItem(title: RowTitle.assignment(assignment), url: assignment.url)]
+
+        case .addForm(let form):
+            // The inline mini-form (Intent 1). No action and no target: the
+            // hosted view owns every interaction, including closing the menu
+            // after Add. The item keeps a title — the form's heading — for the
+            // same reason the course item does: it is how tests and
+            // accessibility find the row the view draws.
+            let item = NSMenuItem(title: form.kind.formHeading, action: nil, keyEquivalent: "")
+            item.view = AddItemFormView(form: form, now: self.now, onAdd: self.onAddItem)
+            return [item]
 
         case .announcement(let announcement):
             return [self.linkItem(title: RowTitle.announcement(announcement), url: announcement.url)]

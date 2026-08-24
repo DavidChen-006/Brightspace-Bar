@@ -96,6 +96,11 @@ final class GraphDayPopupController {
     private var panel: NSPanel?
     private var graceTimer: Timer?
 
+    /// Test seam: the shown panel's frame, or nil when nothing is showing.
+    /// Exists because the zero-size regression (contentView installed before
+    /// its size was read) was invisible to every headless assertion we had.
+    var panelFrameForTesting: CGRect? { self.panel?.frame }
+
     init(opener: any URLOpening, dismissMenu: @escaping () -> Void) {
         self.opener = opener
         self.dismissMenu = dismissMenu
@@ -124,9 +129,16 @@ final class GraphDayPopupController {
 
         let panel = self.panel ?? self.makePanel()
         self.panel = panel
+        // Size FIRST, install second. Assigning `contentView` resizes the view
+        // to the window's current content rect — `.zero` on the fresh panel —
+        // so reading `content.frame.size` after installation answers 0×0 and
+        // the panel becomes an invisible zero-size window (the live bug:
+        // hover ring, no popup). `setFrame` then stretches the installed view
+        // back to the size it laid itself out for.
+        let size = content.frame.size
         panel.contentView = content
         panel.setFrame(
-            GraphPopupMetrics.frame(anchoredTo: cellScreenRect, size: content.frame.size),
+            GraphPopupMetrics.frame(anchoredTo: cellScreenRect, size: size),
             display: true
         )
         // A child window rides its parent — and a menu's carrier window is a
@@ -311,6 +323,7 @@ final class GraphPopupRowView: NSView {
         switch tier {
         case .assignment: "assignment"
         case .quiz: "quiz"
+        case .test: "test"
         }
     }
 
