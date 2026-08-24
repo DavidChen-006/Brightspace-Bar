@@ -13,3 +13,4 @@ brightspace-mcp-server/
 .env.*
 !.env.sample
 .DS_Store
+.claude/worktrees/
