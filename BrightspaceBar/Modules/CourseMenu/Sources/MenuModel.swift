@@ -120,11 +120,18 @@ public struct GraphDayItem: Equatable, Sendable {
     /// translation layer from the same templates the submenu rows use.
     public let url: URL
 
-    public init(title: String, tier: CellTier, url: URL) {
+    /// Non-nil exactly for the student's own items (Intent 4): the id the
+    /// delete ✕ hands back. Fetched items carry nil and get no ✕ — a refresh
+    /// would resurrect them anyway.
+    public let manualId: UUID?
+
+    public init(title: String, tier: CellTier, url: URL, manualId: UUID? = nil) {
         self.title = title
         self.tier = tier
         self.url = url
+        self.manualId = manualId
     }
+
 }
 
 /// Everything the hover popup for one non-empty day says.

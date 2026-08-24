@@ -255,7 +255,7 @@ public enum MenuTranslation {
                             section.items.map {
                                 GraphDayItem(
                                     title: section.courseLabel + " · " + $0.title,
-                                    tier: $0.tier, url: $0.url
+                                    tier: $0.tier, url: $0.url, manualId: $0.manualId
                                 )
                             }
                         }
@@ -330,7 +330,9 @@ public enum MenuTranslation {
         if let next = stats.next {
             lines.append(WeekStatsFormat.nextLine(next, calendar: calendar, timeZone: timeZone))
         }
-        return lines
+        // The heading names the window — without it "1 quiz" answers a question
+        // the reader has to guess. Only when there is something under it.
+        return lines.isEmpty ? [] : ["This week"] + lines
     }
 
     private static func weekKind(of kind: ItemKind) -> WorkKind? {

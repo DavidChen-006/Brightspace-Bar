@@ -180,7 +180,11 @@ public enum GraphTranslation {
                 GraphDayItem(
                     title: entry.work.name,
                     tier: entry.tier,
-                    url: self.url(for: entry.work, courseId: courseId, baseURL: baseURL)
+                    url: self.url(for: entry.work, courseId: courseId, baseURL: baseURL),
+                    // The delete ✕ rides only the student's own items (Intent 4).
+                    manualId: {
+                        if case .manual(let item) = entry.work { item.id } else { nil }
+                    }()
                 )
             }
         return GraphDayDetail(caption: self.caption(for: day, courseLabel: courseLabel, in: calendar), items: rows)
