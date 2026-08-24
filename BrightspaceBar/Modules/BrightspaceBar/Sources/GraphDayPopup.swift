@@ -15,9 +15,12 @@ import CourseMenu
 //
 // Two menu-specific lessons are load-bearing here:
 //
-//   grace timer  — scheduled on RunLoop.main in `.common` mode, because a
-//                  tracking menu spins `.eventTracking` and a `.default`-mode
-//                  timer would simply never fire (measured, exp 12/16).
+//   dismissal    — SPATIAL, never timed. The popup lives exactly while the
+//                  pointer is inside anchor-cell ∪ 4px bridge ∪ panel, the
+//                  same hit-test-on-every-move rule Floating UI's safePolygon,
+//                  Radix HoverCard, and NSPopover use. A timer-based grace
+//                  (two earlier attempts) either expired mid-travel or held
+//                  the popup open over cells the user had plainly left.
 //   anchoring    — DIRECTLY BELOW the cell, left-aligned, never centred on it
 //                  and never diagonal. Centred, the popup covers the hovered
 //                  cell's row neighbours; diagonal (the first attempt) put it
@@ -87,11 +90,6 @@ final class GraphDayPopupController {
         override var canBecomeMain: Bool { false }
     }
 
-    /// How long a dismiss trigger (empty cell, off the grid) waits before the
-    /// panel actually goes — the travel budget for moving straight down
-    /// from the cell into the popup. Entering the popup cancels it.
-    static let graceDelay: TimeInterval = 0.5
-
     private let opener: any URLOpening
     /// Deletes one of the student's own items (Intent 4), or nil for a build
     /// without the feature — the ✕ then simply does not render.
@@ -101,7 +99,9 @@ final class GraphDayPopupController {
     private let dismissMenu: () -> Void
 
     private var panel: NSPanel?
-    private var graceTimer: Timer?
+    /// The hovered cell's screen rect — one leg of the spatial keep-alive
+    /// region. Set by every `show`, cleared by `dismiss`.
+    private var anchorScreenRect: CGRect?
 
     /// Test seam: the shown panel's frame, or nil when nothing is showing.
     /// Exists because the zero-size regression (contentView installed before
@@ -122,7 +122,7 @@ final class GraphDayPopupController {
     /// Re-invoking with another cell's detail MOVES the one panel — a fresh
     /// window per cell would flicker its shadow on every step along a row.
     func show(_ detail: GraphDayDetail, anchoredTo cellScreenRect: CGRect, host: NSWindow?) {
-        self.cancelGrace()
+        self.anchorScreenRect = cellScreenRect
 
         let content = GraphPopupContentView(
             detail: detail,
@@ -143,9 +143,11 @@ final class GraphDayPopupController {
                 self.dismissMenu()
             },
             onHoverChange: { [weak self] inside in
-                // The pointer arriving IN the popup is what the grace delay
-                // exists for; leaving it is an ordinary dismiss trigger.
-                inside ? self?.cancelGrace() : self?.scheduleDismiss()
+                // Leaving the panel is a dismiss trigger like any other — and
+                // like any other it only fires if the pointer is genuinely
+                // outside the whole keep-alive region (it may have gone back
+                // up into the grid, where hover will re-anchor the popup).
+                if !inside { self?.dismissIfOutside() }
             }
         )
 
@@ -172,35 +174,48 @@ final class GraphDayPopupController {
         panel.orderFront(nil)
     }
 
-    /// The soft dismiss: the pointer left the trigger (empty cell, off the
-    /// grid) but may be en route to the popup. Nothing happens for
-    /// `graceDelay`; arriving in the popup cancels this, anything else lets it
-    /// fire.
-    func scheduleDismiss() {
-        guard self.panel != nil, self.graceTimer == nil else { return }
-        let timer = Timer(timeInterval: Self.graceDelay, repeats: false) { _ in
-            // Timer's block is @Sendable; hop back to the actor by hand.
-            Task { @MainActor [weak self] in self?.dismiss() }
-        }
-        // `.common` includes `.eventTracking`, the mode a tracking menu spins
-        // in — in `.default` this timer would never fire while the menu is up.
-        RunLoop.main.add(timer, forMode: .common)
-        self.graceTimer = timer
+    /// The conditional dismiss — every "the pointer left X" signal lands here.
+    ///
+    /// SPATIAL, not timed: the popup lives exactly while the pointer is inside
+    /// the keep-alive region (hovered cell ∪ the bridge over the anchor gap ∪
+    /// the panel itself, each with a hairline of slack for event rounding).
+    /// One rule, asked at the moment of every exit event, with the pointer's
+    /// REAL position (`NSEvent.mouseLocation`, screen coordinates, available
+    /// without an event) — so travelling into the popup keeps it, and leaving
+    /// everything kills it the instant the exit fires, not half a second later.
+    func dismissIfOutside() {
+        guard self.panel != nil else { return }
+        if self.keepAliveRegion().contains(where: { $0.contains(NSEvent.mouseLocation) }) { return }
+        self.dismiss()
     }
 
-    /// The hard dismiss: highlight moved to another row, the menu closed, or
-    /// the grace period expired. Immediate.
+    /// The rects whose union keeps the popup alive. The bridge spans the
+    /// `anchorOffset` gap between the cell's bottom and the panel's top, the
+    /// panel's width — without it the union is disconnected and crossing the
+    /// gap would read as "outside".
+    private func keepAliveRegion() -> [CGRect] {
+        var region: [CGRect] = []
+        if let panel = self.panel { region.append(panel.frame.insetBy(dx: -1, dy: -1)) }
+        if let cell = self.anchorScreenRect {
+            region.append(cell.insetBy(dx: -2, dy: -2))
+            if let panel = self.panel {
+                region.append(CGRect(
+                    x: panel.frame.minX, y: panel.frame.maxY,
+                    width: panel.frame.width, height: max(0, cell.minY - panel.frame.maxY)
+                ))
+            }
+        }
+        return region
+    }
+
+    /// The unconditional dismiss: the menu closed, a row was clicked, or the
+    /// spatial rule decided. Immediate.
     func dismiss() {
-        self.cancelGrace()
         guard let panel = self.panel else { return }
         panel.parent?.removeChildWindow(panel)
         panel.orderOut(nil)
         self.panel = nil
-    }
-
-    private func cancelGrace() {
-        self.graceTimer?.invalidate()
-        self.graceTimer = nil
+        self.anchorScreenRect = nil
     }
 
     private func makePanel() -> NSPanel {
