@@ -308,6 +308,9 @@ private func currentCourse(id: Int, name: String = "A Course") -> Course {
 
 private extension MenuModel {
     func course(id: Int) -> CourseRow? { self.courses.first { $0.id == id } }
+    /// Real courses only — the leading "All classes" fold (id == -1, aggregate
+    /// row, Intent 3) is a derived view, not an enrollment.
+    var realCourses: [CourseRow] { self.courses.filter { $0.id != -1 } }
 }
 
 private func messages(_ rows: [MenuRow]) -> [String] {
@@ -843,8 +846,10 @@ struct AssignmentWiringEndToEndTests {
         // left as a bare row: every submenu is the three add-forms, which exist
         // precisely so the submenu has a job before any fetch (or any typing)
         // has happened.
-        #expect(Set(model.courses.map(\.id)) == RealData.visibleIDsAtMidFall2025)
-        #expect(model.courses.allSatisfy { course in
+        // Real courses only: the "All classes" fold (aggregate row, Intent 3)
+        // is a view with a deliberately empty submenu, not a course.
+        #expect(Set(model.realCourses.map(\.id)) == RealData.visibleIDsAtMidFall2025)
+        #expect(model.realCourses.allSatisfy { course in
             course.submenu == AddItemKind.allCases.map {
                 .addForm(AddItemFormRow(courseId: course.id, kind: $0))
             }
@@ -867,8 +872,9 @@ struct AssignmentWiringEndToEndTests {
         // Assert — since Intent 1 assignment state feeds the GRAPH only, so
         // the submenus must be byte-identical either way (this fixture's items
         // are undated, so the graphs agree too and the whole models compare).
-        #expect(Set(with.courses.map(\.id)) == RealData.visibleIDsAtMidFall2025)
-        #expect(with.courses.allSatisfy { !$0.submenu.isEmpty })
+        // Real courses only: the aggregate fold (Intent 3) carries no submenu.
+        #expect(Set(with.realCourses.map(\.id)) == RealData.visibleIDsAtMidFall2025)
+        #expect(with.realCourses.allSatisfy { !$0.submenu.isEmpty })
         #expect(with.courses.map(\.submenu) == without.courses.map(\.submenu))
     }
 

@@ -125,6 +125,13 @@ private extension MenuModel {
     func row(id: Int) -> CourseRow? {
         self.courses.first { $0.id == id }
     }
+    /// The rows for real courses only. With two or more rendered courses the
+    /// menu now leads with the "All classes" fold (id == -1 — aggregate row,
+    /// Intent 3), which is a derived view, not an enrollment; tests about
+    /// real courses look past it.
+    var realCourses: [CourseRow] {
+        self.courses.filter { $0.id != -1 }
+    }
 }
 
 private func makeCourse(
@@ -166,7 +173,7 @@ struct MenuTranslationTests {
 
         // Assert — guard the count first, or a translation that emits nothing
         // would pass this test vacuously.
-        try #require(model.courses.count == ids.count)
+        try #require(model.realCourses.count == ids.count)
         for id in ids {
             let row = try #require(model.row(id: id), "no row for course \(id)")
             #expect(row.url == Expected.url(id: id))
@@ -192,7 +199,7 @@ struct MenuTranslationTests {
         )
 
         // Assert
-        try #require(model.courses.count == 2)
+        try #require(model.realCourses.count == 2)
         let derived = try #require(model.row(id: 412_690))
         #expect(derived.url == Expected.url(id: 412_690))
         #expect(derived.url.absoluteString.contains("example.invalid") == false)
@@ -233,7 +240,7 @@ struct MenuTranslationTests {
         )
 
         // Assert
-        #expect(model.courses.count == RealData.visibleIDsAtMidFall2025.count)
+        #expect(model.realCourses.count == RealData.visibleIDsAtMidFall2025.count)
     }
 
     @Test("every visible course id appears exactly once")
@@ -248,7 +255,7 @@ struct MenuTranslationTests {
         )
 
         // Assert
-        let actualIDs = model.courses.map(\.id)
+        let actualIDs = model.realCourses.map(\.id)
         #expect(Set(actualIDs) == RealData.visibleIDsAtMidFall2025)
         #expect(actualIDs.count == RealData.visibleIDsAtMidFall2025.count, "an id was duplicated")
     }
@@ -271,7 +278,7 @@ struct MenuTranslationTests {
         )
 
         // Assert
-        #expect(model.courses.count == odd.count)
+        #expect(model.realCourses.count == odd.count)
     }
 
     // ── Derivations: subtitle ────────────────────────────────────────────────
@@ -413,8 +420,8 @@ struct MenuTranslationTests {
         )
 
         // Assert — ids ordered as their codes sort, not as they were handed over.
-        try #require(model.courses.count == 4)
-        #expect(model.courses.map(\.id) == [1, 2, 3, 4])
+        try #require(model.realCourses.count == 4)
+        #expect(model.realCourses.map(\.id) == [1, 2, 3, 4])
     }
 
     @Test("overlapping current terms appear newest first")
@@ -451,7 +458,7 @@ struct MenuTranslationTests {
 
         // Assert
         #expect(model.headers == ["202620"])
-        #expect(model.courses.count == 2)
+        #expect(model.realCourses.count == 2)
     }
 
     // ── Derivations: status ─────────────────────────────────────────────────
@@ -612,7 +619,7 @@ struct MenuTranslationTests {
         // test passes against a translation that returns nothing at all, since two
         // empty models are trivially equal. Verified: it did exactly that against a
         // do-nothing stub until this guard was added.
-        try #require(a.courses.count == RealData.visibleIDsAtMidFall2025.count)
+        try #require(a.realCourses.count == RealData.visibleIDsAtMidFall2025.count)
         try #require(!a.headers.isEmpty)
         #expect(a == b, "translation depends on input order or on dictionary iteration order")
     }

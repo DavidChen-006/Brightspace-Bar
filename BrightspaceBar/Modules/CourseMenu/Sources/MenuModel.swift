@@ -234,6 +234,12 @@ public struct CourseRow: Equatable, Sendable, Identifiable {
     /// into a new month over cells that happen to be unchanged is still a change
     /// the menu must redraw, which for an empty grid is the common case.
     public let graphMonths: [String?]
+    /// The "This week" block rendered in the space right of `graph` — already
+    /// formatted lines ("2 assignments · 1 quiz", "next: HW 2 · Thu"), because
+    /// the derivation (calendar weeks, pluralisation) is backend policy and the
+    /// renderer has no dates. Empty renders nothing, so every pre-graph and
+    /// pre-stats call site keeps its output.
+    public let weekLines: [String]
 
     public init(
         id: Int,
@@ -242,7 +248,8 @@ public struct CourseRow: Equatable, Sendable, Identifiable {
         url: URL,
         submenu: [MenuRow] = [],
         graph: [GraphCell] = [],
-        graphMonths: [String?] = []
+        graphMonths: [String?] = [],
+        weekLines: [String] = []
     ) {
         self.id = id
         self.title = title
@@ -251,6 +258,7 @@ public struct CourseRow: Equatable, Sendable, Identifiable {
         self.submenu = submenu
         self.graph = graph
         self.graphMonths = graphMonths
+        self.weekLines = weekLines
     }
 }
 

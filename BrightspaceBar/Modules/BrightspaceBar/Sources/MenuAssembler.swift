@@ -109,6 +109,7 @@ public struct MenuAssembler {
             item.view = MenuItemHostingView(
                 title: title, cells: course.graph, showsChevron: item.submenu != nil,
                 monthLabels: course.graphMonths,
+                weekLines: course.weekLines,
                 // The day popup's click seam — the SAME opener every menu row
                 // uses, so a popup row and a submenu row open through one path
                 // and the browser-target switch governs both.

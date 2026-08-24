@@ -64,6 +64,28 @@ public final class MenuTextField: NSTextField {
         self.window?.makeFirstResponder(self)
         super.mouseDown(with: event)
     }
+
+    // The system focus ring does not draw inside a menu's never-key carrier
+    // window, so without help the only sign a field is editable is the caret —
+    // easy to miss (user report, 2026-08-24: "I have to click around until I
+    // see the blue blinker"). An accent border while editing is the visible
+    // stand-in for the missing ring.
+    public override func textDidBeginEditing(_ notification: Notification) {
+        super.textDidBeginEditing(notification)
+        self.setFocusedAppearance(true)
+    }
+
+    public override func textDidEndEditing(_ notification: Notification) {
+        super.textDidEndEditing(notification)
+        self.setFocusedAppearance(false)
+    }
+
+    private func setFocusedAppearance(_ focused: Bool) {
+        self.wantsLayer = true
+        self.layer?.borderWidth = focused ? 2 : 0
+        self.layer?.borderColor = focused ? NSColor.controlAccentColor.cgColor : nil
+        self.layer?.cornerRadius = focused ? 3 : 0
+    }
 }
 
 /// The form: heading, name field, link field, date picker, Add. Emits one

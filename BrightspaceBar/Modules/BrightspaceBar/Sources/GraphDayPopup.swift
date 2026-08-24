@@ -18,11 +18,12 @@ import CourseMenu
 //   grace timer  — scheduled on RunLoop.main in `.common` mode, because a
 //                  tracking menu spins `.eventTracking` and a `.default`-mode
 //                  timer would simply never fire (measured, exp 12/16).
-//   anchoring    — BELOW AND TO THE RIGHT of the cell, never centred on it.
-//                  Centred, the popup covers the hovered cell's row neighbours
-//                  and sliding along the row fights the popup for the pointer.
-//                  Down-right leaves the whole row clear AND is the direction
-//                  the safe-triangle grace period lets the pointer travel.
+//   anchoring    — DIRECTLY BELOW the cell, left-aligned, never centred on it
+//                  and never diagonal. Centred, the popup covers the hovered
+//                  cell's row neighbours; diagonal (the first attempt) put it
+//                  further away than the grace period lets a pointer travel —
+//                  measured live: the popup expired before it could be reached.
+//                  Straight down is the shortest path and keeps the row clear.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// The popup's geometry, pure and testable — the half that can be wrong in a
@@ -36,19 +37,22 @@ public enum GraphPopupMetrics {
     /// touch the cell.
     public static let anchorOffset: CGFloat = 4
 
-    /// Where the popup goes: its top-left corner sits `offset` right of the
-    /// cell's right edge and `offset` below its bottom edge. By construction
-    /// the frame intersects neither the hovered cell nor anything in the
-    /// cell's horizontal band — `minX > cell.maxX` and `maxY < cell.minY` —
-    /// which is what lets the pointer slide along a row of cells without the
-    /// popup ever sitting under it.
+    /// Where the popup goes: directly BELOW the cell, left-aligned with it —
+    /// top edge `offset` under the cell, left edge on the cell's own left edge.
+    /// Straight-down is the shortest possible pointer path (the first, diagonal
+    /// down-right placement was measured unreachable live: by the time the
+    /// pointer had crossed the diagonal the grace period had expired). The
+    /// frame still intersects nothing in the cell's horizontal band
+    /// (`maxY < cell.minY`), so sliding along a row never fights the popup;
+    /// covering the rows BELOW is acceptable because hover moves the popup
+    /// with the cell and the grace period only ends on an empty target.
     public static func frame(
         anchoredTo cellScreenRect: CGRect,
         size: CGSize,
         offset: CGFloat = GraphPopupMetrics.anchorOffset
     ) -> CGRect {
         CGRect(
-            x: cellScreenRect.maxX + offset,
+            x: cellScreenRect.minX,
             y: cellScreenRect.minY - offset - size.height,
             width: size.width,
             height: size.height

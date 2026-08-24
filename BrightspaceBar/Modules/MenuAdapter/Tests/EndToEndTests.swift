@@ -66,6 +66,13 @@ private func makeAdapter(
     return (adapter, cache)
 }
 
+/// Real courses only — with two or more rendered courses the menu leads with
+/// the "All classes" fold (id == -1, aggregate row, Intent 3), a derived view
+/// this suite's enrollment claims must look past.
+private extension MenuModel {
+    var realCourses: [CourseRow] { self.courses.filter { $0.id != -1 } }
+}
+
 @Suite("MenuAdapter — the frontend/backend join")
 struct EndToEndTests {
 
@@ -85,8 +92,8 @@ struct EndToEndTests {
 
         // Assert — count, then that the rows are genuinely populated: "27" must not
         // be achievable with twenty-seven blank placeholders.
-        try #require(model.courses.count == RealData.visibleIDsAtMidFall2025.count)
-        for row in model.courses {
+        try #require(model.realCourses.count == RealData.visibleIDsAtMidFall2025.count)
+        for row in model.realCourses {
             #expect(row.id > 0)
             #expect(!row.title.isEmpty)
             #expect(row.url.absoluteString == "https://purdue.brightspace.com/d2l/home/\(row.id)")
@@ -168,7 +175,7 @@ struct EndToEndTests {
         let model = await adapter.currentMenu()
 
         // Assert
-        #expect(model.courses.count == RealData.visibleIDsAtMidFall2025.count)
+        #expect(model.realCourses.count == RealData.visibleIDsAtMidFall2025.count)
         #expect(await source.callCount() == 1, "currentMenu triggered a second fetch")
     }
 
@@ -187,13 +194,13 @@ struct EndToEndTests {
         let (adapter, _) = makeAdapter(source: source, file: scratch.file(), clock: clock)
 
         let before = await adapter.refresh()
-        try #require(before.courses.count == RealData.visibleIDsAtMidFall2025.count)
+        try #require(before.realCourses.count == RealData.visibleIDsAtMidFall2025.count)
 
         // Act
         let after = await adapter.refresh()
 
         // Assert — the whole point: a dead session must not empty the dropdown.
-        #expect(after.courses.count == RealData.visibleIDsAtMidFall2025.count)
+        #expect(after.realCourses.count == RealData.visibleIDsAtMidFall2025.count)
         #expect(after.courses.map(\.id) == before.courses.map(\.id))
     }
 
@@ -220,7 +227,7 @@ struct EndToEndTests {
         let after = await adapter.refresh()
 
         // Assert
-        #expect(after.courses.count == RealData.visibleIDsAtMidFall2025.count)
+        #expect(after.realCourses.count == RealData.visibleIDsAtMidFall2025.count)
     }
 
     @Test("currentMenu still serves the courses after a failed refresh")
@@ -241,7 +248,7 @@ struct EndToEndTests {
         let model = await adapter.currentMenu()
 
         // Assert
-        #expect(model.courses.count == RealData.visibleIDsAtMidFall2025.count)
+        #expect(model.realCourses.count == RealData.visibleIDsAtMidFall2025.count)
         #expect(!model.rows.isEmpty)
     }
 
@@ -298,7 +305,7 @@ struct EndToEndTests {
         let model = await second.currentMenu()
 
         // Assert — the courses came off disk, and no fetch was needed to get them.
-        #expect(model.courses.count == RealData.visibleIDsAtMidFall2025.count)
+        #expect(model.realCourses.count == RealData.visibleIDsAtMidFall2025.count)
         #expect(await secondRun.callCount() == 0)
     }
 

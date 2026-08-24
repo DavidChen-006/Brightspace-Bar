@@ -1,8 +1,10 @@
 import Foundation
+import AggregateGraph
 import AssignmentPipeline
 import CourseMenu
 import CoursePipeline
 import ManualItems
+import WeekStats
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SEAM: backend → frontend, as a pure function.
@@ -74,11 +76,25 @@ public enum MenuTranslation {
                 // ("app broke" / "still showing last term") are both worse.
                 rows.append(.message("No current courses"))
             }
-            rows.append(contentsOf: self.groupedCourseRows(
+            let grouped = self.groupedCourseRows(
                 visible, baseURL: baseURL, assignments: assignments,
                 announcements: announcements, manualItems: manualItems,
                 now: now, timeZone: timeZone
-            ))
+            )
+            // The bird's-eye row (Intent 3): "All classes", every course's
+            // strip folded into one, leading the menu. Derived from the very
+            // rows below it — the same strips, the same order — so the two
+            // views cannot disagree. Only worth a row when there is something
+            // to add up: with zero or one course the fold IS the course list.
+            if let aggregate = self.aggregateRow(
+                over: grouped, baseURL: baseURL,
+                assignments: assignments, manualItems: manualItems,
+                now: now, timeZone: timeZone, visible: visible
+            ) {
+                rows.append(.course(aggregate))
+                rows.append(.separator)
+            }
+            rows.append(contentsOf: grouped)
         }
         rows.append(.separator)
         if let nextRefresh {
@@ -197,6 +213,142 @@ public enum MenuTranslation {
         }
     }
 
+    // MARK: - The aggregate row (Intent 3)
+
+    /// "All classes" — the fold of every rendered course's strip, or nil when
+    /// fewer than two courses render (nothing to add up) or the fold fails
+    /// (mismatched strip lengths, which the shared window makes impossible by
+    /// construction — the `try?` is honesty about the type, not an expected
+    /// path).
+    ///
+    /// The grouped detail flattens into the popup's flat item list by prefixing
+    /// each title with its course label ("CS 25200 · Homework 2") — the popup
+    /// renderer knows one shape, and the prefix carries the grouping the
+    /// aggregate would otherwise lose.
+    private static func aggregateRow(
+        over grouped: [MenuRow],
+        baseURL: URL,
+        assignments: [Int: AssignmentsState],
+        manualItems: [Int: [ManualItem]],
+        now: Date,
+        timeZone: TimeZone,
+        visible: [Course]
+    ) -> CourseRow? {
+        let courseRows = grouped.compactMap { row -> CourseRow? in
+            if case .course(let course) = row { return course } else { return nil }
+        }
+        guard courseRows.count >= 2 else { return nil }
+
+        let strips = courseRows.map {
+            CourseStrip(label: $0.subtitle ?? $0.title, cells: $0.graph)
+        }
+        guard let combined = try? AggregateGraph.combined(strips) else { return nil }
+
+        let cells = combined.map { cell in
+            GraphCell(
+                tier: cell.tier,
+                isToday: cell.isToday,
+                detail: cell.detail.map { detail in
+                    GraphDayDetail(
+                        caption: detail.caption,
+                        items: detail.sections.flatMap { section in
+                            section.items.map {
+                                GraphDayItem(
+                                    title: section.courseLabel + " · " + $0.title,
+                                    tier: $0.tier, url: $0.url
+                                )
+                            }
+                        }
+                    )
+                }
+            )
+        }
+
+        return CourseRow(
+            id: -1,  // Reserved: real course ids are positive (D2L orgUnitIds).
+            title: "All classes",
+            url: baseURL.appending(path: "d2l/home"),
+            submenu: [],  // No submenu: the aggregate is a view, not a course.
+            graph: cells,
+            graphMonths: GraphTranslation.monthLabels(now: now, timeZone: timeZone),
+            weekLines: self.weekLines(
+                items: visible.flatMap {
+                    self.weekItems(
+                        assignments: assignments[$0.id] ?? .neverFetched,
+                        manual: manualItems[$0.id] ?? []
+                    )
+                },
+                now: now, timeZone: timeZone
+            )
+        )
+    }
+
+    // MARK: - The "This week" block (Intent 5)
+
+    /// A course's work in WeekStats' vocabulary: dated, unhidden, deadline-tiered
+    /// items only — the same population that fills graph cells, so the stats and
+    /// the squares are two readings of one set. Grade-only rows have no deadline
+    /// and count nowhere.
+    private static func weekItems(
+        assignments: AssignmentsState,
+        manual: [ManualItem]
+    ) -> [WeekWorkItem] {
+        let fetched = assignments.assignments.compactMap { item -> WeekWorkItem? in
+            guard
+                !item.isHidden,
+                let due = item.dueDate,
+                let kind = self.weekKind(of: item.kind)
+            else { return nil }
+            return WeekWorkItem(name: item.name, kind: kind, due: due)
+        }
+        return fetched + manual.map {
+            WeekWorkItem(name: $0.name, kind: self.weekKind(of: $0.kind), due: $0.due)
+        }
+    }
+
+    /// The rendered lines: counts for this calendar week, then the single next
+    /// due item — possibly beyond the week, because an empty week with a midterm
+    /// next Tuesday should still say so. Empty when there is nothing to say.
+    private static func weekLines(
+        items: [WeekWorkItem],
+        now: Date,
+        timeZone: TimeZone
+    ) -> [String] {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        // Pinned like every calendar in this module: no ambient locale may
+        // decide which day a week starts on.
+        calendar.locale = Locale(identifier: "en_US_POSIX")
+
+        let stats = WeekStatsBuilder.stats(
+            items: items, now: now, calendar: calendar, timeZone: timeZone
+        )
+        var lines: [String] = []
+        if let counts = WeekStatsFormat.countsLine(stats.counts) {
+            lines.append(counts)
+        }
+        if let next = stats.next {
+            lines.append(WeekStatsFormat.nextLine(next, calendar: calendar, timeZone: timeZone))
+        }
+        return lines
+    }
+
+    private static func weekKind(of kind: ItemKind) -> WorkKind? {
+        switch kind {
+        case .assignment: .assignment
+        case .quiz: .quiz
+        case .gradeOnly: nil
+        }
+    }
+
+    private static func weekKind(of kind: ManualItem.Kind) -> WorkKind {
+        switch kind {
+        case .assignment: .assignment
+        case .quiz: .quiz
+        case .test: .test
+        }
+    }
+
     /// The term component of a code like `wl.202610.CS.25100.LE1` → `"202610"`;
     /// nil for shapes like `stars_2025` or `wl.nc.civics.test`.
     private static func term(of code: String) -> String? {
@@ -267,7 +419,13 @@ public enum MenuTranslation {
             // The headings for that same window, from the same `now` and zone —
             // two clocks here would head one menu with columns and another with
             // the months of a different week.
-            graphMonths: GraphTranslation.monthLabels(now: now, timeZone: timeZone)
+            graphMonths: GraphTranslation.monthLabels(now: now, timeZone: timeZone),
+            // The "This week" block (Intent 5), over the same population that
+            // fills this row's squares.
+            weekLines: self.weekLines(
+                items: self.weekItems(assignments: assignments, manual: manualItems),
+                now: now, timeZone: timeZone
+            )
         )
     }
 
