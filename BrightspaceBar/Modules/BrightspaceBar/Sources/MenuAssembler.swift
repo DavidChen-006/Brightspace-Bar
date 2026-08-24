@@ -320,9 +320,16 @@ private final class MenuLifecycleDelegate: NSObject, NSMenuDelegate {
     }
 
     func menu(_ menu: NSMenu, willHighlight item: NSMenuItem?) {
+        // The day popup floats OVER other rows, and NSMenu's tracking cannot
+        // see it — it happily highlights whatever row sits under the panel's
+        // glass while the pointer is actually on a popup row (user report,
+        // 2026-08-24: hovering the popup lit the class below it). While the
+        // pointer is inside the active panel, no row is "under the pointer"
+        // in any sense the user means, so every highlight is suppressed.
+        let effective = GraphDayPopupController.pointerInsideActivePanel ? nil : item
         for row in menu.items {
             guard let component = row.view as? MenuItemHostingView else { continue }
-            component.isHighlightedForMenu = (row === item)
+            component.isHighlightedForMenu = (row === effective)
         }
     }
 }

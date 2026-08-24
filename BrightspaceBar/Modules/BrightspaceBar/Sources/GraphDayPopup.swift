@@ -83,6 +83,18 @@ public enum GraphPopupMetrics {
 /// moves, and dismisses the panel; the grace delay lives here.
 @MainActor
 final class GraphDayPopupController {
+    /// The one showing popup, if any — a registry the menu's highlight
+    /// delegate consults: while the pointer is INSIDE the active panel, the
+    /// menu must not highlight (or act for) whatever row happens to sit under
+    /// the panel's glass. Weak: dismissal must never depend on unregistering.
+    private(set) static weak var active: GraphDayPopupController?
+
+    /// True exactly while a popup is showing and the pointer is over it — the
+    /// spatial fact the highlight suppression rides on.
+    static var pointerInsideActivePanel: Bool {
+        guard let panel = Self.active?.panel else { return false }
+        return panel.frame.contains(NSEvent.mouseLocation)
+    }
     /// RepoBar's dropdown window class: a borderless panel must say explicitly
     /// that it never becomes key, or clicking a row deactivates the menu.
     private final class PopupPanel: NSPanel {
@@ -153,6 +165,7 @@ final class GraphDayPopupController {
 
         let panel = self.panel ?? self.makePanel()
         self.panel = panel
+        Self.active = self
         // Size FIRST, install second. Assigning `contentView` resizes the view
         // to the window's current content rect — `.zero` on the fresh panel —
         // so reading `content.frame.size` after installation answers 0×0 and
@@ -216,6 +229,7 @@ final class GraphDayPopupController {
         panel.orderOut(nil)
         self.panel = nil
         self.anchorScreenRect = nil
+        if Self.active === self { Self.active = nil }
     }
 
     private func makePanel() -> NSPanel {
@@ -381,24 +395,29 @@ final class GraphPopupRowView: NSView {
         }
     }
 
-    static func title(of item: GraphDayItem) -> NSAttributedString {
+    static func title(of item: GraphDayItem, hovered: Bool = false) -> NSAttributedString {
         NSAttributedString(string: item.title, attributes: [
             .font: NSFont.menuFont(ofSize: 13),
-            .foregroundColor: NSColor.linkColor,
+            .foregroundColor: hovered ? NSColor.selectedMenuItemTextColor : NSColor.linkColor,
         ])
     }
 
-    static func kindLabel(of item: GraphDayItem) -> NSAttributedString {
+    static func kindLabel(of item: GraphDayItem, hovered: Bool = false) -> NSAttributedString {
         NSAttributedString(string: Self.kindName(of: item.tier), attributes: [
             .font: NSFont.systemFont(ofSize: 11),
-            .foregroundColor: NSColor.tertiaryLabelColor,
+            .foregroundColor: hovered
+                ? NSColor.selectedMenuItemTextColor.withAlphaComponent(0.7)
+                : NSColor.tertiaryLabelColor,
         ])
     }
 
     override func draw(_ dirtyRect: NSRect) {
         if self.isHovered {
-            NSColor.labelColor.withAlphaComponent(0.06).setFill()
-            NSBezierPath(roundedRect: self.bounds, xRadius: 3, yRadius: 3).fill()
+            // The menu's own selection blue (exp 12's highlight treatment,
+            // extended here): a popup row under the pointer reads exactly like
+            // a highlighted menu row, white text included.
+            NSColor.selectedContentBackgroundColor.setFill()
+            NSBezierPath(roundedRect: self.bounds, xRadius: 4, yRadius: 4).fill()
         }
 
         // A simple ✕ (user decision: no confirm, no management list), drawn
@@ -409,7 +428,9 @@ final class GraphPopupRowView: NSView {
             if self.isHovered {
                 let x = NSAttributedString(string: "✕", attributes: [
                     .font: NSFont.systemFont(ofSize: 11, weight: .semibold),
-                    .foregroundColor: NSColor.secondaryLabelColor,
+                    .foregroundColor: self.isHovered
+                        ? NSColor.selectedMenuItemTextColor.withAlphaComponent(0.8)
+                        : NSColor.secondaryLabelColor,
                 ])
                 let size = x.size()
                 x.draw(at: CGPoint(
@@ -419,14 +440,14 @@ final class GraphPopupRowView: NSView {
             }
         }
 
-        let kind = Self.kindLabel(of: self.item)
+        let kind = Self.kindLabel(of: self.item, hovered: self.isHovered)
         let kindSize = kind.size()
         kind.draw(at: CGPoint(
             x: self.bounds.width - trailingInset - kindSize.width,
             y: (self.bounds.height - kindSize.height) / 2
         ))
 
-        let title = Self.title(of: self.item)
+        let title = Self.title(of: self.item, hovered: self.isHovered)
         // Bounded drawing, not `draw(at:)`: a title longer than the space left
         // of the kind label must truncate rather than run underneath it.
         title.draw(
