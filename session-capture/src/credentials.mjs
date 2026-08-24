@@ -79,17 +79,22 @@ export async function promptForCredentials(env = process.env) {
     );
   }
 
+  // Readline serves ONLY the email line and is closed before the password
+  // read. Left open, its terminal handling keeps echoing every keystroke to
+  // its output on its own — raw mode in readMasked does not silence it, and
+  // the "hidden" password prints in the clear (live bug, 2026-08-24).
   const rl = readline.createInterface({ input: process.stdin, output: process.stderr });
+  let email;
   try {
-    const email = (await question(rl, "Brightspace email: ")).trim();
-    const password = await readMasked("Brightspace password (input hidden): ");
-    if (!email || !password) throw new Error("email and password are both required");
-    const file = saveCredentials({ email, password }, env);
-    console.error(`saved credentials to ${file} (mode 0600)`);
-    return { email, password };
+    email = (await question(rl, "Brightspace email: ")).trim();
   } finally {
     rl.close();
   }
+  const password = await readMasked("Brightspace password (input hidden): ");
+  if (!email || !password) throw new Error("email and password are both required");
+  const file = saveCredentials({ email, password }, env);
+  console.error(`saved credentials to ${file} (mode 0600)`);
+  return { email, password };
 }
 
 function question(rl, text) {
