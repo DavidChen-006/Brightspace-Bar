@@ -278,6 +278,9 @@ private func realMenu(assignments: [Int: AssignmentsState]) throws -> MenuModel 
 
 private extension MenuModel {
     func course(id: Int) -> CourseRow? { self.courses.first { $0.id == id } }
+    /// Real courses only — the leading "All classes" fold (id == -1, aggregate
+    /// row, Intent 3) is a derived view, not an enrollment.
+    var realCourses: [CourseRow] { self.courses.filter { $0.id != -1 } }
 }
 
 @Suite("Graph mapping — due dates into the 112-day week-aligned window")
@@ -673,7 +676,10 @@ struct GraphTranslationTests {
         let unfetched = try #require(model.course(id: Real.hostBID))
         #expect(unfetched.graph.count == Pinned.windowDays)
         #expect(filled(unfetched.graph).isEmpty)
-        #expect(model.courses.filter { !filled($0.graph).isEmpty }.map(\.id) == [Real.hostAID])
+        // The aggregate "All classes" fold (id == -1) also fills — it is the
+        // per-course strips combined (aggregate row, Intent 3) — so the
+        // per-course claim reads the real courses only.
+        #expect(model.realCourses.filter { !filled($0.graph).isEmpty }.map(\.id) == [Real.hostAID])
     }
 
     @Test("an empty assignments map still gives every course its window")
@@ -685,7 +691,7 @@ struct GraphTranslationTests {
         let model = try realMenu(assignments: [:])
 
         // Assert
-        #expect(Set(model.courses.map(\.id)) == RealData.visibleIDsAtMidFall2025)
+        #expect(Set(model.realCourses.map(\.id)) == RealData.visibleIDsAtMidFall2025)
         #expect(model.courses.allSatisfy { $0.graph.count == Pinned.windowDays })
         #expect(model.courses.allSatisfy { filled($0.graph).isEmpty })
         // `firstIndex` rather than a subscript: a course whose graph is shorter

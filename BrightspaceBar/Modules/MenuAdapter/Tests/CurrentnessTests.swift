@@ -49,9 +49,11 @@ private func course(
     )
 }
 
-/// The `.course` ids actually rendered, in row order.
+/// The REAL `.course` ids actually rendered, in row order. The leading
+/// "All classes" fold (id == -1 — aggregate row, Intent 3) is a derived view
+/// over these rows, not an enrollment, so currentness claims look past it.
 private func renderedIds(_ model: MenuModel) -> [Int] {
-    model.rows.compactMap { if case .course(let r) = $0 { r.id } else { nil } }
+    model.rows.compactMap { if case .course(let r) = $0, r.id != -1 { r.id } else { nil } }
 }
 
 private func headers(_ model: MenuModel) -> [String] {

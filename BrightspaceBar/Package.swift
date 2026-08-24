@@ -172,7 +172,13 @@ let package = Package(
             // ManualItems joined for Intent 1: the translation layer is the pure
             // merge point where the student's own items enter the same menu and
             // graph values fetched items do.
-            dependencies: ["CourseMenu", "CoursePipeline", "AssignmentPipeline", "QuizPipeline", "ManualItems"],
+            // AggregateGraph and WeekStats joined for Intents 3 and 5: pure
+            // folds the translation layer applies over its own per-course
+            // output (the all-classes strip, the "This week" lines).
+            dependencies: [
+                "CourseMenu", "CoursePipeline", "AssignmentPipeline", "QuizPipeline",
+                "ManualItems", "AggregateGraph", "WeekStats",
+            ],
             path: "Modules/MenuAdapter/Sources"
         ),
         .testTarget(

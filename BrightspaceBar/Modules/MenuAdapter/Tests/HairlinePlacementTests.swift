@@ -119,8 +119,11 @@ struct HairlinePlacementTests {
         )
 
         // Assert — the whole sequence, written from the pinned policy above rather
-        // than derived from the output.
+        // than derived from the output. Two courses render, so the menu leads
+        // with the "All classes" fold and its separator (aggregate row,
+        // Intent 3) — an unbounded prelude, not part of the hairline rule.
         #expect(shape(model.rows) == [
+            "course", "separator",
             "header", "hairline", "course", "hairline", "course",
             "separator", "command", "command",
         ])
@@ -141,8 +144,10 @@ struct HairlinePlacementTests {
             courses: courses, lastFetch: epoch, now: epoch, baseURL: RealData.baseURL
         )
 
-        // Assert
+        // Assert — the aggregate prelude leads (aggregate row, Intent 3), then
+        // the grouped shape as before.
         #expect(shape(model.rows) == [
+            "course", "separator",
             "header", "hairline", "course",
             "header", "hairline", "course", "hairline", "course",
             "separator", "command", "command",
@@ -202,9 +207,12 @@ struct HairlinePlacementTests {
         // Act
         let hairlines = model.rows.count { $0 == .hairline }
 
-        // Assert
-        try #require(!model.courses.isEmpty)
-        #expect(hairlines == model.courses.count)
+        // Assert — one boundary per REAL course: the "All classes" fold
+        // (id == -1 — aggregate row, Intent 3) sits above the headers and is
+        // bounded by its own separator, not a hairline.
+        let realCourses = model.courses.filter { $0.id != -1 }
+        try #require(!realCourses.isEmpty)
+        #expect(hairlines == realCourses.count)
     }
 
     @Test("every course row has a hairline immediately above it")
@@ -218,9 +226,12 @@ struct HairlinePlacementTests {
 
         // Act — the local claim, stated per row rather than as a total, so a menu
         // with the right COUNT of hairlines in the wrong PLACES still fails.
+        // The leading "All classes" fold (id == -1 — aggregate row, Intent 3)
+        // is deliberately unbounded: it sits above the headers with its own
+        // separator, so the per-course rule applies to real courses only.
         let rows = model.rows
         let unbounded = rows.indices.filter { index in
-            guard case .course = rows[index] else { return false }
+            guard case .course(let course) = rows[index], course.id != -1 else { return false }
             return index == 0 || rows[index - 1] != .hairline
         }
 
@@ -278,8 +289,10 @@ struct HairlinePlacementTests {
             courses: [termed, stars], lastFetch: epoch, now: epoch, baseURL: RealData.baseURL
         )
 
-        // Assert
+        // Assert — with two rendered courses the aggregate prelude leads
+        // (aggregate row, Intent 3); the Other group's boundary holds after it.
         #expect(shape(model.rows) == [
+            "course", "separator",
             "header", "hairline", "course",
             "header", "hairline", "course",
             "separator", "command", "command",
@@ -342,8 +355,10 @@ struct HairlinePlacementTests {
             now: RealData.midFall2025, baseURL: RealData.baseURL
         )
 
-        // Act
-        let withoutBoundaries = model.rows.filter { $0 != .hairline }
+        // Act — strip the hairlines AND the leading "All classes" fold with its
+        // separator (aggregate row, Intent 3): both features are additive, so
+        // what remains must be exactly the pre-feature shape.
+        let withoutBoundaries = Array(model.rows.dropFirst(2)).filter { $0 != .hairline }
 
         // Assert — the pre-hairline shape, stated independently: grouped headers
         // and courses, then the footer.
@@ -351,6 +366,6 @@ struct HairlinePlacementTests {
         #expect(shape(withoutBoundaries).suffix(3) == ["separator", "command", "command"])
         #expect(!shape(withoutBoundaries).dropLast(3).contains("separator"))
         #expect(withoutBoundaries.compactMap { if case .course(let c) = $0 { c.id } else { nil } }
-            == model.courses.map(\.id))
+            == model.courses.map(\.id).filter { $0 != -1 })
     }
 }

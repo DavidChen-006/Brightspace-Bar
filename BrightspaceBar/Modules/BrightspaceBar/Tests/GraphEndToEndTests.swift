@@ -274,7 +274,9 @@ struct GraphEndToEndTests {
             (($0.view as? MenuItemHostingView)?.cells.isEmpty == false)
         }
         #expect(graphed == model.courses.count { !$0.graph.isEmpty })
-        #expect(graphed == 5)
+        // Five real courses PLUS the leading "All classes" fold (aggregate row,
+        // Intent 3), which carries the combined strip and is a component too.
+        #expect(graphed == 6)
         // And the item count matches the model exactly — nothing extra anywhere.
         #expect(menu.items.count == model.rows.count)
     }
@@ -290,7 +292,9 @@ struct GraphEndToEndTests {
         // Month labels flowed backend → contract → component, and the window's
         // opening month is February at column 0 (now is Feb 24; window opens
         // Sun Feb 22).
-        for expected in model.courses {
+        // Real courses only: the "All classes" fold (aggregate row, Intent 3)
+        // is a view with no submenu — it is asserted separately below.
+        for expected in model.courses where expected.id != -1 {
             let item = try #require(menu.items.first { ($0.representedObject as? URL) == expected.url })
             let component = try #require(item.view as? MenuItemHostingView)
             #expect(component.monthLabels == expected.graphMonths)
@@ -303,9 +307,19 @@ struct GraphEndToEndTests {
             #expect(submenu.items.first?.title == "Open Course Home")
         }
 
-        // Boundaries: exactly one hairline row per course, all inert.
+        // The aggregate fold assembled too: a component with the combined
+        // cells and, by design, no submenu (aggregate row, Intent 3).
+        let aggregate = try #require(model.courses.first { $0.id == -1 })
+        let aggregateItem = try #require(
+            menu.items.first { ($0.representedObject as? URL) == aggregate.url }
+        )
+        #expect((aggregateItem.view as? MenuItemHostingView)?.cells == aggregate.graph)
+        #expect(aggregateItem.submenu == nil)
+
+        // Boundaries: exactly one hairline row per REAL course, all inert —
+        // the aggregate fold is bounded by its own separator, not a hairline.
         let hairlines = menu.items.filter { $0.view is HairlineRowView }
-        #expect(hairlines.count == model.courses.count)
+        #expect(hairlines.count == model.courses.count { $0.id != -1 })
         #expect(hairlines.allSatisfy { !$0.isEnabled && $0.title.isEmpty })
     }
 }

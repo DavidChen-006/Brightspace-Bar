@@ -27,7 +27,7 @@ import CourseMenu
 // content layout, which reflows and is not a promise.
 // ═════════════════════════════════════════════════════════════════════════════
 
-@Suite("Graph popup anchoring — down-right of the cell, never over its row")
+@Suite("Graph popup anchoring — directly below the cell, never over its row")
 struct GraphPopupMetricsTests {
 
     /// An 8pt cell somewhere mid-screen, screen coordinates.
@@ -49,17 +49,20 @@ struct GraphPopupMetricsTests {
         #expect(frame.maxY < cell.minY)
     }
 
-    @Test("below means smaller y in screen space, offset by the gap")
+    @Test("below means smaller y in screen space, offset by the gap, left-aligned")
     func belowMeansSmallerYInScreenSpace() {
         let frame = GraphPopupMetrics.frame(anchoredTo: cell, size: size, offset: 4)
         #expect(frame.maxY == cell.minY - 4)
-        #expect(frame.minX == cell.maxX + 4)
+        // Left-aligned with the cell, NOT diagonal: straight-down is the
+        // shortest pointer path, and the diagonal placement was measured
+        // unreachable within the grace period live (user report, 2026-08-24).
+        #expect(frame.minX == cell.minX)
         #expect(frame.size == size)
     }
 
     @Test("the offset is a few px — inside the grace period's travel budget")
     func theOffsetIsAFewPoints() {
-        // The pointer must cross this gap diagonally within the grace delay;
+        // The pointer must cross this gap straight down within the grace delay;
         // an offset that grew past the neighbouring cell's pitch would also
         // stop reading as attached to the cell at all.
         #expect(GraphPopupMetrics.anchorOffset > 0)

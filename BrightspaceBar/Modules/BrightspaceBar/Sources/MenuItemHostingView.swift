@@ -132,6 +132,11 @@ public final class MenuItemHostingView: NSView {
     /// draws whatever strings it is handed, over whatever columns exist.
     public let monthLabels: [String?]
 
+    /// The "This week" block rendered right of the grid — pre-formatted by the
+    /// adapter, drawn verbatim here. Empty renders nothing and the row keeps
+    /// its pre-stats layout.
+    public let weekLines: [String]
+
     /// Set by the menu delegate. The ONE highlight signal AppKit gives us, and
     /// it arrives on the delegate rather than on the view, which is why the
     /// assembler has to own the plumbing.
@@ -155,16 +160,18 @@ public final class MenuItemHostingView: NSView {
 
     public init(
         title: String, cells: [GraphCell], showsChevron: Bool, monthLabels: [String?] = [],
+        weekLines: [String] = [],
         opener: (any URLOpening)? = nil
     ) {
         self.title = title
         self.cells = cells
         self.showsChevron = showsChevron
         self.monthLabels = monthLabels
+        self.weekLines = weekLines
         self.hosting = NSHostingView(
             rootView: CourseCardView(
-                title: title, cells: cells, monthLabels: monthLabels, isHighlighted: false,
-                popup: nil
+                title: title, cells: cells, monthLabels: monthLabels, weekLines: weekLines,
+                isHighlighted: false, popup: nil
             )
         )
         super.init(frame: CGRect(origin: .zero, size: ComponentMetrics.fittingSize(cells: cells.count)))
@@ -201,6 +208,7 @@ public final class MenuItemHostingView: NSView {
     private var card: CourseCardView {
         CourseCardView(
             title: self.title, cells: self.cells, monthLabels: self.monthLabels,
+            weekLines: self.weekLines,
             isHighlighted: self.isHighlightedForMenu, popup: self.popup
         )
     }
@@ -262,6 +270,7 @@ struct CourseCardView: View {
     let title: String
     let cells: [GraphCell]
     let monthLabels: [String?]
+    var weekLines: [String] = []
     let isHighlighted: Bool
     /// Threaded down to the raster view, which is where hover is detected.
     /// A reference, not data — the popup is a side-effect port like `opener`.
@@ -280,10 +289,32 @@ struct CourseCardView: View {
                 .frame(height: ComponentMetrics.titleHeight, alignment: .leading)
 
             if !self.cells.isEmpty {
-                CourseGraphView(
-                    cells: self.cells, monthLabels: self.monthLabels,
-                    isHighlighted: self.isHighlighted, popup: self.popup
-                )
+                // The stats ride BESIDE the grid — the space to its right was
+                // empty by construction (the row stretches to the menu's width)
+                // and "what's hitting me this week, and what's first" is the one
+                // question the squares can't answer at a glance.
+                HStack(alignment: .top, spacing: ComponentMetrics.textInset) {
+                    CourseGraphView(
+                        cells: self.cells, monthLabels: self.monthLabels,
+                        isHighlighted: self.isHighlighted, popup: self.popup
+                    )
+                    if !self.weekLines.isEmpty {
+                        VStack(alignment: .leading, spacing: 2) {
+                            ForEach(self.weekLines, id: \.self) { line in
+                                Text(line)
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(Color(
+                                        self.isHighlighted
+                                            ? NSColor.selectedMenuItemTextColor
+                                            : NSColor.secondaryLabelColor
+                                    ))
+                                    .lineLimit(1)
+                            }
+                        }
+                        // Under the month row, level with the grid's top edge.
+                        .padding(.top, ComponentMetrics.monthRowHeight)
+                    }
+                }
             }
         }
         .padding(.horizontal, ComponentMetrics.textInset)
