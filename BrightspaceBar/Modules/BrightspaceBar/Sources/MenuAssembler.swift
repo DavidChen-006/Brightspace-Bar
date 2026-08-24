@@ -15,6 +15,10 @@ public struct MenuAssembler {
     /// clicks would do nothing. One target serves every item; the clicked item's
     /// `representedObject` says which row was chosen.
     private let target: MenuActionTarget
+    /// Kept alongside the target because the course component needs it too:
+    /// the day popup's rows open links from inside a view, not through an
+    /// `NSMenuItem` action, so the opener must reach `MenuItemHostingView`.
+    private let opener: any URLOpening
     /// Injectable clock for the status titles; production is `Date.init`. A
     /// closure, not a value — the whole point is that it is re-read every time
     /// a menu opens (experiment 18).
@@ -26,6 +30,7 @@ public struct MenuAssembler {
         onCommand: @escaping @MainActor (MenuCommand) -> Void
     ) {
         self.target = MenuActionTarget(opener: opener, onCommand: onCommand)
+        self.opener = opener
         self.now = now
     }
 
@@ -96,7 +101,11 @@ public struct MenuAssembler {
             // accessibility, find this row.
             item.view = MenuItemHostingView(
                 title: title, cells: course.graph, showsChevron: item.submenu != nil,
-                monthLabels: course.graphMonths
+                monthLabels: course.graphMonths,
+                // The day popup's click seam — the SAME opener every menu row
+                // uses, so a popup row and a submenu row open through one path
+                // and the browser-target switch governs both.
+                opener: self.opener
             )
             return [item]
 

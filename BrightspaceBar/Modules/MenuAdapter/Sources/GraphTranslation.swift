@@ -1,6 +1,7 @@
 import Foundation
 import AssignmentPipeline
 import CourseMenu
+import QuizPipeline
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SEAM: due-date instants → CourseRow.graph. The arithmetic half of the graph.
@@ -45,10 +46,24 @@ public enum GraphTranslation {
     ///     arrive as UTC instants, and `2026-02-13T04:30:00Z` is 23:30 on
     ///     **February 12** in Indiana — drawn a day late, a student reads the
     ///     square as "not due until tomorrow".
+    ///   - courseId: with `baseURL`, the link context that lets each non-empty
+    ///     cell carry its hover `detail` — the day's items with the same deep
+    ///     links the submenu builds. `ou=` comes from *this* value, never from
+    ///     `Assignment.courseId`, for the same structural reason
+    ///     `AssignmentTranslation.submenu` insists on it: a popup in course A's
+    ///     grid must be unable to carry course B's id. Nil (the default) keeps
+    ///     every pre-existing call site — and its output — byte-identical,
+    ///     because without an `ou` there is no deep link and therefore no row.
+    ///   - courseLabel: what the caption names the course as ("CS 25200");
+    ///     nil drops the " · course" half, never the caption.
+    ///   - baseURL: the deep links' host. Nil disables details like `courseId`.
     public static func strip(
         state: AssignmentsState,
         now: Date,
-        timeZone: TimeZone
+        timeZone: TimeZone,
+        courseId: Int? = nil,
+        courseLabel: String? = nil,
+        baseURL: URL? = nil
     ) -> [GraphCell] {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = timeZone
@@ -65,6 +80,10 @@ public enum GraphTranslation {
         // expressed as a fold, so the winner cannot depend on the order items
         // arrive in — which `MenuModel`'s `Equatable` skip-rebuild relies on.
         var tiers: [Int: CellTier] = [:]
+        // The SAME guard as the tier fold, accumulated alongside it, so the
+        // popup and the square are two readings of one bucketing — a day whose
+        // cell is filled has items, and a day whose cell is empty has none.
+        var dueByDay: [Int: [(item: Assignment, tier: CellTier)]] = [:]
         for item in state.assignments where !item.isHidden {
             guard
                 let tier = Self.tier(of: item.kind),
@@ -73,12 +92,91 @@ public enum GraphTranslation {
                 (0..<Self.windowDays).contains(offset)
             else { continue }
             tiers[offset] = Swift.max(tiers[offset] ?? tier, tier)
+            dueByDay[offset, default: []].append((item, tier))
         }
 
         // Always the full window: an exclusion empties a cell, it never shortens
         // the strip. `isToday` is set positionally and never as a fill, so the
         // indicator cannot obscure the activity state (decision §2).
-        return (0..<Self.windowDays).map { GraphCell(tier: tiers[$0], isToday: $0 == todayOffset) }
+        return (0..<Self.windowDays).map { offset in
+            GraphCell(
+                tier: tiers[offset],
+                isToday: offset == todayOffset,
+                detail: self.detail(
+                    for: dueByDay[offset] ?? [],
+                    dayOffset: offset, windowStart: windowStart, calendar: calendar,
+                    courseId: courseId, courseLabel: courseLabel, baseURL: baseURL
+                )
+            )
+        }
+    }
+
+    // MARK: - The hover detail
+
+    /// The popup content for one day, or nil — for an empty day, and for any
+    /// strip built without link context, which degrades to exactly the strip
+    /// this function produced before details existed.
+    private static func detail(
+        for due: [(item: Assignment, tier: CellTier)],
+        dayOffset: Int,
+        windowStart: Date,
+        calendar: Calendar,
+        courseId: Int?,
+        courseLabel: String?,
+        baseURL: URL?
+    ) -> GraphDayDetail? {
+        guard
+            !due.isEmpty, let courseId, let baseURL,
+            let day = calendar.date(byAdding: .day, value: dayOffset, to: windowStart)
+        else { return nil }
+
+        // Name then id, a total order for the same reason the submenu's is:
+        // network-derived input must not reshuffle an unchanged popup, or
+        // `MenuModel`'s `Equatable` skip-rebuild compares unequal on identical
+        // data. Not tier-grouped — a day holds a handful of items at most, and
+        // the kind is on every row anyway.
+        let rows = due
+            .sorted { ($0.item.name, $0.item.id) < ($1.item.name, $1.item.id) }
+            .map { entry in
+                GraphDayItem(
+                    title: entry.item.name,
+                    tier: entry.tier,
+                    // The SAME templates the submenu rows use, chosen by the
+                    // same exhaustive switch shape — a popup row and its
+                    // submenu row cannot lead to different pages.
+                    url: self.deepLink(for: entry.item, courseId: courseId, baseURL: baseURL)
+                )
+            }
+        return GraphDayDetail(caption: self.caption(for: day, courseLabel: courseLabel, in: calendar), items: rows)
+    }
+
+    /// "Thu Aug 27 · CS 25200", or just "Thu Aug 27" with no course label.
+    /// Fixed English abbreviations for the same reason `monthNames` is a table:
+    /// a caption that changes with the machine's locale is a test nobody trusts.
+    private static func caption(for day: Date, courseLabel: String?, in calendar: Calendar) -> String {
+        let weekday = Self.weekdayNames[calendar.component(.weekday, from: day) - 1]
+        let date = "\(weekday) \(Self.monthName(of: day, in: calendar)) \(calendar.component(.day, from: day))"
+        guard let courseLabel else { return date }
+        return date + " · " + courseLabel
+    }
+
+    /// Indexed by the Gregorian weekday number minus one (1 = Sunday).
+    private static let weekdayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+
+    /// The popup's deep link, per kind. Only the two tiers can reach here —
+    /// `tier(of:)` already filtered `gradeOnly` out of the grid — but the switch
+    /// stays exhaustive over `ItemKind` so a new kind is a compile error rather
+    /// than a silently mistemplated popup row. The `gradeOnly` arm mirrors what
+    /// `AssignmentTranslation.clickTarget` would answer, unreachable or not.
+    private static func deepLink(for item: Assignment, courseId: Int, baseURL: URL) -> URL {
+        switch item.kind {
+        case .assignment:
+            AssignmentLink.url(courseId: courseId, assignmentId: item.id, baseURL: baseURL)
+        case .quiz:
+            QuizLink.url(courseId: courseId, quizId: item.id, baseURL: baseURL)
+        case .gradeOnly:
+            GradebookLink.url(courseId: courseId, baseURL: baseURL)
+        }
     }
 
     /// The grid's column headings — one entry per week column of `strip`'s

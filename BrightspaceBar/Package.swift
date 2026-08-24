@@ -32,6 +32,7 @@ let package = Package(
         .library(name: "QuizPipeline", targets: ["QuizPipeline"]),
         .library(name: "CourseMenu", targets: ["CourseMenu"]),
         .library(name: "MenuAdapter", targets: ["MenuAdapter"]),
+        .library(name: "ManualItems", targets: ["ManualItems"]),
         .executable(name: "BrightspaceBar", targets: ["BrightspaceBar"]),
     ],
     targets: [
@@ -95,6 +96,23 @@ let package = Package(
             // documenting them, which SPM would otherwise reject as an unhandled
             // resource.
             exclude: ["Fixtures"]
+        ),
+
+        // ── The backend: work items the STUDENT typed in, not D2L ────────────
+        //
+        // Depends on CoursePipeline only for `DaemonPaths` — the file lives in
+        // the same `$BSB_ROOT` the daemon owns, and two transcriptions of
+        // `paths.mjs` would be two places to drift. The merge half is generic
+        // over the fetched type, so nothing here names an adapter type.
+        .target(
+            name: "ManualItems",
+            dependencies: ["CoursePipeline"],
+            path: "Modules/ManualItems/Sources"
+        ),
+        .testTarget(
+            name: "ManualItemsTests",
+            dependencies: ["ManualItems", "CoursePipeline"],
+            path: "Modules/ManualItems/Tests"
         ),
 
         // ── The contract between backend and GUI ─────────────────────────────

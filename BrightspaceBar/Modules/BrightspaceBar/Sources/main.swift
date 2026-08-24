@@ -42,7 +42,7 @@ private let brightspaceBaseURL = URL(string: "https://purdue.brightspace.com")!
 /// Run through `/usr/bin/env` so `node` is found on PATH rather than pinned to
 /// one installation.
 private let daemonCLI = ProcessInfo.processInfo.environment["BSB_REFRESH_CLI"]
-    ?? NSHomeDirectory() + "/PaperShelf/session-capture/src/refresh.mjs"
+    ?? NSHomeDirectory() + "/Developer/BrightspaceBar/session-capture/src/refresh.mjs"
 
 /// How long a spawn may take before it is killed. Generous: a run that has to
 /// climb the silent rung launches a headless browser and waits on a real Entra

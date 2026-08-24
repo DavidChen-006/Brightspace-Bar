@@ -120,8 +120,12 @@ struct GraphEndToEndTests {
     private static let zone = TimeZone(identifier: "America/Indianapolis")!
     private static let baseURL = URL(string: "https://purdue.brightspace.com")!
 
-    private static let scholarly = 440_703
-    private static let civics = 412_690
+    // Two CURRENT Spring-2026 hosts for the interesting payloads. The undated
+    // shells (Scholarly 440703, Civics 412690) that originally carried them are
+    // hidden since the 2026-08-24 user decision — hidden everywhere, so the
+    // fan-out never visits them and they can hold no strip.
+    private static let hostWithQuiz = 1_488_325       // Spring 2026 CS 25200
+    private static let hostAssignmentsOnly = 1_487_623
 
     /// One `cache/data.json` exactly as the daemon writes it (LADDER-PLAN, "File
     /// contracts"): every course the fan-out will visit is present, a course with
@@ -139,7 +143,7 @@ struct GraphEndToEndTests {
           "fetchedAt": "2026-02-24T17:00:00Z",
           "courses": [],
           "assignments": {
-            "\(scholarly)": [
+            "\(hostWithQuiz)": [
               { "id": 700001, "title": "Homework 3", "dueDate": "2026-03-01T04:59:00.000Z", "kind": "assignment" },
               { "id": 700002, "title": "Group Project Milestone", "dueDate": "2026-09-15T23:59:00Z", "kind": "assignment" },
               { "id": 700003, "title": "Assignment With A Broken Date", "dueDate": "not-a-date", "kind": "assignment" },
@@ -147,12 +151,12 @@ struct GraphEndToEndTests {
               { "id": 900102, "title": "Final Exam", "dueDate": "2026-09-15T23:59:00Z", "kind": "quiz" },
               { "id": 900103, "title": "Quiz With A Broken Date", "dueDate": "not-a-date", "kind": "quiz" }
             ],
-            "\(civics)": [
+            "\(hostAssignmentsOnly)": [
               { "id": 700001, "title": "Homework 3", "dueDate": "2026-03-01T04:59:00.000Z", "kind": "assignment" },
               { "id": 700002, "title": "Group Project Milestone", "dueDate": "2026-09-15T23:59:00Z", "kind": "assignment" },
               { "id": 700003, "title": "Assignment With A Broken Date", "dueDate": "not-a-date", "kind": "assignment" }
             ],
-            "1487623": [], "1488325": [], "1488428": [], "1495427": [], "1498777": []
+            "1488428": [], "1495427": [], "1498777": []
           }
         }
         """
@@ -166,21 +170,20 @@ struct GraphEndToEndTests {
 
         // 2. The same visibility filter the app's fetch fan-out uses. At the
         //    pinned date the capture's five Spring-2026 enrollments are current
-        //    and the two undated administrative shells ride along — seven
-        //    courses, the menu's real February shape. Only the two shells get
-        //    payload bytes below; the other five prove that a course with
-        //    nothing due still earns an (all-empty) strip.
+        //    — and nothing else: since the 2026-08-24 user decision the two
+        //    undated administrative shells are hidden and never fetched. Only
+        //    two of the five get payload bytes below; the other three prove
+        //    that a course with nothing due still earns an (all-empty) strip.
         let visible = MenuTranslation.visibleCourses(courses, now: Self.now)
         try #require(Set(visible.map(\.id)) == [
-            Self.scholarly, Self.civics,
             1_487_623, 1_488_325, 1_488_428, 1_495_427, 1_498_777,
         ])
 
         // 3. A canned daemon cache through the real source → fetcher → store.
-        //    Scholarly holds BOTH kinds (its Feb 28 collides assignment vs quiz);
-        //    Civics holds assignments only (its Feb 28 stays a plain assignment) —
-        //    so both tiers are observable in one menu. The other five courses are
-        //    present with empty lists, as the daemon writes them.
+        //    One host holds BOTH kinds (its Feb 28 collides assignment vs quiz);
+        //    the other holds assignments only (its Feb 28 stays a plain
+        //    assignment) — so both tiers are observable in one menu. The other
+        //    three courses are present with empty lists, as the daemon writes them.
         let cache = try CannedCache(Self.daemonCache)
         let store = AssignmentStore(clock: FixedClock(now: Self.now))
         let fetcher = AssignmentFetcher(
@@ -216,11 +219,11 @@ struct GraphEndToEndTests {
 
         // Assert — the window is 16 whole weeks, stated as a literal so the
         // production constant cannot be resized and re-blessed in one edit.
-        let scholarly = try #require(model.courses.first { $0.id == Self.scholarly })
+        let scholarly = try #require(model.courses.first { $0.id == Self.hostWithQuiz })
         try #require(scholarly.graph.count == 112)
         #expect(GraphTranslation.windowDays == 112)
 
-        // Scholarly: assignment + quiz share Feb 28 local, so cell 6 carries the
+        // The quiz host: assignment + quiz share Feb 28 local, so cell 6 carries the
         // higher tier. Cell 2 is today: outlined, honestly empty — and it is cell
         // 2 rather than cell 0 only because the window opens on Sunday.
         #expect(scholarly.graph[Self.todayIndex] == GraphCell(tier: nil, isToday: true))
@@ -234,9 +237,9 @@ struct GraphEndToEndTests {
             #expect(cell == GraphCell(tier: nil, isToday: false), "cell \(index) should be empty")
         }
 
-        // Civics: same payload, no quiz route — the same day stays an assignment,
+        // The assignments-only host: same payload, no quiz route — the same day stays an assignment,
         // so both tiers are provably distinguishable end to end.
-        let civics = try #require(model.courses.first { $0.id == Self.civics })
+        let civics = try #require(model.courses.first { $0.id == Self.hostAssignmentsOnly })
         #expect(civics.graph.count == 112)
         #expect(civics.graph[Self.deadlineIndex].tier == .assignment)
     }
@@ -264,14 +267,14 @@ struct GraphEndToEndTests {
         }
 
         // One component per course, and EVERY course carries cells — which under
-        // always-emit is now unconditional rather than a consequence of all seven
-        // having been fetched. Five of them fetched to empty and still get a full
+        // always-emit is now unconditional rather than a consequence of all five
+        // having been fetched. Three of them fetched to empty and still get a full
         // window, and a `neverFetched` course would too.
         let graphed = menu.items.count {
             (($0.view as? MenuItemHostingView)?.cells.isEmpty == false)
         }
         #expect(graphed == model.courses.count { !$0.graph.isEmpty })
-        #expect(graphed == 7)
+        #expect(graphed == 5)
         // And the item count matches the model exactly — nothing extra anywhere.
         #expect(menu.items.count == model.rows.count)
     }

@@ -42,13 +42,15 @@ struct AnnouncementEndToEndTests {
 
     @Test("a refresh lands announcements inside the fetched course's submenu")
     func refreshLandsAnnouncementsInTheSubmenu() async throws {
-        // Arrange — one visible (undated) course, one announcement posted
+        // Arrange — one visible CURRENT course (dated: an undated shell would
+        // be hidden under the 2026-08-24 policy), one announcement posted
         // yesterday, the whole stack real except the two sources.
         let scratch = try ScratchDir()
         let clock = ManualClock(epoch)
         let course = Course(
             id: 412_690, name: "Purdue Civics Knowledge Test", code: "wl.nc.civics.test",
-            role: "Learner", isActive: true, homeUrl: nil
+            role: "Learner", isActive: true, homeUrl: nil,
+            startDate: "2000-01-01T00:00:00.000Z", endDate: "2999-01-01T00:00:00.000Z"
         )
         let courseSource = CountingSource([.courses([course])])
         let cache = CourseCache(fileURL: scratch.file(), clock: clock, staleAfter: 3600)
@@ -92,7 +94,8 @@ struct AnnouncementEndToEndTests {
         let clock = ManualClock(epoch)
         let course = Course(
             id: 412_690, name: "Purdue Civics Knowledge Test", code: "wl.nc.civics.test",
-            role: "Learner", isActive: true, homeUrl: nil
+            role: "Learner", isActive: true, homeUrl: nil,
+            startDate: "2000-01-01T00:00:00.000Z", endDate: "2999-01-01T00:00:00.000Z"
         )
 
         func build(feed: AnnouncementFeed?) async -> MenuModel {

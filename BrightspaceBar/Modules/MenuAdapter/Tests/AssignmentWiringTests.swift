@@ -151,18 +151,22 @@ private enum Pinned {
     static let loadFailed = "Couldn't load assignments"
     static let refreshFailed = "Couldn't refresh — may be out of date"
 
-    /// The exact URLs experiment 7 navigated in a real browser, each of which
-    /// rendered a page naming its own folder. Written out in full rather than
-    /// interpolated, so editing the template cannot silently rewrite the
-    /// expectation alongside the code.
+    /// URLs in the exact shape experiment 7 navigated in a real browser (each
+    /// rendered a page naming its own folder). The two courses that carried
+    /// those assignments are the undated shells, HIDDEN since the 2026-08-24
+    /// user decision — so the end-to-end tests below host the same real
+    /// assignment bytes on CURRENT courses, and these literals pin the same
+    /// verified template with the host course's `ou=`. Written out in full
+    /// rather than interpolated, so editing the template cannot silently
+    /// rewrite the expectation alongside the code.
     static let citiURL =
-        "https://purdue.brightspace.com/d2l/lms/dropbox/user/folder_submit_files.d2l?db=445296&grpid=0&ou=440703"
+        "https://purdue.brightspace.com/d2l/lms/dropbox/user/folder_submit_files.d2l?db=445296&grpid=0&ou=1360027"
     static let purcURL =
-        "https://purdue.brightspace.com/d2l/lms/dropbox/user/folder_submit_files.d2l?db=445297&grpid=0&ou=440703"
+        "https://purdue.brightspace.com/d2l/lms/dropbox/user/folder_submit_files.d2l?db=445297&grpid=0&ou=1360027"
     static let ideationURL =
-        "https://purdue.brightspace.com/d2l/lms/dropbox/user/folder_submit_files.d2l?db=529524&grpid=0&ou=440703"
+        "https://purdue.brightspace.com/d2l/lms/dropbox/user/folder_submit_files.d2l?db=529524&grpid=0&ou=1360027"
     static let untitledURL =
-        "https://purdue.brightspace.com/d2l/lms/dropbox/user/folder_submit_files.d2l?db=648911&grpid=0&ou=412690"
+        "https://purdue.brightspace.com/d2l/lms/dropbox/user/folder_submit_files.d2l?db=648911&grpid=0&ou=1360020"
 }
 
 /// The two courses that actually have assignments, and their real contents —
@@ -180,6 +184,15 @@ private enum RealAssignments {
     static let civicsID = 412_690
     static let untitledID = 648_911
     static let untitledName = "Untitled"
+
+    /// Current HOSTS for the real assignment bytes. The two shells above are
+    /// hidden since the 2026-08-24 user decision (undated → no menu space, no
+    /// fetches), so the end-to-end tests re-home the same genuine dropbox bytes
+    /// on dated Fall 2025 courses that ARE visible at `midFall2025`. Two hosts,
+    /// so the cross-course `ou=` guarantee is still exercised.
+    static let hostAID = 1_360_027  // Fall 2025 CS 25100-LEC - Merge
+    static let hostAName = "Fall 2025 CS 25100-LEC - Merge"
+    static let hostBID = 1_360_020  // Fall 2025 CS 25000 - Merge
 
     /// Name-ascending, which is the pinned order for an all-undated course.
     /// Independently sorted here by reading the three names, not by calling the
@@ -237,6 +250,16 @@ private enum AssignmentFixture {
     static var civics: [Assignment] {
         get throws { try self.assignments("dropbox-folders-412690.json", courseId: RealAssignments.civicsID) }
     }
+
+    /// The same real bytes, homed on the CURRENT courses the E2E tests render —
+    /// the shells that originally carried them are hidden since 2026-08-24.
+    static var scholarlyOnHostA: [Assignment] {
+        get throws { try self.assignments("dropbox-folders-440703.json", courseId: RealAssignments.hostAID) }
+    }
+
+    static var civicsOnHostB: [Assignment] {
+        get throws { try self.assignments("dropbox-folders-412690.json", courseId: RealAssignments.hostBID) }
+    }
 }
 
 /// An `AssignmentSource` scripted per course. `FakeAssignmentSource` lives in
@@ -272,12 +295,14 @@ private func assignment(
     )
 }
 
-/// A course whose Access window has no dates — so it renders under "Other" at any
-/// `now`, exactly as the two real assignment-bearing courses do.
-private func undatedCourse(id: Int, name: String = "A Course") -> Course {
+/// A course with a wide-open Access window, so it is CURRENT — and therefore
+/// visible — at any test `now`. An undated shell would be hidden entirely under
+/// the 2026-08-24 policy, so it can no longer host assignments in these tests.
+private func currentCourse(id: Int, name: String = "A Course") -> Course {
     Course(
         id: id, name: name, code: "shell_\(id)", role: "Learner", isActive: true,
-        homeUrl: nil, startDate: nil, endDate: nil
+        homeUrl: nil,
+        startDate: "2000-01-01T00:00:00.000Z", endDate: "2999-01-01T00:00:00.000Z"
     )
 }
 
@@ -624,7 +649,8 @@ struct AssignmentSubmenuOrderTests {
 @Suite("The join — real bytes through parser, store, and translation into a menu")
 struct AssignmentWiringEndToEndTests {
 
-    /// The 9 courses visible at `midFall2025`, per the currentness policy.
+    /// The 7 current courses visible at `midFall2025`, per the 2026-08-24
+    /// currentness policy (undated shells hidden).
     private func realMenu(
         assignments: [Int: AssignmentsState],
         now: Date = RealData.midFall2025
@@ -639,25 +665,27 @@ struct AssignmentWiringEndToEndTests {
         )
     }
 
-    @Test("the headline path: real assignments reach the real course's submenu with verified URLs")
+    @Test("the headline path: real assignments reach a current course's submenu with the verified URL shape")
     func theFullChainPopulatesASubmenu() async throws {
         // Arrange — genuine enrollment bytes through the genuine `EnrollmentParser`,
         // genuine dropbox bytes through the genuine `AssignmentParser`, folded by
-        // the genuine `AssignmentStore`. Nothing about this data is hand-built.
+        // the genuine `AssignmentStore`. The bytes are re-homed on a CURRENT
+        // course: the shell that carried them is hidden since the 2026-08-24
+        // user decision, and hidden courses get no submenu to populate.
         let store = AssignmentStore(clock: ManualClock(RealData.midFall2025))
         _ = await store.apply(
-            courseId: RealAssignments.scholarlyID,
-            result: .success(try AssignmentFixture.scholarly)
+            courseId: RealAssignments.hostAID,
+            result: .success(try AssignmentFixture.scholarlyOnHostA)
         )
-        let state = await store.state(for: RealAssignments.scholarlyID)
+        let state = await store.state(for: RealAssignments.hostAID)
 
         // Act
-        let model = try self.realMenu(assignments: [RealAssignments.scholarlyID: state])
+        let model = try self.realMenu(assignments: [RealAssignments.hostAID: state])
 
         // Assert — the course renders, and its submenu carries all three
-        // assignments with the exact names and the browser-verified URLs.
-        let course = try #require(model.course(id: RealAssignments.scholarlyID))
-        #expect(course.title == RealAssignments.scholarlyName)
+        // assignments with the exact names and the verified URL template.
+        let course = try #require(model.course(id: RealAssignments.hostAID))
+        #expect(course.title == RealAssignments.hostAName)
 
         let rows = course.submenu.assignments
         try #require(rows.count == 3)
@@ -675,26 +703,26 @@ struct AssignmentWiringEndToEndTests {
     @Test("every assignment carries its OWN course in ou, never a neighbour's")
     func assignmentsNeverCrossCourses() async throws {
         // Arrange — PRIORITY 1, and the failure mode the join newly makes
-        // possible. Both real courses hold assignments at once, so a shared or
-        // last-wins course id produces a valid Brightspace URL pointing at
-        // somebody else's submission folder.
+        // possible. Two visible current courses hold assignments at once, so a
+        // shared or last-wins course id produces a valid Brightspace URL
+        // pointing at somebody else's submission folder.
         let store = AssignmentStore(clock: ManualClock(RealData.midFall2025))
         _ = await store.apply(
-            courseId: RealAssignments.scholarlyID, result: .success(try AssignmentFixture.scholarly)
+            courseId: RealAssignments.hostAID, result: .success(try AssignmentFixture.scholarlyOnHostA)
         )
         _ = await store.apply(
-            courseId: RealAssignments.civicsID, result: .success(try AssignmentFixture.civics)
+            courseId: RealAssignments.hostBID, result: .success(try AssignmentFixture.civicsOnHostB)
         )
         let states = [
-            RealAssignments.scholarlyID: await store.state(for: RealAssignments.scholarlyID),
-            RealAssignments.civicsID: await store.state(for: RealAssignments.civicsID),
+            RealAssignments.hostAID: await store.state(for: RealAssignments.hostAID),
+            RealAssignments.hostBID: await store.state(for: RealAssignments.hostBID),
         ]
 
         // Act
         let model = try self.realMenu(assignments: states)
 
         // Assert — checked per course, so a failure names which one leaked.
-        for courseId in [RealAssignments.scholarlyID, RealAssignments.civicsID] {
+        for courseId in [RealAssignments.hostAID, RealAssignments.hostBID] {
             let course = try #require(model.course(id: courseId))
             let rows = course.submenu.assignments
             try #require(!rows.isEmpty, "course \(courseId) rendered no assignments")
@@ -711,24 +739,53 @@ struct AssignmentWiringEndToEndTests {
         }
     }
 
-    @Test("the civics assignment gets exactly the URL experiment 7 verified")
+    @Test("the second host gets exactly the URL template experiment 7 verified")
     func theOtherCourseGetsItsVerifiedURL() async throws {
-        // Arrange — the second course, asserted against a full literal so a
-        // systematic id shift cannot pass.
+        // Arrange — the second host course, asserted against a full literal so
+        // a systematic id shift cannot pass. (The civics shell that originally
+        // carried this assignment is hidden since 2026-08-24 — pinned below.)
         let store = AssignmentStore(clock: ManualClock(RealData.midFall2025))
         _ = await store.apply(
-            courseId: RealAssignments.civicsID, result: .success(try AssignmentFixture.civics)
+            courseId: RealAssignments.hostBID, result: .success(try AssignmentFixture.civicsOnHostB)
         )
-        let state = await store.state(for: RealAssignments.civicsID)
+        let state = await store.state(for: RealAssignments.hostBID)
 
         // Act
-        let model = try self.realMenu(assignments: [RealAssignments.civicsID: state])
+        let model = try self.realMenu(assignments: [RealAssignments.hostBID: state])
 
         // Assert
-        let course = try #require(model.course(id: RealAssignments.civicsID))
+        let course = try #require(model.course(id: RealAssignments.hostBID))
         let row = try #require(course.submenu.assignments.first)
         #expect(row.title == RealAssignments.untitledName)
         #expect(row.url.absoluteString == Pinned.untitledURL)
+    }
+
+    @Test("the hidden shells never render, even when assignment state exists for them")
+    func hiddenShellsStayHiddenDespiteAssignmentState() async throws {
+        // Arrange — the negative of the old headline path. User decision
+        // 2026-08-24: the undated shells (Civics, Scholarly Project) are hidden
+        // everywhere, so even a store that holds their REAL assignments must
+        // not conjure their rows back into the menu.
+        let store = AssignmentStore(clock: ManualClock(RealData.midFall2025))
+        _ = await store.apply(
+            courseId: RealAssignments.scholarlyID, result: .success(try AssignmentFixture.scholarly)
+        )
+        _ = await store.apply(
+            courseId: RealAssignments.civicsID, result: .success(try AssignmentFixture.civics)
+        )
+        let states = [
+            RealAssignments.scholarlyID: await store.state(for: RealAssignments.scholarlyID),
+            RealAssignments.civicsID: await store.state(for: RealAssignments.civicsID),
+        ]
+
+        // Act
+        let model = try self.realMenu(assignments: states)
+
+        // Assert — the visible set excludes both shells, and none of their
+        // assignments appear anywhere in the model.
+        #expect(model.course(id: RealAssignments.scholarlyID) == nil)
+        #expect(model.course(id: RealAssignments.civicsID) == nil)
+        #expect(model.courses.allSatisfy { $0.submenu.assignments.isEmpty })
     }
 
     @Test("the fetcher's fan-out reaches the menu, and one failing course does not empty another")
@@ -739,14 +796,14 @@ struct AssignmentWiringEndToEndTests {
         let store = AssignmentStore(clock: ManualClock(RealData.midFall2025))
         let fetcher = AssignmentFetcher(
             source: ScriptedSource([
-                RealAssignments.scholarlyID: .success(try AssignmentFixture.scholarly),
-                RealAssignments.civicsID: .failure(.sessionExpired),
+                RealAssignments.hostAID: .success(try AssignmentFixture.scholarlyOnHostA),
+                RealAssignments.hostBID: .failure(.sessionExpired),
             ]),
             store: store
         )
         let courses = [
-            undatedCourse(id: RealAssignments.scholarlyID),
-            undatedCourse(id: RealAssignments.civicsID),
+            currentCourse(id: RealAssignments.hostAID),
+            currentCourse(id: RealAssignments.hostBID),
         ]
 
         // Act
@@ -755,18 +812,18 @@ struct AssignmentWiringEndToEndTests {
             courses: courses, lastFetch: Instant.feb20, now: Instant.feb20,
             baseURL: Pinned.baseURL,
             assignments: [
-                RealAssignments.scholarlyID: await store.state(for: RealAssignments.scholarlyID),
-                RealAssignments.civicsID: await store.state(for: RealAssignments.civicsID),
+                RealAssignments.hostAID: await store.state(for: RealAssignments.hostAID),
+                RealAssignments.hostBID: await store.state(for: RealAssignments.hostBID),
             ],
             timeZone: Pinned.utc
         )
 
         // Assert — the succeeding course is fully populated…
-        let scholarly = try #require(model.course(id: RealAssignments.scholarlyID))
-        #expect(scholarly.submenu.assignments.count == 3)
+        let succeeded = try #require(model.course(id: RealAssignments.hostAID))
+        #expect(succeeded.submenu.assignments.count == 3)
         // …and the failing one says so rather than silently claiming emptiness.
-        let civics = try #require(model.course(id: RealAssignments.civicsID))
-        #expect(messages(civics.submenu) == [Pinned.loadFailed])
+        let failed = try #require(model.course(id: RealAssignments.hostBID))
+        #expect(messages(failed.submenu) == [Pinned.loadFailed])
     }
 
     @Test("with no assignment state at all, every course still gets a submenu")
@@ -788,20 +845,20 @@ struct AssignmentWiringEndToEndTests {
         // Arrange
         let store = AssignmentStore(clock: ManualClock(RealData.midFall2025))
         _ = await store.apply(
-            courseId: RealAssignments.scholarlyID, result: .success(try AssignmentFixture.scholarly)
+            courseId: RealAssignments.hostAID, result: .success(try AssignmentFixture.scholarlyOnHostA)
         )
-        let state = await store.state(for: RealAssignments.scholarlyID)
+        let state = await store.state(for: RealAssignments.hostAID)
 
         // Act
-        let model = try self.realMenu(assignments: [RealAssignments.scholarlyID: state])
+        let model = try self.realMenu(assignments: [RealAssignments.hostAID: state])
 
-        // Assert — nine courses visible, all with submenus, exactly one of which
+        // Assert — seven courses visible, all with submenus, exactly one of which
         // holds real assignment rows. The others say "No assignments" rather than
         // vanishing as a submenu.
         #expect(Set(model.courses.map(\.id)) == RealData.visibleIDsAtMidFall2025)
         #expect(model.courses.allSatisfy { !$0.submenu.isEmpty })
         let withAssignments = model.courses.filter { !$0.submenu.assignments.isEmpty }.map(\.id)
-        #expect(withAssignments == [RealAssignments.scholarlyID])
+        #expect(withAssignments == [RealAssignments.hostAID])
     }
 
     @Test("translation is deterministic even when the assignments arrive shuffled")
@@ -809,17 +866,17 @@ struct AssignmentWiringEndToEndTests {
         // Arrange — `MenuModel`'s `Equatable` is what lets the GUI skip
         // rebuilding an unchanged menu, so an order-dependent submenu would make
         // identical data compare unequal and rebuild the menu on every open.
-        let real = try AssignmentFixture.scholarly
+        let real = try AssignmentFixture.scholarlyOnHostA
         try #require(real.count == 3)
 
         // Act
-        let a = try self.realMenu(assignments: [RealAssignments.scholarlyID: .loaded(real)])
-        let b = try self.realMenu(assignments: [RealAssignments.scholarlyID: .loaded(Array(real.reversed()))])
+        let a = try self.realMenu(assignments: [RealAssignments.hostAID: .loaded(real)])
+        let b = try self.realMenu(assignments: [RealAssignments.hostAID: .loaded(Array(real.reversed()))])
 
         // Assert — the count guard is load-bearing: two empty models are
         // trivially equal, so without it this passes against a translation that
         // renders nothing.
-        try #require(a.course(id: RealAssignments.scholarlyID)?.submenu.assignments.count == 3)
+        try #require(a.course(id: RealAssignments.hostAID)?.submenu.assignments.count == 3)
         #expect(a == b, "submenu order depends on input order")
     }
 
@@ -829,12 +886,12 @@ struct AssignmentWiringEndToEndTests {
         // would render an assignment as a sibling of the courses.
         let store = AssignmentStore(clock: ManualClock(RealData.midFall2025))
         _ = await store.apply(
-            courseId: RealAssignments.scholarlyID, result: .success(try AssignmentFixture.scholarly)
+            courseId: RealAssignments.hostAID, result: .success(try AssignmentFixture.scholarlyOnHostA)
         )
 
         // Act
         let model = try self.realMenu(assignments: [
-            RealAssignments.scholarlyID: await store.state(for: RealAssignments.scholarlyID),
+            RealAssignments.hostAID: await store.state(for: RealAssignments.hostAID),
         ])
 
         // Assert

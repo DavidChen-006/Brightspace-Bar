@@ -216,10 +216,12 @@ struct MenuTranslationTests {
 
     // ── Priority 2: no silent data loss ──────────────────────────────────────
 
-    @Test("every current-or-undated real course survives translation")
+    @Test("every current real course survives translation — and only the current ones")
     func realPayloadYieldsTheVisibleSet() throws {
         // Arrange — the genuine bytes through the genuine parser, so this is the
-        // real chain and not hand-built data. `now` is pinned mid-semester;
+        // real chain and not hand-built data. Since the 2026-08-24 user decision
+        // the visible set is current ONLY: the undated administrative shells are
+        // hidden along with ended terms. `now` is pinned mid-semester;
         // which courses count as visible then is transcribed truth in RealData.
         let courses = try CrossPackageFixture.realCourses
         try #require(courses.count == RealData.totalCourses)
@@ -528,10 +530,13 @@ struct MenuTranslationTests {
 
     @Test("no course row appears after the commands")
     func commandsComeLast() throws {
-        // Arrange
+        // Arrange — `now` pinned mid-semester: at `epoch` (summer 2026) the
+        // real payload has no current courses at all under the 2026-08-24
+        // policy, and a menu with zero course rows would pass this vacuously.
         let courses = try CrossPackageFixture.realCourses
         let model = MenuTranslation.menu(
-            courses: courses, lastFetch: epoch, now: epoch, baseURL: RealData.baseURL
+            courses: courses, lastFetch: RealData.midFall2025,
+            now: RealData.midFall2025, baseURL: RealData.baseURL
         )
 
         // Act

@@ -230,6 +230,12 @@ private enum Real {
     static let civicsID = 412_690
     static let citiID = 445_296
     static let moduleOneQuizID = 476_481
+
+    /// Current hosts for the menu-wiring tests: the undated shells above are
+    /// HIDDEN since the 2026-08-24 user decision, so the graph join is
+    /// exercised on dated Fall 2025 courses that are visible at `midFall2025`.
+    static let hostAID = 1_360_027  // Fall 2025 CS 25100-LEC - Merge
+    static let hostBID = 1_360_020  // Fall 2025 CS 25000 - Merge
 }
 
 private func work(
@@ -631,41 +637,43 @@ struct GraphTranslationTests {
     @Test("a course with loaded assignments carries its strip on its row")
     func aLoadedCourseCarriesAGraph() throws {
         // Arrange — the real 27-course payload, at the instant the rest of the
-        // suite probes, with one dated assignment for the Scholarly Project.
+        // suite probes, with one dated assignment for a current Fall 2025 host
+        // (the Scholarly Project shell that once played this role is hidden
+        // since the 2026-08-24 policy).
         let state = AssignmentsState.loaded([
-            work(Real.citiID, .assignment, due: Pinned.duringMidFall2025),
+            work(Real.citiID, .assignment, due: Pinned.duringMidFall2025, courseId: Real.hostAID),
         ])
 
         // Act
-        let model = try realMenu(assignments: [Real.scholarlyID: state])
+        let model = try realMenu(assignments: [Real.hostAID: state])
 
         // Assert — the window reached the row, and the deadline landed on the cell
         // its local day names. `now` is Tuesday Sep 30 locally, so the window
         // opens Sunday Sep 28 and Thursday Oct 2 is cell 4.
-        let scholarly = try #require(model.course(id: Real.scholarlyID))
-        #expect(scholarly.graph.count == Pinned.windowDays)
-        #expect(filled(scholarly.graph) == [Pinned.duringMidFall2025Index: .assignment])
-        #expect(scholarly.graph.firstIndex(where: \.isToday) == Pinned.midFall2025TodayIndex)
+        let host = try #require(model.course(id: Real.hostAID))
+        #expect(host.graph.count == Pinned.windowDays)
+        #expect(filled(host.graph) == [Pinned.duringMidFall2025Index: .assignment])
+        #expect(host.graph.firstIndex(where: \.isToday) == Pinned.midFall2025TodayIndex)
     }
 
     @Test("a course with no assignment state still carries a full empty window")
     func anUnfetchedCourseStillCarriesTheWindow() throws {
-        // Arrange / Act — Civics is absent from the map, so it is `neverFetched`.
+        // Arrange / Act — host B is absent from the map, so it is `neverFetched`.
         // Under always-emit that no longer means "no graph": it means a full
-        // window with nothing in it, so Civics' row is the same shape as
-        // Scholarly's and the two cannot be told apart by height (§2 item 2).
+        // window with nothing in it, so host B's row is the same shape as
+        // host A's and the two cannot be told apart by height (§2 item 2).
         let state = AssignmentsState.loaded([
-            work(Real.citiID, .assignment, due: Pinned.duringMidFall2025),
+            work(Real.citiID, .assignment, due: Pinned.duringMidFall2025, courseId: Real.hostAID),
         ])
-        let model = try realMenu(assignments: [Real.scholarlyID: state])
+        let model = try realMenu(assignments: [Real.hostAID: state])
 
         // Assert — same length, no fills; the tiered one is still the only course
         // carrying work, which is what proves the graph is joined per course
         // rather than handed to everyone.
-        let civics = try #require(model.course(id: Real.civicsID))
-        #expect(civics.graph.count == Pinned.windowDays)
-        #expect(filled(civics.graph).isEmpty)
-        #expect(model.courses.filter { !filled($0.graph).isEmpty }.map(\.id) == [Real.scholarlyID])
+        let unfetched = try #require(model.course(id: Real.hostBID))
+        #expect(unfetched.graph.count == Pinned.windowDays)
+        #expect(filled(unfetched.graph).isEmpty)
+        #expect(model.courses.filter { !filled($0.graph).isEmpty }.map(\.id) == [Real.hostAID])
     }
 
     @Test("an empty assignments map still gives every course its window")

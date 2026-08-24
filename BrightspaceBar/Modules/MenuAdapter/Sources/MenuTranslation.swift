@@ -88,12 +88,14 @@ public enum MenuTranslation {
     /// what keeps "what we fetch" and "what we show" from drifting — fanning out
     /// over all 27 enrollments would waste calls on ended courses that answer 403.
     ///
-    /// The currentness policy (user decision, 2026-08-09): what is being taken NOW
-    /// plus the undated administrative shells; ended and not-yet-started terms are
-    /// hidden. `IsActive` is deliberately not consulted — it is true for every
-    /// enrollment back to Fall 2024 (measured).
+    /// The currentness policy (user decision, 2026-08-24, superseding 2026-08-09):
+    /// ONLY what is being taken NOW. The undated administrative shells (Civics
+    /// Test, Scholarly Project Milestones) are hidden along with ended and
+    /// not-yet-started terms — real classes exist, so "Other" earns no menu space
+    /// and no network calls. `IsActive` is deliberately not consulted — it is true
+    /// for every enrollment back to Fall 2024 (measured).
     public static func visibleCourses(_ courses: [Course], now: Date) -> [Course] {
-        courses.filter { self.isCurrent($0, now: now) || self.isUndated($0) }
+        courses.filter { self.isCurrent($0, now: now) }
     }
 
     // MARK: - Currentness (pure policy on Access dates)
@@ -110,8 +112,9 @@ public enum MenuTranslation {
 
     /// No usable date on either side — the administrative shells (Civics Test,
     /// Scholarly Project Milestones). Also where unparseable dates degrade to:
-    /// if D2L ever changes its wire format, courses fail OPEN into "Other"
-    /// instead of silently vanishing.
+    /// since 2026-08-24 these are hidden entirely, so if D2L ever changes its
+    /// wire format, courses fail CLOSED (vanish) — the "No current courses"
+    /// message is the tell that dates stopped parsing.
     private static func isUndated(_ course: Course) -> Bool {
         self.parseDate(course.startDate) == nil && self.parseDate(course.endDate) == nil
     }
@@ -227,7 +230,14 @@ public enum MenuTranslation {
             // SEAM: the graph join, over the same state the submenu reads.
             // `neverFetched` yields `[]`, so a course absent from the map keeps
             // the pre-graph row it had before this feature existed.
-            graph: GraphTranslation.strip(state: assignments, now: now, timeZone: timeZone),
+            // Link context rides along so every non-empty cell carries its hover
+            // detail; `ou=` and the caption's course label both come from *this*
+            // course, the same guarantee the submenu join makes.
+            graph: GraphTranslation.strip(
+                state: assignments, now: now, timeZone: timeZone,
+                courseId: course.id, courseLabel: self.subtitle(from: course.code),
+                baseURL: baseURL
+            ),
             // The headings for that same window, from the same `now` and zone —
             // two clocks here would head one menu with columns and another with
             // the months of a different week.

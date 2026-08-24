@@ -138,15 +138,24 @@ public final class MenuItemHostingView: NSView {
     public var isHighlightedForMenu = false {
         didSet {
             guard oldValue != self.isHighlightedForMenu else { return }
+            // Losing the highlight means the pointer left this course entirely
+            // (another row, or off the menu) — the day popup goes with it, no
+            // grace: the grace period exists for travel WITHIN the grid.
+            if !self.isHighlightedForMenu { self.popup?.dismiss() }
             self.hosting.rootView = self.card
             self.needsDisplay = true
         }
     }
 
     private let hosting: NSHostingView<CourseCardView>
+    /// The hover popup for this course's day cells, or nil when the assembler
+    /// gave no opener — the headless-test shape, where no popup can exist and
+    /// hovering degrades to nothing rather than to a crash.
+    private var popup: GraphDayPopupController?
 
     public init(
-        title: String, cells: [GraphCell], showsChevron: Bool, monthLabels: [String?] = []
+        title: String, cells: [GraphCell], showsChevron: Bool, monthLabels: [String?] = [],
+        opener: (any URLOpening)? = nil
     ) {
         self.title = title
         self.cells = cells
@@ -154,7 +163,8 @@ public final class MenuItemHostingView: NSView {
         self.monthLabels = monthLabels
         self.hosting = NSHostingView(
             rootView: CourseCardView(
-                title: title, cells: cells, monthLabels: monthLabels, isHighlighted: false
+                title: title, cells: cells, monthLabels: monthLabels, isHighlighted: false,
+                popup: nil
             )
         )
         super.init(frame: CGRect(origin: .zero, size: ComponentMetrics.fittingSize(cells: cells.count)))
@@ -164,6 +174,23 @@ public final class MenuItemHostingView: NSView {
         self.hosting.frame = self.bounds
         self.hosting.autoresizingMask = [.width, .height]
         self.addSubview(self.hosting)
+
+        // After super.init, because closing the menu on a popup click needs
+        // `self` — this view is the one layer that knows a menu exists at all.
+        if let opener {
+            self.popup = GraphDayPopupController(opener: opener) { [weak self] in
+                self?.enclosingMenuItem?.menu?.cancelTracking()
+            }
+            self.hosting.rootView = self.card
+        }
+    }
+
+    /// Leaving the window (the menu closed) must take the popup along — a child
+    /// window is removed with its parent, but the controller's state has to
+    /// agree that nothing is showing.
+    public override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if self.window == nil { self.popup?.dismiss() }
     }
 
     @available(*, unavailable)
@@ -174,7 +201,7 @@ public final class MenuItemHostingView: NSView {
     private var card: CourseCardView {
         CourseCardView(
             title: self.title, cells: self.cells, monthLabels: self.monthLabels,
-            isHighlighted: self.isHighlightedForMenu
+            isHighlighted: self.isHighlightedForMenu, popup: self.popup
         )
     }
 
@@ -236,6 +263,9 @@ struct CourseCardView: View {
     let cells: [GraphCell]
     let monthLabels: [String?]
     let isHighlighted: Bool
+    /// Threaded down to the raster view, which is where hover is detected.
+    /// A reference, not data — the popup is a side-effect port like `opener`.
+    let popup: GraphDayPopupController?
 
     var body: some View {
         VStack(alignment: .leading, spacing: ComponentMetrics.rowGap) {
@@ -252,7 +282,7 @@ struct CourseCardView: View {
             if !self.cells.isEmpty {
                 CourseGraphView(
                     cells: self.cells, monthLabels: self.monthLabels,
-                    isHighlighted: self.isHighlighted
+                    isHighlighted: self.isHighlighted, popup: self.popup
                 )
             }
         }
@@ -269,10 +299,12 @@ struct CourseGraphView: View {
     let cells: [GraphCell]
     let monthLabels: [String?]
     let isHighlighted: Bool
+    let popup: GraphDayPopupController?
 
     var body: some View {
         GraphRasterView(
-            cells: self.cells, monthLabels: self.monthLabels, isHighlighted: self.isHighlighted
+            cells: self.cells, monthLabels: self.monthLabels, isHighlighted: self.isHighlighted,
+            popup: self.popup
         )
         .frame(
             width: ComponentMetrics.weekdayGutter + ComponentMetrics.gridWidth(cells: self.cells.count),
@@ -295,15 +327,20 @@ struct GraphRasterView: NSViewRepresentable {
     let cells: [GraphCell]
     let monthLabels: [String?]
     let isHighlighted: Bool
+    let popup: GraphDayPopupController?
 
     func makeNSView(context: Context) -> GraphRasterNSView {
         GraphRasterNSView(
-            cells: self.cells, monthLabels: self.monthLabels, isHighlighted: self.isHighlighted
+            cells: self.cells, monthLabels: self.monthLabels, isHighlighted: self.isHighlighted,
+            popup: self.popup
         )
     }
 
     func updateNSView(_ view: GraphRasterNSView, context: Context) {
         view.isHighlighted = self.isHighlighted
+        // Re-attached on every update, because the hosting view swaps its root
+        // on each highlight change and the port must survive the swap.
+        view.popup = self.popup
     }
 }
 
@@ -330,6 +367,21 @@ final class GraphRasterNSView: NSView {
         }
     }
 
+    /// The hover popup's port, or nil in headless builds. Weak on purpose:
+    /// the controller is the hosting view's, and a raster view recreated by
+    /// SwiftUI must not keep a stale one alive.
+    weak var popup: GraphDayPopupController?
+
+    /// The day cell under the pointer, tracked for the hover ring. Only cells
+    /// with a `detail` are ever hovered — an empty day is a dismiss trigger,
+    /// not a target, so it gets no ring and no popup.
+    private var hoveredIndex: Int? {
+        didSet {
+            guard oldValue != self.hoveredIndex else { return }
+            self.needsDisplay = true
+        }
+    }
+
     /// The grid's top-left corner inside this view: the gutters the labels need.
     private static let gridOrigin = CGPoint(
         x: ComponentMetrics.weekdayGutter, y: ComponentMetrics.monthRowHeight
@@ -337,10 +389,12 @@ final class GraphRasterNSView: NSView {
 
     override var isFlipped: Bool { true }
 
-    init(cells: [GraphCell], monthLabels: [String?], isHighlighted: Bool) {
+    init(cells: [GraphCell], monthLabels: [String?], isHighlighted: Bool,
+         popup: GraphDayPopupController? = nil) {
         self.cells = cells
         self.monthLabels = monthLabels
         self.isHighlighted = isHighlighted
+        self.popup = popup
         super.init(frame: CGRect(
             origin: .zero,
             size: CGSize(
@@ -353,6 +407,51 @@ final class GraphRasterNSView: NSView {
     @available(*, unavailable)
     required init?(coder: NSCoder) {
         fatalError("GraphRasterNSView is built in code, never from a nib")
+    }
+
+    // MARK: - Hover (Intent 2 — the day popup)
+
+    /// The exp-16 recipe, verbatim: `.activeAlways` because a menu's carrier
+    /// window is never key, and `.inVisibleRect` so the area needs no manual
+    /// resize plumbing.
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        for area in self.trackingAreas { self.removeTrackingArea(area) }
+        self.addTrackingArea(NSTrackingArea(
+            rect: .zero,
+            options: [.mouseMoved, .mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+            owner: self, userInfo: nil
+        ))
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        let point = self.convert(event.locationInWindow, from: nil)
+        let rects = ComponentMetrics.gridRects(count: self.cells.count, origin: Self.gridOrigin)
+        // Inset by the gutter's half, so the 2pt gap between cells does not
+        // flicker the hover off between neighbours (exp 16's tolerance).
+        let index = rects.firstIndex { $0.insetBy(dx: -1, dy: -1).contains(point) }
+
+        // Only a cell with a detail is a hover target; an empty cell — like
+        // leaving the grid — is a dismiss trigger, softened by the grace delay
+        // so the pointer can travel down-right into the popup.
+        guard let index, let detail = self.cells[index].detail else {
+            self.hoveredIndex = nil
+            self.popup?.scheduleDismiss()
+            return
+        }
+        guard index != self.hoveredIndex else { return }
+        self.hoveredIndex = index
+        guard let window = self.window else { return }
+        self.popup?.show(
+            detail,
+            anchoredTo: window.convertToScreen(self.convert(rects[index], to: nil)),
+            host: window
+        )
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        self.hoveredIndex = nil
+        self.popup?.scheduleDismiss()
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -377,6 +476,20 @@ final class GraphRasterNSView: NSView {
             outline.lineWidth = 1
             (self.isHighlighted ? NSColor.selectedMenuItemTextColor : .labelColor).setStroke()
             outline.stroke()
+        }
+
+        // The hover ring, over everything: the affordance that says "this cell
+        // answers". Inflated OUTWARD (exp 16's ring) so it never covers the
+        // fill that says what is due, and drawn only for popup-bearing cells —
+        // `hoveredIndex` is never set for an empty day.
+        if let hovered = self.hoveredIndex, hovered < rects.count {
+            let ring = NSBezierPath(
+                roundedRect: rects[hovered].insetBy(dx: -1, dy: -1),
+                xRadius: ComponentMetrics.cellRadius, yRadius: ComponentMetrics.cellRadius
+            )
+            ring.lineWidth = 1.5
+            (self.isHighlighted ? NSColor.selectedMenuItemTextColor : .controlAccentColor).setStroke()
+            ring.stroke()
         }
     }
 

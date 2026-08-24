@@ -227,29 +227,60 @@ struct HairlinePlacementTests {
         #expect(unbounded.isEmpty, "courses at \(unbounded) have no boundary above them")
     }
 
-    @Test("the \"no current courses\" message still leads, with the boundary below it")
-    func theMessageKeepsItsPlaceAboveTheBoundaries() {
-        // Arrange — a semester break: only undated administrative shells are
-        // visible, so the menu leads with an explanatory message and then the
-        // "Other" group. The message must not acquire a boundary of its own.
-        //
-        // Built inline rather than via `makeCourse`, whose wide-open Access
-        // window would make the course CURRENT — this case needs `isUndated`
-        // (nil dates), or `hasCurrent` is true and the message never renders.
-        let courses = [Course(
+    @Test("the \"no current courses\" break menu has no boundaries — message, separator, commands")
+    func theBreakMenuHasNoBoundaries() {
+        // Arrange — a semester break. Since the 2026-08-24 user decision the
+        // undated administrative shells are hidden along with ended terms, so a
+        // break renders NO course rows at all — the message never coexists with
+        // a hairline any more, and a stray boundary here would draw a line
+        // across an otherwise bare menu. Built with dated-but-out-of-term
+        // courses plus an undated shell, so both hidden classes are exercised.
+        let ended = Course(
+            id: 1, name: "Course 1", code: "wl.202610.CS.25100.LE1",
+            role: "Learner", isActive: true, homeUrl: nil,
+            startDate: "2025-08-14T04:00:00.000Z", endDate: "2025-12-29T04:59:00.000Z"
+        )
+        let shell = Course(
             id: 412_690, name: "Course 412690", code: "wl.nc.civics.test",
             role: "Learner", isActive: true, homeUrl: nil,
             startDate: nil, endDate: nil
-        )]
+        )
+        let summer2026 = Date(timeIntervalSince1970: 1_785_024_000)  // 2026-07-31
 
         // Act
         let model = MenuTranslation.menu(
-            courses: courses, lastFetch: epoch, now: epoch, baseURL: RealData.baseURL
+            courses: [ended, shell], lastFetch: summer2026, now: summer2026,
+            baseURL: RealData.baseURL
+        )
+
+        // Assert — the whole sequence: message, footer, nothing bounded.
+        #expect(shape(model.rows) == [
+            "message", "separator", "command", "command",
+        ])
+    }
+
+    @Test("a current-but-untermed course still gets its boundary under the Other header")
+    func theOtherGroupStillBoundsItsCourses() {
+        // Arrange — the nil-bucket machinery is intentionally kept: a course
+        // that is current but untermed (STARS 2025's shape — nil start, real
+        // future end) renders under "Other", and the hairline rule must hold
+        // there exactly as under a term header.
+        let termed = makeCourse(id: 1, code: "wl.202610.CS.25100.LE1")
+        let stars = Course(
+            id: 1_415_558, name: "STARS 2025", code: "stars_2025",
+            role: "Learner", isActive: true, homeUrl: nil,
+            startDate: nil, endDate: "2999-01-01T00:00:00.000Z"
+        )
+
+        // Act
+        let model = MenuTranslation.menu(
+            courses: [termed, stars], lastFetch: epoch, now: epoch, baseURL: RealData.baseURL
         )
 
         // Assert
         #expect(shape(model.rows) == [
-            "message", "header", "hairline", "course",
+            "header", "hairline", "course",
+            "header", "hairline", "course",
             "separator", "command", "command",
         ])
     }
