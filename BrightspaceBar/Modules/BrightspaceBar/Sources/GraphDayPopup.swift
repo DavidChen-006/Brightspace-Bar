@@ -111,6 +111,14 @@ final class GraphDayPopupController {
     private let dismissMenu: () -> Void
 
     private var panel: NSPanel?
+    /// Intercepts clicks bound for the panel BEFORE the menu's modal tracking
+    /// session can consume them. NSMenu treats a click on the panel as "a
+    /// click outside the menu" — it closes the menu (tearing the panel down)
+    /// and swallows the event, which is why hover worked and clicks did not:
+    /// enter/exit are window-server per-window events, clicks route through
+    /// the tracking session. Installed while the panel shows, removed on
+    /// dismiss.
+    private var clickMonitor: Any?
     /// The hovered cell's screen rect — one leg of the spatial keep-alive
     /// region. Set by every `show`, cleared by `dismiss`.
     private var anchorScreenRect: CGRect?
@@ -166,6 +174,7 @@ final class GraphDayPopupController {
         let panel = self.panel ?? self.makePanel()
         self.panel = panel
         Self.active = self
+        self.installClickMonitorIfNeeded()
         // Size FIRST, install second. Assigning `contentView` resizes the view
         // to the window's current content rect — `.zero` on the fresh panel —
         // so reading `content.frame.size` after installation answers 0×0 and
@@ -221,9 +230,36 @@ final class GraphDayPopupController {
         return region
     }
 
+    /// Both halves of a click are intercepted: consuming only the down would
+    /// leave the menu a stray up-event, and only the up would let the down
+    /// close the menu first. The action itself runs on the DOWN — by the up,
+    /// a first click may already have torn the popup down.
+    private func installClickMonitorIfNeeded() {
+        guard self.clickMonitor == nil else { return }
+        self.clickMonitor = NSEvent.addLocalMonitorForEvents(
+            matching: [.leftMouseDown, .leftMouseUp]
+        ) { [weak self] event in
+            guard
+                let self, let panel = self.panel,
+                panel.frame.contains(NSEvent.mouseLocation)
+            else { return event }
+            if event.type == .leftMouseDown,
+               let content = panel.contentView as? GraphPopupContentView {
+                content.performClick(
+                    at: content.convert(panel.convertPoint(fromScreen: NSEvent.mouseLocation), from: nil)
+                )
+            }
+            return nil  // The menu session must see neither half.
+        }
+    }
+
     /// The unconditional dismiss: the menu closed, a row was clicked, or the
     /// spatial rule decided. Immediate.
     func dismiss() {
+        if let monitor = self.clickMonitor {
+            NSEvent.removeMonitor(monitor)
+            self.clickMonitor = nil
+        }
         guard let panel = self.panel else { return }
         panel.parent?.removeChildWindow(panel)
         panel.orderOut(nil)
@@ -307,6 +343,17 @@ final class GraphPopupContentView: NSView {
     @available(*, unavailable)
     required init?(coder: NSCoder) {
         fatalError("GraphPopupContentView is built in code, never from a nib")
+    }
+
+    /// A click delivered by the controller's event monitor — the only click
+    /// path that exists while an NSMenu is tracking. Finds the row under the
+    /// point and runs the same action a direct mouseUp would have.
+    func performClick(at point: CGPoint) {
+        for case let row as GraphPopupRowView in self.subviews
+        where row.frame.contains(point) {
+            row.performClick(at: self.convert(point, to: row))
+            return
+        }
     }
 
     /// The panel is a bare window; the rounded card is drawn here. Popover
@@ -474,7 +521,13 @@ final class GraphPopupRowView: NSView {
     override func mouseExited(with event: NSEvent) { self.isHovered = false }
 
     override func mouseUp(with event: NSEvent) {
-        let point = self.convert(event.locationInWindow, from: nil)
+        self.performClick(at: self.convert(event.locationInWindow, from: nil))
+    }
+
+    /// The one click action, shared by the direct path (mouseUp, when no menu
+    /// is tracking) and the monitor path (the only one that fires while a menu
+    /// IS tracking).
+    func performClick(at point: CGPoint) {
         if self.showsDelete, self.deleteRect.contains(point), let id = self.item.manualId {
             self.onDelete?(id)
             return
