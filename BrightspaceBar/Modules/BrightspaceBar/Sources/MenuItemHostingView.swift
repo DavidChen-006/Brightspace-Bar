@@ -143,13 +143,13 @@ public final class MenuItemHostingView: NSView {
     public var isHighlightedForMenu = false {
         didSet {
             guard oldValue != self.isHighlightedForMenu else { return }
-            // Losing the highlight gets the GRACE dismiss, not the hard one:
-            // the popup hangs BELOW the row, so the pointer travelling into it
-            // necessarily exits this item (de-highlighting it) on the way —
-            // an immediate dismiss here made the popup untouchable (user
-            // report, 2026-08-24). Arriving in the popup cancels the grace;
-            // genuinely leaving lets it fire.
-            if !self.isHighlightedForMenu { self.popup?.scheduleDismiss() }
+            // Losing the highlight asks the SPATIAL question, not a timer:
+            // the popup hangs BELOW the row, so travelling into it necessarily
+            // exits this item (de-highlighting it) en route — but the pointer
+            // is then inside the keep-alive region and the popup stays. A
+            // pointer genuinely on another row is outside it and the popup
+            // goes at once.
+            if !self.isHighlightedForMenu { self.popup?.dismissIfOutside() }
             self.hosting.rootView = self.card
             self.needsDisplay = true
         }
@@ -474,7 +474,9 @@ final class GraphRasterNSView: NSView {
         // so the pointer can travel down-right into the popup.
         guard let index, let detail = self.cells[index].detail else {
             self.hoveredIndex = nil
-            self.popup?.scheduleDismiss()
+            // An empty cell or the gutter is an exit like any other — the
+            // popup survives exactly if the pointer is en route to it.
+            self.popup?.dismissIfOutside()
             return
         }
         guard index != self.hoveredIndex else { return }
@@ -489,7 +491,7 @@ final class GraphRasterNSView: NSView {
 
     override func mouseExited(with event: NSEvent) {
         self.hoveredIndex = nil
-        self.popup?.scheduleDismiss()
+        self.popup?.dismissIfOutside()
     }
 
     override func draw(_ dirtyRect: NSRect) {
