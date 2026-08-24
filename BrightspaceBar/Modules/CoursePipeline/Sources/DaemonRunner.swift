@@ -120,6 +120,12 @@ public struct DaemonRunner: Sendable {
     private func childEnvironment() -> [String: String] {
         var environment = ProcessInfo.processInfo.environment
         environment["BSB_ROOT"] = self.paths.root.path
+        // Launched from Finder/`open`, the app inherits launchd's bare PATH,
+        // which has no Homebrew — and `/usr/bin/env node` then finds nothing.
+        let path = environment["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin"
+        for extra in ["/opt/homebrew/bin", "/usr/local/bin"] where !path.split(separator: ":").contains(Substring(extra)) {
+            environment["PATH"] = (environment["PATH"] ?? path) + ":" + extra
+        }
         return environment
     }
 

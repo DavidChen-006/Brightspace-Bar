@@ -474,14 +474,18 @@ struct SectionedStateTests {
     @Test("a whole-course model carries sectioned submenus through MenuTranslation")
     func sectionsSurviveTheWholeCourseTranslation() throws {
         // Arrange — the end of the chain: per-course states in, a `MenuModel` out.
-        // Both real courses are undated, so both render under "Other" at any `now`.
+        // The course carries a wide-open Access window so it is CURRENT at any
+        // `now`: an undated course is hidden entirely under the 2026-08-24 user
+        // decision, and a hidden course has no submenu to section.
         let civicsItems = [
             work(Real.untitledID, Real.civicsID, .assignment, name: "Untitled"),
             work(Real.honorPledgeID, Real.civicsID, .quiz, name: "Honor Pledge"),
         ]
         let courses = [
             Course(id: Real.civicsID, name: "Purdue Civics Knowledge Test",
-                   code: "wl.nc.civics.test", role: "Learner", isActive: true),
+                   code: "wl.nc.civics.test", role: "Learner", isActive: true,
+                   homeUrl: nil,
+                   startDate: "2000-01-01T00:00:00.000Z", endDate: "2999-01-01T00:00:00.000Z"),
         ]
 
         // Act

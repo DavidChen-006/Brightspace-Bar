@@ -97,6 +97,51 @@ public enum CellTier: Int, Comparable, Equatable, Sendable, CaseIterable {
     public static func < (lhs: Self, rhs: Self) -> Bool { lhs.rawValue < rhs.rawValue }
 }
 
+/// One work item inside a day cell's hover popup.
+///
+/// Deliberately the same shape as every other clickable row — title plus a
+/// non-optional destination — so the popup renders it the way the menu renders
+/// rows and a popup line can never exist without a working click target. The
+/// kind travels as the `CellTier` the grid already speaks, not as a display
+/// string: the tier is contract vocabulary, and how a tier is *named* on screen
+/// ("assignment"/"quiz") is the renderer's word choice, exactly like its colour.
+public struct GraphDayItem: Equatable, Sendable {
+    /// The item's name, rendered as the popup row's link text.
+    public let title: String
+    /// What kind of work this is — the same ranking the cell's fill is drawn
+    /// from, so the popup and the square can never disagree about a day.
+    public let tier: CellTier
+    /// Where clicking the row goes: the item's deep link, pre-built by the
+    /// translation layer from the same templates the submenu rows use.
+    public let url: URL
+
+    public init(title: String, tier: CellTier, url: URL) {
+        self.title = title
+        self.tier = tier
+        self.url = url
+    }
+}
+
+/// Everything the hover popup for one non-empty day says.
+///
+/// `caption` is pre-formatted ("Thu Aug 27 · CS 25200") for the same reason
+/// `AssignmentRow.subtitle` is: a `GraphCell` carries no date, and date
+/// formatting is policy that lives in the pure translation layer, never in view
+/// code. `items` is never empty by contract — an empty day has no detail at
+/// all (`GraphCell.detail == nil`), not a detail with nothing to say.
+public struct GraphDayDetail: Equatable, Sendable {
+    /// The popup's caption line: the local day plus the course label.
+    public let caption: String
+    /// One entry per work item due that day, in a deterministic order the
+    /// translation layer owns.
+    public let items: [GraphDayItem]
+
+    public init(caption: String, items: [GraphDayItem]) {
+        self.caption = caption
+        self.items = items
+    }
+}
+
 /// One day in a course's graph strip.
 ///
 /// Carries no date. The strip is positional — index is the day offset from the
@@ -114,10 +159,22 @@ public struct GraphCell: Equatable, Sendable {
     /// must not obscure the underlying activity state" holds by construction
     /// rather than by careful drawing.
     public let isToday: Bool
+    /// What hovering this cell shows, or nil for a day with nothing due.
+    ///
+    /// Nil and "tier is nil" travel together by construction in the translation
+    /// layer, but the renderer keys ONLY off this field for hover behaviour —
+    /// a cell with a fill and no detail simply has no popup, which is the safe
+    /// degradation for any strip built without link context (stubs, old tests).
+    ///
+    /// Last and defaulted for the same reason `CourseRow.graph` was: every
+    /// existing call site compiles untouched, and it participates in
+    /// `Equatable` like every other field.
+    public let detail: GraphDayDetail?
 
-    public init(tier: CellTier?, isToday: Bool = false) {
+    public init(tier: CellTier?, isToday: Bool = false, detail: GraphDayDetail? = nil) {
         self.tier = tier
         self.isToday = isToday
+        self.detail = detail
     }
 }
 

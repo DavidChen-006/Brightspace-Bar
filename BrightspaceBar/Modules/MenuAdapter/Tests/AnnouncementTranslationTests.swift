@@ -197,12 +197,15 @@ private func announcements(_ rows: [MenuRow]) -> [AnnouncementRow] {
     rows.compactMap { if case .announcement(let row) = $0 { row } else { nil } }
 }
 
-/// A course whose Access window has no dates — so it renders under "Other" at any
-/// `now`, exactly as the two real courses do.
-private func undatedCourse(id: Int, name: String = "A Course") -> Course {
+/// A course with a wide-open Access window, so it is CURRENT — and therefore
+/// visible — at any test `now`. Undated shells are hidden entirely under the
+/// 2026-08-24 user decision, so they can no longer host announcements in the
+/// menu-level tests.
+private func currentCourse(id: Int, name: String = "A Course") -> Course {
     Course(
         id: id, name: name, code: "shell_\(id)", role: "Learner", isActive: true,
-        homeUrl: nil, startDate: nil, endDate: nil
+        homeUrl: nil,
+        startDate: "2000-01-01T00:00:00.000Z", endDate: "2999-01-01T00:00:00.000Z"
     )
 }
 
@@ -664,8 +667,8 @@ struct AnnouncementWiringTests {
     ) -> MenuModel {
         MenuTranslation.menu(
             courses: [
-                undatedCourse(id: Real.scholarlyID, name: "Scholarly Project Milestones"),
-                undatedCourse(id: Real.civicsID, name: "Purdue Civics Knowledge Test"),
+                currentCourse(id: Real.scholarlyID, name: "Scholarly Project Milestones"),
+                currentCourse(id: Real.civicsID, name: "Purdue Civics Knowledge Test"),
             ],
             lastFetch: Instant.now,
             now: Instant.now,
@@ -762,8 +765,8 @@ struct AnnouncementWiringTests {
         let withEmptyMap = self.menu(announcements: [:], assignments: assignments)
         let withoutTheArgument = MenuTranslation.menu(
             courses: [
-                undatedCourse(id: Real.scholarlyID, name: "Scholarly Project Milestones"),
-                undatedCourse(id: Real.civicsID, name: "Purdue Civics Knowledge Test"),
+                currentCourse(id: Real.scholarlyID, name: "Scholarly Project Milestones"),
+                currentCourse(id: Real.civicsID, name: "Purdue Civics Knowledge Test"),
             ],
             lastFetch: Instant.now,
             now: Instant.now,

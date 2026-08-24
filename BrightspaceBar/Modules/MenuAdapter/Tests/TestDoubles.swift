@@ -155,6 +155,9 @@ enum RealData {
         "202510": 5,
     ]
 
+    /// Codes carrying no term component in the FULL payload — a payload fact,
+    /// not a visibility claim: since 2026-08-24 the two fully undated shells
+    /// among these are hidden, so at most the dated untermed ones can render.
     static let untermedCount = 4
 
     /// The only two items whose `OrgUnit.HomeUrl` is non-null. Both are
@@ -185,13 +188,16 @@ enum RealData {
     static let civicsCode = "wl.nc.civics.test"
     static let civicsName = "Purdue Civics Knowledge Test"
 
-    // ── Currentness policy truth (added 2026-08-09) ──────────────────────────
+    // ── Currentness policy truth (user decision 2026-08-24, superseding
+    //    2026-08-09) ─────────────────────────────────────────────────────────
     //
-    // The menu now filters to current + undated. At a probe instant of
+    // The menu now filters to CURRENT ONLY. At a probe instant of
     // 2025-10-01T00:00:00Z (mid Fall 2025), the JSON says: six termed Fall 2025
-    // courses are inside their Access window, STARS 2025 has a nil start and an
-    // end of 2026-01-12 (current, untermed code → "Other"), and the two shells
-    // (Civics, Scholarly Project) carry no dates at all → "Other".
+    // courses are inside their Access window, and STARS 2025 has a nil start and
+    // an end of 2026-01-12 — current, and its untermed code still files it under
+    // "Other". The two fully undated shells (Civics 412690, Scholarly Project
+    // 440703) are HIDDEN everywhere: real classes exist, so "Other" earns no
+    // menu space and no network calls for them.
 
     /// 2025-10-01T00:00:00Z — mid Fall 2025 semester.
     static let midFall2025 = Date(timeIntervalSince1970: 1_759_276_800)
@@ -204,11 +210,11 @@ enum RealData {
         1_361_997,  // Fall 2025 ECON 57600-004 LEC
         1_372_751,  // Fall 2025 STAT 35000-018 DIS
         1_413_404,  // Fall 2025 PHIL 30400-001 LEC
-        1_415_558,  // STARS 2025 — nil start, ends 2026-01-12
-        412_690,    // Civics Knowledge Test — undated
-        440_703,    // Scholarly Project Milestones — undated
+        1_415_558,  // STARS 2025 — nil start, ends 2026-01-12: CURRENT, untermed
     ]
 
+    /// "Other" survives only because STARS 2025 is current-but-untermed — the
+    /// nil-bucket machinery still renders, undated courses just never reach it.
     static let headersAtMidFall2025 = ["202610", "Other"]
-    static let countsAtMidFall2025: [String: Int] = ["202610": 6, "Other": 3]
+    static let countsAtMidFall2025: [String: Int] = ["202610": 6, "Other": 1]
 }

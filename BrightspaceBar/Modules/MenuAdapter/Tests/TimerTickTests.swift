@@ -67,7 +67,10 @@ private let interval: TimeInterval = 15 * 60
 /// The one assignment the fake tenant holds, in the one course that is both
 /// visible at `epoch` and real (`RealData.visibleIDsAtMidFall2025` contains it).
 private enum Work {
-    static let courseID = 440_703
+    // A dated, CURRENT Fall 2025 course: the undated shell (440703) that once
+    // hosted this is hidden — and never fetched — since the 2026-08-24 user
+    // decision, so the fan-out would not even ask about it.
+    static let courseID = 1_360_027
     static let id = 445_296
     static let name = "Upload your CITI Certificate to Complete Module 2"
 
