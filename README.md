@@ -1,98 +1,87 @@
 # BrightspaceBar
 
-Experiments validating a simpler authentication path for a Brightspace (D2L) MCP
-server. Two experiments, both green, that together show JWT renewal needs no
-browser.
+A macOS menu-bar app for Purdue Brightspace (D2L): your courses, a GitHub-style
+due-date heatmap per class, and one-click deep links that land already signed
+in — without your credentials ever touching the app.
 
-## The problem
+<!-- TODO: add docs/screenshot.png — the menu open, showing the aggregate
+     heatmap, a course row, and a day popup. -->
+![BrightspaceBar menu](docs/screenshot.png)
 
-The reference implementation
-([RohanMuppa/brightspace-mcp-server](https://github.com/RohanMuppa/brightspace-mcp-server),
-MIT) renews its 60-minute Brightspace API JWT by launching a headless Chromium
-every hour and evaluating
-`D2L.LP.Web.Authentication.OAuth2.GetToken()` in the page context. That is
-roughly 1,300 lines of browser machinery on the hot path, and in practice it
-corrupts its own persistent browser profile.
+## What it does
 
-## The finding
+- **A heatmap per course** — each current course is a row with a
+  GitHub-contributions-style grid of the coming weeks: darker squares mean
+  heavier work (assignment < quiz < test), today is outlined.
+- **An "All classes" aggregate** on top, folding every course's grid into one.
+- **Hover a day, see the work** — a popup lists that day's items; clicking one
+  opens it in a persistent, already-signed-in Chromium (each click adds a tab).
+- **"This week" at a glance** — per-course counts and the next due item, right
+  beside the grid.
+- **Your own items** — add assignments/quizzes/tests with a date picker from
+  each course's submenu; they render in the grid like fetched ones and delete
+  with an ✕ from the popup.
+- **Background refresh** every 30 minutes, silently, via a session the app
+  never sees.
 
-That JavaScript call is a plain HTTP request underneath:
+## How it stays safe
 
+The app is two halves with a deliberate wall between them:
+
+- A **Swift menu-bar app** that renders cached JSON. It contains no network
+  code and no credentials — it cannot log in *by construction*.
+- A **Node daemon** (`session-capture/`) that owns the browser session: a
+  one-time interactive login into a persistent Chromium profile, then silent
+  cookie/JWT renewal on a ladder that only escalates as far as it must.
+
+Your email and password are typed once, by you, into Microsoft's real login
+page in a real browser window. They are never stored by this project, never
+logged, and never cross into the Swift process (invariant **D7**). The app
+only ever spawns the daemon in its non-interactive mode (invariant **D8**).
+
+## Requirements
+
+- macOS 14+
+- Xcode Command Line Tools with Swift 6.2+ (`xcode-select --install`)
+- Node 20+ (`brew install node`)
+- A Purdue career account (the SAML entity is currently Purdue-specific —
+  PRs generalising it are welcome)
+
+## Install
+
+```sh
+git clone https://github.com/DavidChen-006/BrightspaceBar.git
+cd BrightspaceBar
+make setup    # checks prerequisites, installs the daemon's dependencies
+make login    # one-time: a Chromium window opens — sign in with your Purdue account
+make run      # the icon appears in your menu bar
 ```
-POST /d2l/lp/auth/oauth2/token
-cookie: d2lSessionVal=…; d2lSecureSessionVal=…
-x-csrf-token: …
 
-scope=*:*:*
+After `make login`, the daemon refreshes the session silently; you should not
+see a login again for weeks. If courses ever stop refreshing, run `make login`
+once more.
+
+## Project layout
+
+| Path | What it is |
+| --- | --- |
+| `BrightspaceBar/` | The Swift package: the menu-bar app and its modules (`Modules/<Name>/`), tests included |
+| `session-capture/` | The Node daemon: login ladder, data fetch, deep-link opener |
+| `experiments/` | Numbered probes that de-risked each design decision — kept as engineering notes |
+| `docs/` | Design documents |
+
+Architecture rules (enforced by tests): the GUI imports only the `CourseMenu`
+contract module; adapters translate between pipelines and the menu model; the
+composition root is `main.swift`. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Development
+
+```sh
+make test                     # full suite, from the repo root
+make -C BrightspaceBar run    # run the app from source
 ```
 
-Response: `{ access_token, expires_at }`.
+## License
 
-So JWT renewal is one HTTP POST. No browser, no page context, no Chromium.
-
-## Resulting architecture
-
-A browser is needed **once per session** — the interactive SSO + MFA flow,
-roughly weekly — to obtain the session cookie and CSRF token. Every JWT renewal
-after that is a single HTTP POST against the stored cookie.
-
-## Experiment 1 — fresh cookie (`experiment-1-fresh-cookie/`)
-
-Headed Playwright drives the real login: Purdue's campus selector →
-`sso.purdue.edu` SAML → Microsoft Entra → Authenticator MFA approved by the
-human on their phone. Runs in a **non-persistent** browser context (no profile
-to corrupt) and captures a fresh session cookie plus the XSRF token.
-
-Result: **2/2 green**, ~31s wall clock including human MFA approval.
-
-## Experiment 2 — cookie to JWT (`experiment-2-cookie-to-jwt/`)
-
-Pure HTTP, no Playwright: cookie → JWT → authenticated GET.
-
-Result: **8/8 green**. Verified `whoami.Identifier === jwt.sub` and retrieved 27
-real course enrollments.
-
-## Findings
-
-Measured, not inferred:
-
-- **`x-csrf-token` is required.** Omitting it is refused.
-- **The cookie is reusable.** Repeated mints return different, valid JWTs.
-- **A fresh XSRF token could not be re-fetched over plain HTTP** with only the
-  two session cookies, so the CSRF token must be persisted alongside the cookie.
-  (Untested hypothesis for why: the `d2lSameSiteCanaryA`/`B` cookies were not
-  captured.)
-- **Brightspace returns HTTP 200 on auth failure, not 401.** The body is an HTML
-  stub containing `sessionExpired=1`. Any refresh implementation keying on
-  `res.status === 200` will silently treat an expired session as success. Every
-  check in these experiments keys on token/JSON presence instead.
-- **The JWT lifetime is exactly 3600s, and no `refresh_token` is ever issued.**
-  The session cookie is the only renewable credential.
-
-## Unmeasured
-
-How long the session cookie actually remains valid is **not known**. Re-running
-experiment 2 periodically against the same `session.json` until it fails would
-establish it.
-
-## Security notes
-
-`artifacts/session.json` is gitignored because it holds a live credential (an
-active session cookie and CSRF token). Only `fixture-session.json`, which
-contains fake values, is committed. These experiments run against the author's
-own account only.
-
-## Vendored reference: `RepoBar/`
-
-`RepoBar/` is a vendored, **unmodified** copy of
-[steipete/RepoBar](https://github.com/steipete/RepoBar) (MIT, © 2025 Peter
-Steinberger). It is third-party code, included only as a reference
-implementation of a native macOS menu-bar app — the intended UI pattern for a
-future Brightspace menu-bar client. Its license is retained verbatim at
-`RepoBar/LICENSE`.
-
-## Credit
-
-Reference implementation:
-[RohanMuppa/brightspace-mcp-server](https://github.com/RohanMuppa/brightspace-mcp-server)
-(MIT).
+[MIT](LICENSE). Not affiliated with Purdue University or D2L Corporation;
+Brightspace is a trademark of D2L.

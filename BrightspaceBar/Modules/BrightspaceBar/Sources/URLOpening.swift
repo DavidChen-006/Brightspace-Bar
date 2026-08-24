@@ -45,7 +45,7 @@ public struct ChromiumURLOpener: URLOpening {
 
     public static var defaultCLI: String {
         ProcessInfo.processInfo.environment["BSB_OPEN_CLI"]
-            ?? NSHomeDirectory() + "/Developer/BrightspaceBar/session-capture/src/browser-open.mjs"
+            ?? RepoPaths.sessionCaptureCLI("browser-open.mjs")
     }
 
     public func open(_ url: URL) {

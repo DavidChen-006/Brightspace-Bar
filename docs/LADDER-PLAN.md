@@ -328,7 +328,7 @@ Why a file, not stdout events: D8 — the app is not always the spawner
 pipe. `cache/mfa.json` is ephemeral STATUS: not course data, not a secret
 (the number is display-by-design and useless without the phone).
 
-- Experiment 17 (experiment-17-mfa-icon-watch/, commit 66205f0): VERDICT —
+- Experiment 17 (experiments/experiment-17-mfa-icon-watch/, commit 66205f0): VERDICT —
   **kqueue DispatchSource on the cache DIRECTORY**: 2.6ms median / 3.8ms max
   end-to-end (write→repaint), 5x faster than FSEvents at median, no cold-start
   tail (FSEvents' first delivery after idle = 117-257ms — and one-write-after-

@@ -37,13 +37,13 @@ private let pollInterval: TimeInterval = 30 * 60
 private let brightspaceBaseURL = URL(string: "https://purdue.brightspace.com")!
 
 /// The daemon CLI this app spawns: `BSB_REFRESH_CLI` when set — which is how a
-/// test or a moved checkout points elsewhere — otherwise David's own
-/// `session-capture` package.
+/// test or a moved checkout points elsewhere — otherwise the `session-capture`
+/// package in the checkout this binary was built from (see `RepoPaths`).
 ///
 /// Run through `/usr/bin/env` so `node` is found on PATH rather than pinned to
 /// one installation.
 private let daemonCLI = ProcessInfo.processInfo.environment["BSB_REFRESH_CLI"]
-    ?? NSHomeDirectory() + "/Developer/BrightspaceBar/session-capture/src/refresh.mjs"
+    ?? RepoPaths.sessionCaptureCLI("refresh.mjs")
 
 /// How long a spawn may take before it is killed. Generous: a run that has to
 /// climb the silent rung launches a headless browser and waits on a real Entra

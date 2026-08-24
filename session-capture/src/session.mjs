@@ -6,7 +6,7 @@
  * shape is decided in exactly one place and is testable without a browser.
  *
  * Provenance: these two functions originate in
- * `experiment-1-fresh-cookie/src/acquire-session.mjs`, where they were written and
+ * `../experiments/experiment-1-fresh-cookie/src/acquire-session.mjs`, where they were written and
  * proven. That folder is a frozen experiment record and keeps its own copy; this
  * is the live definition that tooling depends on. The duplication is deliberate —
  * importing across a folder we might one day delete would be a latent trap, and a

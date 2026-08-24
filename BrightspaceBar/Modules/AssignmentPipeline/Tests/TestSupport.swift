@@ -68,7 +68,7 @@ public enum Fixture {
 
 // MARK: - Ground truth, transcribed from experiment 7's live capture
 
-/// Hand-transcribed from `experiment-7-assignment-deeplinks/artifacts/approach-a.json`
+/// Hand-transcribed from `experiments/experiment-7-assignment-deeplinks/artifacts/approach-a.json`
 /// and its browser-verified deep links — never recomputed the way the code computes it.
 public enum Truth {
     public static let baseURL = URL(string: "https://purdue.brightspace.com")!
