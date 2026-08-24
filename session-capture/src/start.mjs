@@ -39,8 +39,12 @@ if (!credentials) {
 }
 
 // 2. The menu-bar app. One instance only — the icon is a singleton by meaning
-// even if not by mechanism, and two writers on the cache help nobody.
-const running = spawnSync("pgrep", ["-f", "BrightspaceBar"]).status === 0;
+// even if not by mechanism, and two writers on the cache help nobody. The
+// pattern is the BINARY PATH, not the bare name: `pgrep -f BrightspaceBar`
+// also matches the view Chromium, whose command line carries the profile dir
+// `.../Application Support/BrightspaceBar/profile` — a browser tab left open
+// then silently suppressed the app launch (live bug, 2026-08-24).
+const running = spawnSync("pgrep", ["-f", APP_BINARY]).status === 0;
 if (running) {
   console.error("BrightspaceBar is already running — not launching a second copy.");
 } else if (!existsSync(APP_BINARY)) {
