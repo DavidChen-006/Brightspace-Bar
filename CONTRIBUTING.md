@@ -1,14 +1,49 @@
 # Contributing
 
-## Build and test
+## Getting set up
+
+Fork the repo, clone your fork, then:
 
 ```sh
 make setup                      # check prerequisites, install the daemon's npm deps
+make test                       # the Swift suite — should be green before you start
+```
+
+## Build and test
+
+```sh
 make -C BrightspaceBar test     # hermetic Swift suite (no network, no daemon)
 cd session-capture && npm test  # daemon unit tests (node:test, no browser launched)
 ```
 
 Run the Swift tests before pushing — they include the architecture checks below.
+
+## Workflow
+
+The usual open-source loop: find or open an issue → branch → implement →
+tests → PR → CI → review → merge. Branch names like `feat/…` or `fix/…` are
+appreciated but not enforced.
+
+Open an issue **before** writing code for: large features, architectural
+changes (anything the architecture rules below would notice), or anything
+touching the D7/D8 security invariants. Small fixes can go straight to a PR.
+
+## Testing expectations
+
+- A bug fix comes with a regression test that fails without the fix.
+- New behavior comes with tests.
+- The `ArchitectureTests` suite enforces the module boundaries below — if your
+  change fights them, that's a design conversation, not a test to loosen.
+
+## Commits and PRs
+
+Keep commits and PRs small and focused — no unrelated cleanup mixed into a
+change. The repo uses `Co-Authored-By:` trailers where they apply.
+
+## Formatting
+
+No enforced linter yet. Match the surrounding style; the codebase favors prose
+comments that explain *why*, not what.
 
 ## Architecture rules
 

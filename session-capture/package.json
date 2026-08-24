@@ -3,6 +3,9 @@
   "private": true,
   "type": "module",
   "description": "Capture a live Brightspace session without handling a password",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "node src/start.mjs",
     "capture": "node src/manual-capture.mjs",

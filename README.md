@@ -39,27 +39,46 @@ page in a real browser window. They are never stored by this project, never
 logged, and never cross into the Swift process (invariant **D7**). The app
 only ever spawns the daemon in its non-interactive mode (invariant **D8**).
 
-## Requirements
+## Supported
 
 - macOS 14+
 - Xcode Command Line Tools with Swift 6.2+ (`xcode-select --install`)
 - Node 20+ (`brew install node`)
-- A Purdue career account (the SAML entity is currently Purdue-specific —
-  PRs generalising it are welcome)
+- Purdue Brightspace via Entra specifically — the SAML entityId is
+  Purdue-hardcoded today; PRs generalising it are welcome.
 
-## Install
+This is a build-from-source app today — no binary release yet. The latest
+tagged state is
+[`v0.1.0`](https://github.com/DavidChen-006/BrightspaceBar/releases/tag/v0.1.0).
+
+## Quick Start
 
 ```sh
 git clone https://github.com/DavidChen-006/BrightspaceBar.git
 cd BrightspaceBar
 make setup    # checks prerequisites, installs the daemon's dependencies
-make login    # one-time: a Chromium window opens — sign in with your Purdue account
-make run      # the icon appears in your menu bar
+make start    # THE one command — see below
 ```
 
-After `make login`, the daemon refreshes the session silently; you should not
-see a login again for weeks. If courses ever stop refreshing, run `make login`
-once more.
+`make start` does everything: it builds the app, prompts for your credentials
+in the terminal on first run, launches the menu bar, and performs the headless
+login — no browser window; the MFA verification number appears **on the
+menu-bar icon**, you type it into Authenticator on your phone, and the icon
+reverts. After that, the daemon refreshes the session silently for weeks. If
+courses ever stop refreshing, run `make start` again.
+
+Two finer-grained targets exist for when you want the steps separately:
+`make login` (interactive Chromium login only) and `make run` (build & launch
+the app only). `make start` is the primary path.
+
+### Environment configuration
+
+See [`session-capture/.env.example`](session-capture/.env.example) for the
+knobs. Normally you never touch env vars: credentials are entered once via the
+`make start` prompt and stored with mode 0600 under
+`~/Library/Application Support/BrightspaceBar` — never in the repo. When
+`BS_EMAIL` and `BS_PASSWORD` are both set in the environment, they override
+the stored file.
 
 ## Project layout
 
@@ -73,13 +92,18 @@ The numbered `experiment-*` probes that de-risked each design decision live on
 the [`experiments` branch](https://github.com/DavidChen-006/BrightspaceBar/tree/experiments/experiments)
 — kept as engineering notes, off the main tree.
 
-Architecture rules (enforced by tests): the GUI imports only the `CourseMenu`
-contract module; adapters translate between pipelines and the menu model; the
+## Architecture
+
+The deep dive lives in [docs/architecture.md](docs/architecture.md) and
+[BrightspaceBar/ARCHITECTURE.md](BrightspaceBar/ARCHITECTURE.md). The short
+version, enforced by tests: the GUI imports only the `CourseMenu` contract
+module; adapters translate between pipelines and the menu model; the
 composition root is `main.swift`. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Development
 
 ```sh
+make -C BrightspaceBar build  # build the Swift app (or: cd BrightspaceBar && swift build)
 make test                     # full suite, from the repo root
 make -C BrightspaceBar run    # run the app from source
 ```

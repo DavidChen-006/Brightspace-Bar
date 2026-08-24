@@ -19,12 +19,17 @@ jobs:
         run: make -C BrightspaceBar test
 
   daemon-tests:
+    name: daemon-tests (node ${{ matrix.node-version }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ["20", "22"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: ${{ matrix.node-version }}
       # --ignore-scripts skips the postinstall (playwright install chromium):
       # the unit tests import the playwright package but never launch a browser.
       - name: Install daemon dependencies

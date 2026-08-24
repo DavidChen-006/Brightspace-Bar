@@ -12,7 +12,7 @@
   - Make one baseline commit before doing open-source cleanup.
   - Tag it mentally as: *this is the version that worked before I touched packaging/docs.*
 
-- [ ] **3. Identify everything the app depends on**
+- [x] **3. Identify everything the app depends on**
   - Runtime/language version.
   - Package manager.
   - Database.
@@ -65,11 +65,11 @@
 
 ## Phase 3 — Make the Environment Reproducible
 
-- [ ] **8. Pin the important runtime versions**
+- [x] **8. Pin the important runtime versions**
   - Node/Python/Rust/Go/etc.
   - Record the supported version somewhere machine-readable when possible.
 
-- [ ] **9. Make dependencies declarative**
+- [x] **9. Make dependencies declarative**
   - `package.json`
   - `pyproject.toml`
   - `requirements.txt`
@@ -77,7 +77,7 @@
   - `go.mod`
   - etc.
 
-- [ ] **10. Commit the appropriate lockfile**
+- [x] **10. Commit the appropriate lockfile**
   - `package-lock.json`
   - `pnpm-lock.yaml`
   - `yarn.lock`
@@ -86,13 +86,13 @@
   - `Cargo.lock`
   - etc.
 
-- [ ] **11. Create `.env.example`**
+- [x] **11. Create `.env.example`**
   - Include every required environment variable.
   - Put fake/example values in it.
   - Explain unusual variables.
   - Never put real credentials in it.
 
-- [ ] **12. Make first-time setup deterministic**
+- [x] **12. Make first-time setup deterministic**
   - A new contributor should not need knowledge that exists only in your head.
   - Ideally setup becomes a handful of commands.
 
@@ -106,7 +106,7 @@
     make setup
     ```
 
-- [ ] **14. Make database setup reproducible**
+- [x] **14. Make database setup reproducible**
   - Schema migrations.
   - Seed data if required.
   - Commands for creating/resetting a development DB.
@@ -116,14 +116,14 @@
 
 ## Phase 4 — Test the Repo From a Stranger's Perspective
 
-- [ ] **15. Clone the project into a completely new directory**
+- [x] **15. Clone the project into a completely new directory**
   - Do not test only from your original development folder.
 
-- [ ] **16. Follow only the instructions you intend to publish**
+- [x] **16. Follow only the instructions you intend to publish**
   - Pretend you know nothing about the project.
   - Do not use undocumented commands from memory.
 
-- [ ] **17. Verify installation from zero**
+- [x] **17. Verify installation from zero**
   - Install dependencies.
   - Configure environment variables.
   - Set up the DB.
@@ -133,7 +133,7 @@
 - [ ] **18. Verify the main user flow**
   - The app should actually perform its primary purpose.
 
-- [ ] **19. Run the complete test suite**
+- [x] **19. Run the complete test suite**
   ```bash
   npm test
   # or
@@ -141,7 +141,7 @@
   # etc.
   ```
 
-- [ ] **20. Run linting, formatting and type checking**
+- [x] **20. Run linting, formatting and type checking**
   - Linter.
   - Formatter.
   - Static type checker.
@@ -173,7 +173,7 @@
   - unused prototypes.
   - commented-out implementations.
 
-- [ ] **23. Remove dead dependencies**
+- [x] **23. Remove dead dependencies**
   - If the app no longer imports it, don't make contributors install it.
 
 - [x] **24. Standardize project commands**
@@ -185,7 +185,7 @@
     make build
     ```
 
-- [ ] **25. Separate generated files from source files**
+- [x] **25. Separate generated files from source files**
   - Contributors should know what they are expected to edit.
 
 ---
@@ -200,24 +200,24 @@
   - etc.
   - Add `LICENSE` to the repository.
 
-- [ ] **27. Decide what the project officially supports**
+- [x] **27. Decide what the project officially supports**
   - Operating systems.
   - Runtime versions.
   - Databases.
   - Browsers.
   - Deployment environments.
 
-- [ ] **28. Mark experimental versus stable APIs**
+- [x] **28. Mark experimental versus stable APIs**
   - Contributors should know what they can safely build against.
 
-- [ ] **29. Define backwards-compatibility expectations**
+- [x] **29. Define backwards-compatibility expectations**
   - Particularly important for libraries, SDKs, CLIs and APIs.
 
 ---
 
 ## Phase 7 — Write the README
 
-- [ ] **30. Explain what the project is immediately**
+- [x] **30. Explain what the project is immediately**
   - First paragraph should answer:
     > What does this do and why would I use it?
 
@@ -228,31 +228,31 @@
   - CLI example.
   - API example.
 
-- [ ] **32. Add a minimal Quick Start**
+- [x] **32. Add a minimal Quick Start**
   ```bash
   git clone ...
   cd project
   ...
   ```
 
-- [ ] **33. Document prerequisites**
+- [x] **33. Document prerequisites**
   - Runtime version.
   - Database.
   - Docker if required.
   - External accounts/APIs.
 
-- [ ] **34. Document environment configuration**
+- [x] **34. Document environment configuration**
 
-- [ ] **35. Document how to start development mode**
+- [x] **35. Document how to start development mode**
 
-- [ ] **36. Document how to run tests**
+- [x] **36. Document how to run tests**
 
-- [ ] **37. Document how to build the project**
+- [x] **37. Document how to build the project**
 
-- [ ] **38. Explain the basic architecture**
+- [x] **38. Explain the basic architecture**
   - Give contributors a map before making them read thousands of lines of code.
 
-- [ ] **39. Link to deeper documentation instead of turning the README into a book**
+- [x] **39. Link to deeper documentation instead of turning the README into a book**
 
 ---
 
@@ -260,7 +260,7 @@
 
 - [x] **40. Create `CONTRIBUTING.md`**
 
-- [ ] **41. Explain contributor setup**
+- [x] **41. Explain contributor setup**
   - Fork.
   - Clone.
   - Install.
@@ -268,7 +268,7 @@
   - Run.
   - Test.
 
-- [ ] **42. Explain the contribution workflow**
+- [x] **42. Explain the contribution workflow**
   ```text
   Issue
     ↓
@@ -287,30 +287,30 @@
   Merge
   ```
 
-- [ ] **43. Define branch naming if you care about it**
+- [x] **43. Define branch naming if you care about it**
 
-- [ ] **44. Define formatting/lint expectations**
+- [x] **44. Define formatting/lint expectations**
 
-- [ ] **45. Define testing expectations**
+- [x] **45. Define testing expectations**
   - Bug fix → regression test.
   - New behavior → tests.
   - Large architecture changes → discuss first.
 
-- [ ] **46. Explain how commits/PRs should be scoped**
+- [x] **46. Explain how commits/PRs should be scoped**
   - Prefer small, focused changes.
   - Avoid unrelated cleanup mixed into feature PRs.
 
-- [ ] **47. Tell contributors when they should open an issue before coding**
+- [x] **47. Tell contributors when they should open an issue before coding**
   - Especially for large features or architectural changes.
 
 ---
 
 ## Phase 9 — Make the Architecture Legible
 
-- [ ] **48. Create a short architecture document**
+- [x] **48. Create a short architecture document**
   - Usually `docs/architecture.md`.
 
-- [ ] **49. Explain the major components**
+- [x] **49. Explain the major components**
   ```text
   Client
     ↓
@@ -321,12 +321,12 @@
   Database
   ```
 
-- [ ] **50. Explain the important data flow**
+- [x] **50. Explain the important data flow**
 
-- [ ] **51. Explain important invariants**
+- [x] **51. Explain important invariants**
   - These are often more useful than explaining every class.
 
-- [ ] **52. Explain extension points**
+- [x] **52. Explain extension points**
   - Where would someone add:
     - a provider?
     - command?
@@ -335,7 +335,7 @@
     - integration?
     - plugin?
 
-- [ ] **53. Document intentionally strange decisions**
+- [x] **53. Document intentionally strange decisions**
   - If a contributor will look at code and think:
     > Why did they do it this way?
   - Write down the answer.
@@ -344,19 +344,19 @@
 
 ## Phase 10 — Put Quality Checks Into Automation
 
-- [ ] **54. Add GitHub Actions CI**
+- [x] **54. Add GitHub Actions CI**
 
-- [ ] **55. Run tests on every pull request**
+- [x] **55. Run tests on every pull request**
 
 - [ ] **56. Run linting on every pull request**
 
-- [ ] **57. Run type checking/compiler checks**
+- [x] **57. Run type checking/compiler checks**
 
-- [ ] **58. Run the build**
+- [x] **58. Run the build**
 
-- [ ] **59. Test the supported runtime versions if appropriate**
+- [x] **59. Test the supported runtime versions if appropriate**
 
-- [ ] **60. Make CI failures understandable**
+- [x] **60. Make CI failures understandable**
   - A contributor should know what they need to fix.
 
 - [ ] **61. Require CI to pass before merging**
@@ -365,26 +365,26 @@
 
 ## Phase 11 — Prepare GitHub Itself
 
-- [ ] **62. Add a good repository description**
+- [x] **62. Add a good repository description**
 
-- [ ] **63. Add relevant GitHub topics**
+- [x] **63. Add relevant GitHub topics**
 
 - [x] **64. Create issue templates**
   - Bug report.
   - Feature request.
 
-- [ ] **65. Create a pull request template**
+- [x] **65. Create a pull request template**
   - What changed?
   - Why?
   - How was it tested?
   - Screenshots if applicable.
 
-- [ ] **66. Add `CODE_OF_CONDUCT.md` if you expect a community**
+- [x] **66. Add `CODE_OF_CONDUCT.md` if you expect a community**
 
-- [ ] **67. Add `SECURITY.md`**
+- [x] **67. Add `SECURITY.md`**
   - Explain how security vulnerabilities should be reported privately.
 
-- [ ] **68. Configure Dependabot/Renovate if useful**
+- [x] **68. Configure Dependabot/Renovate if useful**
 
 - [ ] **69. Configure branch protection**
   - Require PRs.
@@ -422,11 +422,11 @@
 
 ## Phase 13 — Perform the "Fresh Contributor" Test
 
-- [ ] **75. Delete or move your test clone**
+- [x] **75. Delete or move your test clone**
 
-- [ ] **76. Clone the public-style repo again**
+- [x] **76. Clone the public-style repo again**
 
-- [ ] **77. Time how much undocumented knowledge you need**
+- [x] **77. Time how much undocumented knowledge you need**
   - Every time you think:
     > Oh, I forgot—you also have to...
   - Stop and document or automate it.
@@ -448,32 +448,32 @@
   open PR
   ```
 
-- [ ] **79. Test on another machine/container if practical**
+- [x] **79. Test on another machine/container if practical**
   - This catches environment assumptions that a second folder cannot.
 
 ---
 
 ## Phase 14 — Publish
 
-- [ ] **80. Do one final secrets scan**
+- [x] **80. Do one final secrets scan**
 
-- [ ] **81. Run the entire CI-equivalent suite locally**
+- [x] **81. Run the entire CI-equivalent suite locally**
 
-- [ ] **82. Push the repository to GitHub**
+- [x] **82. Push the repository to GitHub**
 
 - [ ] **83. Verify the README renders correctly on GitHub**
 
 - [ ] **84. Verify links and images work**
 
-- [ ] **85. Verify a fresh GitHub clone still works**
+- [x] **85. Verify a fresh GitHub clone still works**
 
-- [ ] **86. Create the first release/tag if the project is ready for one**
+- [x] **86. Create the first release/tag if the project is ready for one**
   ```bash
   git tag v0.1.0
   git push origin v0.1.0
   ```
 
-- [ ] **87. Write release notes**
+- [x] **87. Write release notes**
   - What it does.
   - Known limitations.
   - What kind of contributions you want.

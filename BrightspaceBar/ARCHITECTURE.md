@@ -47,7 +47,7 @@ D7), so there is no credential type here to leak.
 
 ## One fetch, end to end
 
-1. A trigger fires: `launch()` at startup, `timerTick()` every 15 minutes
+1. A trigger fires: `launch()` at startup, `timerTick()` every 30 minutes
    (`RefreshScheduler`), or `refresh()` from the Refresh click. Each maps to its
    own `PollTrigger` — manual always fetches, launch/timer only when stale.
 2. `DaemonCourseSource` spawns `/usr/bin/env node <refresh.mjs>` with `BSB_ROOT`
