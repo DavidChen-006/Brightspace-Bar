@@ -2,64 +2,76 @@ import AppKit
 import CourseMenu
 
 // ─────────────────────────────────────────────────────────────────────────────
-// The heatmap's hover popup: hover a non-empty day cell and a small panel lists
+// The heatmap's hover popup: hover a non-empty day cell and a small bubble lists
 // the items due that day, each row a link into the signed-in browser.
 //
-// It is a borderless child WINDOW, not a drawn bubble, for two reasons the
-// exp-16 bubble could not answer: the popup must extend past the menu item's
-// bounds (a day near the grid's bottom edge would clip), and its rows must be
-// CLICKABLE, which a painted bubble is not. The window recipe — borderless
-// non-activating `NSPanel`, `canBecomeKey == false`, child of the anchor's own
-// window — is RepoBar's autocomplete dropdown, which proved a panel like this
-// receives its own mouse events without stealing key status from its host.
+// It is a SUBVIEW of the course row's own `MenuItemHostingView`, not a window.
+// The first build floated a borderless NSPanel (RepoBar's autocomplete recipe),
+// and hover worked while clicks never arrived: NSMenu's modal tracking session
+// owns every mouse event while a menu is open, and a click on a window that is
+// not the menu reads as "outside the menu" — it closes the menu (tearing the
+// panel down) before the panel can hear anything. A local event monitor did not
+// save it either; the tracking session takes events ahead of monitors.
 //
-// Two menu-specific lessons are load-bearing here:
+// Experiments 9 → 14 → 16 proved the one place clicks ARE delivered during
+// menu tracking: a menu item's own view. So the bubble lives in the row's view
+// tree, where the tracking session treats a click on it as a click on the row —
+// the exact path Open Course Home rides. The costs, accepted deliberately:
 //
-//   dismissal    — SPATIAL, never timed. The popup lives exactly while the
-//                  pointer is inside anchor-cell ∪ 4px bridge ∪ panel, the
-//                  same hit-test-on-every-move rule Floating UI's safePolygon,
-//                  Radix HoverCard, and NSPopover use. A timer-based grace
-//                  (two earlier attempts) either expired mid-travel or held
-//                  the popup open over cells the user had plainly left.
-//   anchoring    — DIRECTLY BELOW the cell, left-aligned, never centred on it
-//                  and never diagonal. Centred, the popup covers the hovered
-//                  cell's row neighbours; diagonal (the first attempt) put it
-//                  further away than the grace period lets a pointer travel —
-//                  measured live: the popup expired before it could be reached.
-//                  Straight down is the shortest path and keeps the row clear.
+//   clipping   — the bubble must fit the row's bounds. It anchors below the
+//                cell, flips above when the row's bottom edge would cut it,
+//                and clamps horizontally. A day with many items may still
+//                brush the row's edge; that beats a popup that cannot be
+//                clicked at all.
+//   dismissal  — SPATIAL, never timed (unchanged from the panel build): the
+//                bubble lives exactly while the pointer is inside anchor-cell
+//                ∪ bridge ∪ bubble, hit-tested on every exit signal.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// The popup's geometry, pure and testable — the half that can be wrong in a
-/// way a screenshot will not show. Frames speak SCREEN coordinates
-/// (bottom-left origin, y upward), because that is the space `NSWindow.setFrame`
-/// consumes and converting twice is where sign errors live.
+/// way a screenshot will not show. `frame(anchoredTo:size:)` speaks whatever
+/// space the anchor rect is in (screen or an unflipped view — the arithmetic
+/// is identical: below the cell means smaller y); `within:` adds the row's
+/// bounds and the flip/clamp the in-row bubble needs.
 public enum GraphPopupMetrics {
-    /// The gap between the hovered cell and the popup's top-left corner, both
-    /// axes. Small enough that the pointer's down-right travel crosses it
-    /// within the grace period, large enough that the panel's shadow does not
-    /// touch the cell.
+    /// The gap between the hovered cell and the bubble's near edge, both axes.
     public static let anchorOffset: CGFloat = 4
 
     /// Where the popup goes: directly BELOW the cell, left-aligned with it —
     /// top edge `offset` under the cell, left edge on the cell's own left edge.
-    /// Straight-down is the shortest possible pointer path (the first, diagonal
-    /// down-right placement was measured unreachable live: by the time the
-    /// pointer had crossed the diagonal the grace period had expired). The
-    /// frame still intersects nothing in the cell's horizontal band
-    /// (`maxY < cell.minY`), so sliding along a row never fights the popup;
-    /// covering the rows BELOW is acceptable because hover moves the popup
-    /// with the cell and the grace period only ends on an empty target.
+    /// Straight-down is the shortest possible pointer path (a diagonal
+    /// placement was measured unreachable live).
     public static func frame(
-        anchoredTo cellScreenRect: CGRect,
+        anchoredTo cellRect: CGRect,
         size: CGSize,
         offset: CGFloat = GraphPopupMetrics.anchorOffset
     ) -> CGRect {
         CGRect(
-            x: cellScreenRect.minX,
-            y: cellScreenRect.minY - offset - size.height,
+            x: cellRect.minX,
+            y: cellRect.minY - offset - size.height,
             width: size.width,
             height: size.height
         )
+    }
+
+    /// The in-row placement: below-left-aligned as above, then kept inside
+    /// `bounds` — flipped ABOVE the cell when the row's bottom edge would clip
+    /// it, slid horizontally when the right edge would. In an unflipped view
+    /// "below the cell" is toward y = 0, so "clipped by the bottom" is
+    /// `minY < 0`.
+    public static func frame(
+        anchoredTo cellRect: CGRect,
+        size: CGSize,
+        within bounds: CGRect,
+        offset: CGFloat = GraphPopupMetrics.anchorOffset
+    ) -> CGRect {
+        var frame = self.frame(anchoredTo: cellRect, size: size, offset: offset)
+        if frame.minY < bounds.minY {
+            frame.origin.y = cellRect.maxY + offset
+        }
+        frame.origin.y = max(bounds.minY, min(frame.origin.y, bounds.maxY - size.height))
+        frame.origin.x = max(bounds.minX, min(frame.origin.x, bounds.maxX - size.width))
+        return frame
     }
 
     // Content layout, one table like `ComponentMetrics` and for the same
@@ -79,29 +91,11 @@ public enum GraphPopupMetrics {
     }
 }
 
-/// One popup per course component, owned by its `MenuItemHostingView`. Shows,
-/// moves, and dismisses the panel; the grace delay lives here.
+/// One popup per course component, owned by its `MenuItemHostingView` — which
+/// is also its canvas: the bubble is installed as a subview of the host so its
+/// clicks travel the menu-native path.
 @MainActor
 final class GraphDayPopupController {
-    /// The one showing popup, if any — a registry the menu's highlight
-    /// delegate consults: while the pointer is INSIDE the active panel, the
-    /// menu must not highlight (or act for) whatever row happens to sit under
-    /// the panel's glass. Weak: dismissal must never depend on unregistering.
-    private(set) static weak var active: GraphDayPopupController?
-
-    /// True exactly while a popup is showing and the pointer is over it — the
-    /// spatial fact the highlight suppression rides on.
-    static var pointerInsideActivePanel: Bool {
-        guard let panel = Self.active?.panel else { return false }
-        return panel.frame.contains(NSEvent.mouseLocation)
-    }
-    /// RepoBar's dropdown window class: a borderless panel must say explicitly
-    /// that it never becomes key, or clicking a row deactivates the menu.
-    private final class PopupPanel: NSPanel {
-        override var canBecomeKey: Bool { false }
-        override var canBecomeMain: Bool { false }
-    }
-
     private let opener: any URLOpening
     /// Deletes one of the student's own items (Intent 4), or nil for a build
     /// without the feature — the ✕ then simply does not render.
@@ -109,40 +103,38 @@ final class GraphDayPopupController {
     /// Closes the whole menu after a row click — supplied by the hosting view,
     /// which is the layer that knows a menu exists at all.
     private let dismissMenu: () -> Void
+    /// The row view the bubble draws into. Weak: the host owns the controller.
+    private(set) weak var host: NSView?
 
-    private var panel: NSPanel?
-    /// Intercepts clicks bound for the panel BEFORE the menu's modal tracking
-    /// session can consume them. NSMenu treats a click on the panel as "a
-    /// click outside the menu" — it closes the menu (tearing the panel down)
-    /// and swallows the event, which is why hover worked and clicks did not:
-    /// enter/exit are window-server per-window events, clicks route through
-    /// the tracking session. Installed while the panel shows, removed on
-    /// dismiss.
-    private var clickMonitor: Any?
-    /// The hovered cell's screen rect — one leg of the spatial keep-alive
-    /// region. Set by every `show`, cleared by `dismiss`.
-    private var anchorScreenRect: CGRect?
+    private var bubble: GraphPopupContentView?
+    /// The hovered cell's rect in the HOST's coordinates — one leg of the
+    /// spatial keep-alive region. Set by every `show`, cleared by `dismiss`.
+    private var anchorRect: CGRect?
 
-    /// Test seam: the shown panel's frame, or nil when nothing is showing.
-    /// Exists because the zero-size regression (contentView installed before
-    /// its size was read) was invisible to every headless assertion we had.
-    var panelFrameForTesting: CGRect? { self.panel?.frame }
+    /// Test seam: the shown bubble's frame (in host coordinates, unclamped
+    /// when there is no host), or nil when nothing is showing. Exists because
+    /// the zero-size regression (contentView installed before its size was
+    /// read, in the panel era) was invisible to every headless assertion.
+    var panelFrameForTesting: CGRect? { self.bubble?.frame }
 
     init(
         opener: any URLOpening,
         onDeleteItem: (@MainActor (UUID) -> Void)? = nil,
+        host: NSView? = nil,
         dismissMenu: @escaping () -> Void
     ) {
         self.opener = opener
         self.onDeleteItem = onDeleteItem
+        self.host = host
         self.dismissMenu = dismissMenu
     }
 
-    /// Shows the popup for `detail`, anchored below-right of the hovered cell.
-    /// Re-invoking with another cell's detail MOVES the one panel — a fresh
-    /// window per cell would flicker its shadow on every step along a row.
-    func show(_ detail: GraphDayDetail, anchoredTo cellScreenRect: CGRect, host: NSWindow?) {
-        self.anchorScreenRect = cellScreenRect
+    /// Shows the bubble for `detail`, anchored below the hovered cell.
+    /// `cellRect` is in the HOST view's coordinate space (callers convert; the
+    /// tests pass arbitrary rects with no host and get the unclamped frame).
+    /// Re-invoking with another cell's detail replaces the one bubble in place.
+    func show(_ detail: GraphDayDetail, anchoredTo cellRect: CGRect) {
+        self.anchorRect = cellRect
 
         let content = GraphPopupContentView(
             detail: detail,
@@ -158,12 +150,14 @@ final class GraphDayPopupController {
             },
             onClick: { [weak self] url in
                 guard let self else { return }
-                self.opener.open(url)
+                // Close the menu FIRST — the exp-14 order (cancelTracking,
+                // then act) — so the spawn never races menu teardown.
                 self.dismiss()
                 self.dismissMenu()
+                self.opener.open(url)
             },
             onHoverChange: { [weak self] inside in
-                // Leaving the panel is a dismiss trigger like any other — and
+                // Leaving the bubble is a dismiss trigger like any other — and
                 // like any other it only fires if the pointer is genuinely
                 // outside the whole keep-alive region (it may have gone back
                 // up into the grid, where hover will re-anchor the popup).
@@ -171,124 +165,80 @@ final class GraphDayPopupController {
             }
         )
 
-        let panel = self.panel ?? self.makePanel()
-        self.panel = panel
-        Self.active = self
-        self.installClickMonitorIfNeeded()
-        // Size FIRST, install second. Assigning `contentView` resizes the view
-        // to the window's current content rect — `.zero` on the fresh panel —
-        // so reading `content.frame.size` after installation answers 0×0 and
-        // the panel becomes an invisible zero-size window (the live bug:
-        // hover ring, no popup). `setFrame` then stretches the installed view
-        // back to the size it laid itself out for.
         let size = content.frame.size
-        panel.contentView = content
-        panel.setFrame(
-            GraphPopupMetrics.frame(anchoredTo: cellScreenRect, size: size),
-            display: true
-        )
-        // A child window rides its parent — and a menu's carrier window is a
-        // real window — so the panel stays glued if the menu ever moves, and
-        // sits above it in z-order without guessing at menu window levels.
-        if let host, panel.parent == nil {
-            host.addChildWindow(panel, ordered: .above)
-        }
-        panel.orderFront(nil)
+        content.frame = self.host.map { host in
+            GraphPopupMetrics.frame(anchoredTo: cellRect, size: size, within: host.bounds)
+        } ?? GraphPopupMetrics.frame(anchoredTo: cellRect, size: size)
+
+        self.bubble?.removeFromSuperview()
+        self.bubble = content
+        // On TOP of the SwiftUI hosting view — subview order is z-order.
+        self.host?.addSubview(content)
     }
 
     /// The conditional dismiss — every "the pointer left X" signal lands here.
     ///
-    /// SPATIAL, not timed: the popup lives exactly while the pointer is inside
+    /// SPATIAL, not timed: the bubble lives exactly while the pointer is inside
     /// the keep-alive region (hovered cell ∪ the bridge over the anchor gap ∪
-    /// the panel itself, each with a hairline of slack for event rounding).
+    /// the bubble itself, each with a hairline of slack for event rounding).
     /// One rule, asked at the moment of every exit event, with the pointer's
     /// REAL position (`NSEvent.mouseLocation`, screen coordinates, available
-    /// without an event) — so travelling into the popup keeps it, and leaving
-    /// everything kills it the instant the exit fires, not half a second later.
+    /// without an event).
     func dismissIfOutside() {
-        guard self.panel != nil else { return }
-        if self.keepAliveRegion().contains(where: { $0.contains(NSEvent.mouseLocation) }) { return }
+        guard self.bubble != nil else { return }
+        let pointer = self.pointerInHostCoordinates()
+        if self.keepAliveRegion().contains(where: { $0.contains(pointer) }) { return }
         self.dismiss()
     }
 
-    /// The rects whose union keeps the popup alive. The bridge spans the
-    /// `anchorOffset` gap between the cell's bottom and the panel's top, the
-    /// panel's width — without it the union is disconnected and crossing the
-    /// gap would read as "outside".
+    /// `NSEvent.mouseLocation` is screen space; the region is host space.
+    /// With no window (headless tests) the point cannot be converted and the
+    /// region can never contain it — dismissal-by-position degrades to always
+    /// dismissing, which is the safe direction.
+    private func pointerInHostCoordinates() -> CGPoint {
+        guard let host = self.host, let window = host.window else {
+            return CGPoint(x: -.greatestFiniteMagnitude, y: -.greatestFiniteMagnitude)
+        }
+        return host.convert(
+            window.convertPoint(fromScreen: NSEvent.mouseLocation), from: nil
+        )
+    }
+
+    /// The rects whose union keeps the bubble alive, in host coordinates. The
+    /// bridge spans the `anchorOffset` gap between the cell's bottom and the
+    /// bubble's top — without it the union is disconnected and crossing the
+    /// gap would read as "outside". (Unflipped: the bubble sits at SMALLER y
+    /// than the cell, except when it flipped above.)
     private func keepAliveRegion() -> [CGRect] {
         var region: [CGRect] = []
-        if let panel = self.panel { region.append(panel.frame.insetBy(dx: -1, dy: -1)) }
-        if let cell = self.anchorScreenRect {
+        if let bubble = self.bubble { region.append(bubble.frame.insetBy(dx: -1, dy: -1)) }
+        if let cell = self.anchorRect {
             region.append(cell.insetBy(dx: -2, dy: -2))
-            if let panel = self.panel {
+            if let bubble = self.bubble {
+                let gapBottom = min(cell.minY, bubble.frame.maxY)
+                let gapTop = max(cell.minY, bubble.frame.maxY)
                 region.append(CGRect(
-                    x: panel.frame.minX, y: panel.frame.maxY,
-                    width: panel.frame.width, height: max(0, cell.minY - panel.frame.maxY)
+                    x: bubble.frame.minX, y: gapBottom,
+                    width: bubble.frame.width, height: gapTop - gapBottom
                 ))
             }
         }
         return region
     }
 
-    /// Both halves of a click are intercepted: consuming only the down would
-    /// leave the menu a stray up-event, and only the up would let the down
-    /// close the menu first. The action itself runs on the DOWN — by the up,
-    /// a first click may already have torn the popup down.
-    private func installClickMonitorIfNeeded() {
-        guard self.clickMonitor == nil else { return }
-        self.clickMonitor = NSEvent.addLocalMonitorForEvents(
-            matching: [.leftMouseDown, .leftMouseUp]
-        ) { [weak self] event in
-            guard
-                let self, let panel = self.panel,
-                panel.frame.contains(NSEvent.mouseLocation)
-            else { return event }
-            if event.type == .leftMouseDown,
-               let content = panel.contentView as? GraphPopupContentView {
-                content.performClick(
-                    at: content.convert(panel.convertPoint(fromScreen: NSEvent.mouseLocation), from: nil)
-                )
-            }
-            return nil  // The menu session must see neither half.
-        }
-    }
-
     /// The unconditional dismiss: the menu closed, a row was clicked, or the
     /// spatial rule decided. Immediate.
     func dismiss() {
-        if let monitor = self.clickMonitor {
-            NSEvent.removeMonitor(monitor)
-            self.clickMonitor = nil
-        }
-        guard let panel = self.panel else { return }
-        panel.parent?.removeChildWindow(panel)
-        panel.orderOut(nil)
-        self.panel = nil
-        self.anchorScreenRect = nil
-        if Self.active === self { Self.active = nil }
-    }
-
-    private func makePanel() -> NSPanel {
-        let panel = PopupPanel(
-            contentRect: .zero,
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        panel.isOpaque = false
-        panel.backgroundColor = .clear
-        panel.hasShadow = true
-        panel.isReleasedWhenClosed = false
-        panel.acceptsMouseMovedEvents = true
-        panel.isFloatingPanel = true
-        panel.collectionBehavior = [.transient, .ignoresCycle]
-        return panel
+        self.bubble?.removeFromSuperview()
+        self.bubble = nil
+        self.anchorRect = nil
+        self.host?.needsDisplay = true
     }
 }
 
 /// The popup's content: a caption line, then one clickable row per item. Sizes
-/// itself at init — the controller reads `frame.size` to place the window —
-/// and is flipped so rows read top-down like the list they are.
+/// itself at init — the controller reads `frame.size` to place it — and is
+/// flipped so rows read top-down like the list they are.
 final class GraphPopupContentView: NSView {
     private let onHoverChange: (Bool) -> Void
 
@@ -303,7 +253,7 @@ final class GraphPopupContentView: NSView {
         self.onHoverChange = onHoverChange
 
         // Width: the widest line wins, capped — a long assignment name
-        // truncates in its row rather than dragging the panel across the menu.
+        // truncates in its row rather than dragging the bubble across the row.
         let caption = Self.captionString(detail.caption)
         let rowWidths = detail.items.map {
             GraphPopupRowView.title(of: $0).size().width
@@ -345,9 +295,10 @@ final class GraphPopupContentView: NSView {
         fatalError("GraphPopupContentView is built in code, never from a nib")
     }
 
-    /// A click delivered by the controller's event monitor — the only click
-    /// path that exists while an NSMenu is tracking. Finds the row under the
-    /// point and runs the same action a direct mouseUp would have.
+    /// Routes a click that landed on the bubble but not on a row's own view
+    /// (the caption, the padding) — and the seam the hosting view can call if
+    /// an event ever arrives at the row level instead. Finds the row under
+    /// the point and runs the same action a direct mouseUp would have.
     func performClick(at point: CGPoint) {
         for case let row as GraphPopupRowView in self.subviews
         where row.frame.contains(point) {
@@ -356,9 +307,8 @@ final class GraphPopupContentView: NSView {
         }
     }
 
-    /// The panel is a bare window; the rounded card is drawn here. Popover
-    /// background over a hairline border, matching how exp 16's bubble dressed
-    /// itself, at panel scale.
+    /// The bubble draws its own card: popover background over a hairline
+    /// border — exp 16's bubble dress, at list scale.
     override func draw(_ dirtyRect: NSRect) {
         let card = NSBezierPath(
             roundedRect: self.bounds.insetBy(dx: 0.5, dy: 0.5),
@@ -374,7 +324,7 @@ final class GraphPopupContentView: NSView {
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
         for area in self.trackingAreas { self.removeTrackingArea(area) }
-        // `.activeAlways`: the panel never becomes key, so the default
+        // `.activeAlways`: a menu's carrier window is never key, so the default
         // active-in-key-window scope would leave these areas permanently deaf.
         self.addTrackingArea(NSTrackingArea(
             rect: .zero,
@@ -385,6 +335,14 @@ final class GraphPopupContentView: NSView {
 
     override func mouseEntered(with event: NSEvent) { self.onHoverChange(true) }
     override func mouseExited(with event: NSEvent) { self.onHoverChange(false) }
+
+    /// Clicks on the bubble's chrome (caption, padding) must not fall through
+    /// the responder chain to `MenuItemHostingView.mouseUp`, which would fire
+    /// the ROW's action for a click the user aimed at the popup.
+    override func mouseDown(with event: NSEvent) {}
+    override func mouseUp(with event: NSEvent) {
+        self.performClick(at: self.convert(event.locationInWindow, from: nil))
+    }
 
     private static func captionString(_ text: String) -> NSAttributedString {
         NSAttributedString(string: text, attributes: [
@@ -520,13 +478,16 @@ final class GraphPopupRowView: NSView {
     override func mouseEntered(with event: NSEvent) { self.isHovered = true }
     override func mouseExited(with event: NSEvent) { self.isHovered = false }
 
+    /// The menu-native click path (exp 9/14/16): the tracking session delivers
+    /// the event to the deepest view under the pointer — this row — because
+    /// the bubble lives in the menu item's own view tree.
+    override func mouseDown(with event: NSEvent) {}
     override func mouseUp(with event: NSEvent) {
         self.performClick(at: self.convert(event.locationInWindow, from: nil))
     }
 
-    /// The one click action, shared by the direct path (mouseUp, when no menu
-    /// is tracking) and the monitor path (the only one that fires while a menu
-    /// IS tracking).
+    /// The one click action, shared by the direct path and the content view's
+    /// fall-through hit-test.
     func performClick(at point: CGPoint) {
         if self.showsDelete, self.deleteRect.contains(point), let id = self.item.manualId {
             self.onDelete?(id)
