@@ -11,7 +11,7 @@ jobs:
     # Fall back to macos-14 if macos-15 runners are unavailable.
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # The Makefile's CLT framework/rpath flags are conditional on
       # /Library/Developer/CommandLineTools existing, so the same target
       # works both on a CLT-only machine and on Xcode runners.
@@ -26,7 +26,7 @@ jobs:
       matrix:
         node-version: ["20", "22"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
