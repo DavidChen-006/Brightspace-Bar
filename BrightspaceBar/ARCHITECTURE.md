@@ -85,7 +85,7 @@ changed is who handles it. The daemon holds a persistent Chromium profile and a
 ladder itself when the cookie is dead. The app spawns it and reads `cache/`.
 
 The ladder, the rung seam, and the file contracts are specified in
-[`../LADDER-PLAN.md`](../LADDER-PLAN.md); the daemon lives in
+[`../docs/LADDER-PLAN.md`](../docs/LADDER-PLAN.md); the daemon lives in
 `../session-capture/`. Open item, written down rather than pretended away: a
 headed login can only be started from a terminal
 (`npm run refresh -- --allow-full-login`), so a session that has fallen past the
