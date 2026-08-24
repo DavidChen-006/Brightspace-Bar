@@ -186,10 +186,14 @@ public final class MenuItemHostingView: NSView {
         self.hosting.autoresizingMask = [.width, .height]
         self.addSubview(self.hosting)
 
-        // After super.init, because closing the menu on a popup click needs
-        // `self` — this view is the one layer that knows a menu exists at all.
+        // After super.init, because the controller needs `self` twice over:
+        // as the CANVAS the bubble is installed into (the menu-native click
+        // path — exps 9/14/16), and to close the menu after a click, since
+        // this view is the one layer that knows a menu exists at all.
         if let opener {
-            self.popup = GraphDayPopupController(opener: opener, onDeleteItem: onDeleteItem) { [weak self] in
+            self.popup = GraphDayPopupController(
+                opener: opener, onDeleteItem: onDeleteItem, host: self
+            ) { [weak self] in
                 self?.enclosingMenuItem?.menu?.cancelTracking()
             }
             self.hosting.rootView = self.card
@@ -481,12 +485,11 @@ final class GraphRasterNSView: NSView {
         }
         guard index != self.hoveredIndex else { return }
         self.hoveredIndex = index
-        guard let window = self.window else { return }
-        self.popup?.show(
-            detail,
-            anchoredTo: window.convertToScreen(self.convert(rects[index], to: nil)),
-            host: window
-        )
+        // The anchor is handed over in the HOST view's coordinates — the
+        // bubble is a subview of the course row now, not a window, so screen
+        // space never enters into it.
+        guard let host = self.popup?.host else { return }
+        self.popup?.show(detail, anchoredTo: self.convert(rects[index], to: host))
     }
 
     override func mouseExited(with event: NSEvent) {

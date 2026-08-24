@@ -40,7 +40,7 @@ struct GraphPopupPanelTests {
     @Test("show() gives the panel the content's own size, not the fresh panel's zero")
     func shownPanelHasTheContentSize() throws {
         let controller = GraphDayPopupController(opener: FakeURLOpener(), dismissMenu: {})
-        controller.show(self.detail(rows: 2), anchoredTo: self.cell, host: nil)
+        controller.show(self.detail(rows: 2), anchoredTo: self.cell)
 
         let frame = try #require(controller.panelFrameForTesting)
         #expect(!frame.isEmpty, "a zero-size panel is the live 'ring but no popup' bug")
@@ -53,9 +53,9 @@ struct GraphPopupPanelTests {
     @Test("re-showing with another day's detail keeps the panel non-empty")
     func reShowKeepsThePanelNonEmpty() throws {
         let controller = GraphDayPopupController(opener: FakeURLOpener(), dismissMenu: {})
-        controller.show(self.detail(rows: 1), anchoredTo: self.cell, host: nil)
+        controller.show(self.detail(rows: 1), anchoredTo: self.cell)
         let moved = self.cell.offsetBy(dx: 30, dy: -20)
-        controller.show(self.detail(rows: 3), anchoredTo: moved, host: nil)
+        controller.show(self.detail(rows: 3), anchoredTo: moved)
 
         let frame = try #require(controller.panelFrameForTesting)
         #expect(!frame.isEmpty)
