@@ -189,7 +189,7 @@ struct AggregateRowTests {
         // Assert — week stats, Intent 5, over the union: counts add, and the
         // single next item is the earliest across both courses (Wed before Fri).
         let aggregate = try #require(model.courses.first { $0.id == -1 })
-        #expect(aggregate.weekLines == ["2 assignments", "next: Homework 2 · Wed"])
+        #expect(aggregate.weekLines == ["This week", "2 assignments", "next: Homework 2 · Wed"])
     }
 }
 
@@ -233,7 +233,7 @@ struct WeekLinesTranslationTests {
         // Assert — week stats, Intent 5: EXACTLY these two lines. The next
         // item is the earliest due at-or-after now (Homework 4, Wednesday) —
         // the March midterm counts as upcoming but is not first.
-        #expect(row.weekLines == ["2 assignments · 1 quiz", "next: Homework 4 · Wed"])
+        #expect(row.weekLines == ["This week", "2 assignments · 1 quiz", "next: Homework 4 · Wed"])
     }
 
     @Test("gradeOnly and hidden items count nowhere in the week block")
@@ -250,7 +250,7 @@ struct WeekLinesTranslationTests {
 
         // Assert — week stats, Intent 5: the block reads the same population
         // that fills the squares, so hidden and gradeOnly change nothing.
-        #expect(alone.weekLines == ["1 assignment", "next: Homework 4 · Wed"])
+        #expect(alone.weekLines == ["This week", "1 assignment", "next: Homework 4 · Wed"])
         #expect(crowded.weekLines == alone.weekLines)
     }
 
@@ -276,6 +276,6 @@ struct WeekLinesTranslationTests {
         let row = try self.row(assignments: .loaded([]), manualItems: [midterm])
 
         // Assert — Mar 20 2026 is a Friday.
-        #expect(row.weekLines == ["next: Midterm 1 · Fri"])
+        #expect(row.weekLines == ["This week", "next: Midterm 1 · Fri"])
     }
 }

@@ -29,7 +29,7 @@ import MenuAdapter
 
 /// How often a non-manual trigger may fetch, and when cached data counts as
 /// stale. A manual Refresh click always fetches regardless (see `PollPolicy`).
-private let pollInterval: TimeInterval = 15 * 60
+private let pollInterval: TimeInterval = 30 * 60
 
 /// The tenant. Also the base every course row's click URL is derived from —
 /// `MenuTranslation` builds `{baseURL}/d2l/home/{id}` because D2L's own
@@ -69,6 +69,9 @@ let dataSource: any MenuDataSource
 /// stub mode, where there is no `$BSB_ROOT` worth writing user data into —
 /// the forms render, and Add degrades to closing the menu.
 var addItem: (@MainActor (AddItemDraft) -> Void)?
+/// Set only in the live path: what the popup's ✕ deletes (Intent 4). Nil in
+/// stub mode, where the ✕ simply does not render.
+var deleteItem: (@MainActor (UUID) -> Void)?
 /// Set only in the live path: the launch fetch needs the poller directly, and it
 /// must not go through `MenuDataSource.refresh()`, which maps to `.manual`.
 var launchFetch: (@Sendable () async -> Void)?
@@ -190,6 +193,12 @@ if ProcessInfo.processInfo.environment["BRIGHTSPACEBAR_STUB"] == "1" {
         // better recovery here than serving what the file still holds.
         _ = try? manualStore.add(item)
     }
+    deleteItem = { id in
+        // The removed item comes back for a future undo; today the ✕ is the
+        // whole interaction (user decision: no confirm, delete is cheap to
+        // redo by re-adding).
+        _ = try? manualStore.delete(id: id)
+    }
 
     // SEAM: from here down the stack is only ever seen as `MenuDataSource`.
     // `timeZone` is `.current` — read once here, in the shell, because
@@ -242,7 +251,8 @@ if ProcessInfo.processInfo.environment["BRIGHTSPACEBAR_STUB"] == "1" {
 let controller = StatusBarController(
     dataSource: dataSource,
     opener: BrowserTarget.resolve().makeOpener(),
-    onAddItem: addItem
+    onAddItem: addItem,
+    onDeleteItem: deleteItem
 )
 
 // SEAM: the login challenge. The daemon writes the Entra verification number to

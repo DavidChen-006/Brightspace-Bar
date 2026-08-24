@@ -28,17 +28,21 @@ public struct MenuAssembler {
     /// feature (stubs, most tests) — the Add button then closes the menu and
     /// discards, which is the honest degradation for a seam nobody wired.
     private let onAddItem: (@MainActor (AddItemDraft) -> Void)?
+    /// Deletes one of the student's own items (Intent 4); nil disables the ✕.
+    private let onDeleteItem: (@MainActor (UUID) -> Void)?
 
     public init(
         opener: any URLOpening,
         now: @escaping () -> Date = Date.init,
         onAddItem: (@MainActor (AddItemDraft) -> Void)? = nil,
+        onDeleteItem: (@MainActor (UUID) -> Void)? = nil,
         onCommand: @escaping @MainActor (MenuCommand) -> Void
     ) {
         self.target = MenuActionTarget(opener: opener, onCommand: onCommand)
         self.opener = opener
         self.now = now
         self.onAddItem = onAddItem
+        self.onDeleteItem = onDeleteItem
     }
 
     /// Builds a fresh menu with fresh items every call. Never reuses an
@@ -113,7 +117,8 @@ public struct MenuAssembler {
                 // The day popup's click seam — the SAME opener every menu row
                 // uses, so a popup row and a submenu row open through one path
                 // and the browser-target switch governs both.
-                opener: self.opener
+                opener: self.opener,
+                onDeleteItem: self.onDeleteItem
             )
             return [item]
 

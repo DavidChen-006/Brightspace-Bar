@@ -88,11 +88,14 @@ final class GraphDayPopupController {
     }
 
     /// How long a dismiss trigger (empty cell, off the grid) waits before the
-    /// panel actually goes — the safe-triangle budget for travelling down-right
+    /// panel actually goes — the travel budget for moving straight down
     /// from the cell into the popup. Entering the popup cancels it.
-    static let graceDelay: TimeInterval = 0.3
+    static let graceDelay: TimeInterval = 0.5
 
     private let opener: any URLOpening
+    /// Deletes one of the student's own items (Intent 4), or nil for a build
+    /// without the feature — the ✕ then simply does not render.
+    private let onDeleteItem: (@MainActor (UUID) -> Void)?
     /// Closes the whole menu after a row click — supplied by the hosting view,
     /// which is the layer that knows a menu exists at all.
     private let dismissMenu: () -> Void
@@ -105,8 +108,13 @@ final class GraphDayPopupController {
     /// its size was read) was invisible to every headless assertion we had.
     var panelFrameForTesting: CGRect? { self.panel?.frame }
 
-    init(opener: any URLOpening, dismissMenu: @escaping () -> Void) {
+    init(
+        opener: any URLOpening,
+        onDeleteItem: (@MainActor (UUID) -> Void)? = nil,
+        dismissMenu: @escaping () -> Void
+    ) {
         self.opener = opener
+        self.onDeleteItem = onDeleteItem
         self.dismissMenu = dismissMenu
     }
 
@@ -118,6 +126,16 @@ final class GraphDayPopupController {
 
         let content = GraphPopupContentView(
             detail: detail,
+            onDelete: self.onDeleteItem.map { delete in
+                { [weak self] id in
+                    // Delete, then close everything: the menu model is rebuilt
+                    // on the next open with the item (and its square) gone.
+                    delete(id)
+                    guard let self else { return }
+                    self.dismiss()
+                    self.dismissMenu()
+                }
+            },
             onClick: { [weak self] url in
                 guard let self else { return }
                 self.opener.open(url)
@@ -211,7 +229,12 @@ final class GraphPopupContentView: NSView {
 
     override var isFlipped: Bool { true }
 
-    init(detail: GraphDayDetail, onClick: @escaping (URL) -> Void, onHoverChange: @escaping (Bool) -> Void) {
+    init(
+        detail: GraphDayDetail,
+        onDelete: ((UUID) -> Void)? = nil,
+        onClick: @escaping (URL) -> Void,
+        onHoverChange: @escaping (Bool) -> Void
+    ) {
         self.onHoverChange = onHoverChange
 
         // Width: the widest line wins, capped — a long assignment name
@@ -240,7 +263,7 @@ final class GraphPopupContentView: NSView {
         self.addSubview(captionField)
 
         for (index, item) in detail.items.enumerated() {
-            let row = GraphPopupRowView(item: item, onClick: onClick)
+            let row = GraphPopupRowView(item: item, onDelete: onDelete, onClick: onClick)
             row.frame = CGRect(
                 x: pad,
                 y: pad + GraphPopupMetrics.captionHeight + GraphPopupMetrics.captionGap
@@ -300,6 +323,7 @@ final class GraphPopupContentView: NSView {
 /// text — an 11pt word is a poor thing to have to hit inside a menu.
 final class GraphPopupRowView: NSView {
     private let item: GraphDayItem
+    private let onDelete: ((UUID) -> Void)?
     private let onClick: (URL) -> Void
     private var isHovered = false {
         didSet {
@@ -310,10 +334,21 @@ final class GraphPopupRowView: NSView {
 
     override var isFlipped: Bool { true }
 
-    init(item: GraphDayItem, onClick: @escaping (URL) -> Void) {
+    init(item: GraphDayItem, onDelete: ((UUID) -> Void)? = nil, onClick: @escaping (URL) -> Void) {
         self.item = item
+        self.onDelete = onDelete
         self.onClick = onClick
         super.init(frame: .zero)
+    }
+
+    /// The ✕ renders only on the student's own items with a deleter wired —
+    /// fetched rows have nothing to delete (a refresh restores them anyway).
+    private var showsDelete: Bool { self.item.manualId != nil && self.onDelete != nil }
+
+    /// Where the ✕ hit-target sits: the row's trailing edge, past the kind
+    /// label, full row height so it is comfortable to hit at 11pt.
+    private var deleteRect: CGRect {
+        CGRect(x: self.bounds.width - 16, y: 0, width: 16, height: self.bounds.height)
     }
 
     @available(*, unavailable)
@@ -351,10 +386,28 @@ final class GraphPopupRowView: NSView {
             NSBezierPath(roundedRect: self.bounds, xRadius: 3, yRadius: 3).fill()
         }
 
+        // A simple ✕ (user decision: no confirm, no management list), drawn
+        // only while the row is hovered so unhovered rows stay clean.
+        var trailingInset: CGFloat = 0
+        if self.showsDelete {
+            trailingInset = self.deleteRect.width + 2
+            if self.isHovered {
+                let x = NSAttributedString(string: "✕", attributes: [
+                    .font: NSFont.systemFont(ofSize: 11, weight: .semibold),
+                    .foregroundColor: NSColor.secondaryLabelColor,
+                ])
+                let size = x.size()
+                x.draw(at: CGPoint(
+                    x: self.deleteRect.midX - size.width / 2,
+                    y: (self.bounds.height - size.height) / 2
+                ))
+            }
+        }
+
         let kind = Self.kindLabel(of: self.item)
         let kindSize = kind.size()
         kind.draw(at: CGPoint(
-            x: self.bounds.width - kindSize.width,
+            x: self.bounds.width - trailingInset - kindSize.width,
             y: (self.bounds.height - kindSize.height) / 2
         ))
 
@@ -364,7 +417,7 @@ final class GraphPopupRowView: NSView {
         title.draw(
             with: CGRect(
                 x: 0, y: (self.bounds.height - title.size().height) / 2,
-                width: self.bounds.width - kindSize.width - GraphPopupMetrics.kindGap,
+                width: self.bounds.width - trailingInset - kindSize.width - GraphPopupMetrics.kindGap,
                 height: title.size().height
             ),
             options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine]
@@ -385,6 +438,11 @@ final class GraphPopupRowView: NSView {
     override func mouseExited(with event: NSEvent) { self.isHovered = false }
 
     override func mouseUp(with event: NSEvent) {
+        let point = self.convert(event.locationInWindow, from: nil)
+        if self.showsDelete, self.deleteRect.contains(point), let id = self.item.manualId {
+            self.onDelete?(id)
+            return
+        }
         self.onClick(self.item.url)
     }
 }

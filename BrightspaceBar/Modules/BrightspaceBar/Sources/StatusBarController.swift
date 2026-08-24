@@ -16,6 +16,10 @@ public final class StatusBarController {
     /// closure because this file may not import a storage module; the
     /// composition root owns what "persist" means.
     private let onAddItem: (@MainActor (AddItemDraft) -> Void)?
+    /// Deletes one of the student's own items by id (Intent 4), or nil for a
+    /// build without the feature. Injected like `onAddItem` and for the same
+    /// reason: this file may not import a storage module.
+    private let onDeleteItem: (@MainActor (UUID) -> Void)?
     private let statusItem: NSStatusItem
     private var shownModel: MenuModel?
 
@@ -29,6 +33,12 @@ public final class StatusBarController {
             // Re-pull immediately: the data source reads manual items fresh on
             // every snapshot, so the next menu open shows the new item's square.
             Task { await self.reload() }
+        },
+        onDeleteItem: { [weak self] id in
+            guard let self else { return }
+            self.onDeleteItem?(id)
+            // Same re-pull as an add: the next open shows the square lightened.
+            Task { await self.reload() }
         }
     ) { [weak self] command in
         self?.handle(command)
@@ -37,11 +47,13 @@ public final class StatusBarController {
     public init(
         dataSource: any MenuDataSource,
         opener: any URLOpening,
-        onAddItem: (@MainActor (AddItemDraft) -> Void)? = nil
+        onAddItem: (@MainActor (AddItemDraft) -> Void)? = nil,
+        onDeleteItem: (@MainActor (UUID) -> Void)? = nil
     ) {
         self.dataSource = dataSource
         self.opener = opener
         self.onAddItem = onAddItem
+        self.onDeleteItem = onDeleteItem
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         self.statusItem.button?.image = Self.logoImage
         Self.warmUp()

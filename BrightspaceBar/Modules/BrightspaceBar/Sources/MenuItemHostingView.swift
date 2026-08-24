@@ -143,10 +143,13 @@ public final class MenuItemHostingView: NSView {
     public var isHighlightedForMenu = false {
         didSet {
             guard oldValue != self.isHighlightedForMenu else { return }
-            // Losing the highlight means the pointer left this course entirely
-            // (another row, or off the menu) — the day popup goes with it, no
-            // grace: the grace period exists for travel WITHIN the grid.
-            if !self.isHighlightedForMenu { self.popup?.dismiss() }
+            // Losing the highlight gets the GRACE dismiss, not the hard one:
+            // the popup hangs BELOW the row, so the pointer travelling into it
+            // necessarily exits this item (de-highlighting it) on the way —
+            // an immediate dismiss here made the popup untouchable (user
+            // report, 2026-08-24). Arriving in the popup cancels the grace;
+            // genuinely leaving lets it fire.
+            if !self.isHighlightedForMenu { self.popup?.scheduleDismiss() }
             self.hosting.rootView = self.card
             self.needsDisplay = true
         }
@@ -161,7 +164,8 @@ public final class MenuItemHostingView: NSView {
     public init(
         title: String, cells: [GraphCell], showsChevron: Bool, monthLabels: [String?] = [],
         weekLines: [String] = [],
-        opener: (any URLOpening)? = nil
+        opener: (any URLOpening)? = nil,
+        onDeleteItem: (@MainActor (UUID) -> Void)? = nil
     ) {
         self.title = title
         self.cells = cells
@@ -185,7 +189,7 @@ public final class MenuItemHostingView: NSView {
         // After super.init, because closing the menu on a popup click needs
         // `self` — this view is the one layer that knows a menu exists at all.
         if let opener {
-            self.popup = GraphDayPopupController(opener: opener) { [weak self] in
+            self.popup = GraphDayPopupController(opener: opener, onDeleteItem: onDeleteItem) { [weak self] in
                 self?.enclosingMenuItem?.menu?.cancelTracking()
             }
             self.hosting.rootView = self.card
@@ -300,13 +304,16 @@ struct CourseCardView: View {
                     )
                     if !self.weekLines.isEmpty {
                         VStack(alignment: .leading, spacing: 2) {
-                            ForEach(self.weekLines, id: \.self) { line in
+                            ForEach(Array(self.weekLines.enumerated()), id: \.offset) { index, line in
+                                // Line 0 is the "This week" heading — semibold
+                                // and label-strength, naming the window the
+                                // dimmer lines under it describe.
                                 Text(line)
-                                    .font(.system(size: 10))
+                                    .font(.system(size: 10, weight: index == 0 ? .semibold : .regular))
                                     .foregroundStyle(Color(
                                         self.isHighlighted
                                             ? NSColor.selectedMenuItemTextColor
-                                            : NSColor.secondaryLabelColor
+                                            : index == 0 ? NSColor.labelColor : NSColor.secondaryLabelColor
                                     ))
                                     .lineLimit(1)
                             }
