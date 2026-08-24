@@ -1,0 +1,16 @@
+# Dependabot: npm (the Node daemon) and GitHub Actions.
+#
+# The Swift package (BrightspaceBar/) has zero external SPM dependencies, and
+# Dependabot's Swift support is limited anyway — so there is no swift ecosystem
+# entry here. Revisit if Package.swift ever grows a dependency.
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/session-capture"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
