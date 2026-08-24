@@ -15,10 +15,17 @@
  * A warm session passes straight through it, so the wrap is safe to apply
  * always and is what makes the click reliable rather than usually-fine.
  *
- * KNOWN LIMITATION (deferred by decision): the profile is single-instance, so a
- * click while a refresh holds the profile — or a second click while the first
- * window is open — fails to launch. It degrades to a clear message and a
- * non-zero exit, never a crash; the app treats the spawn as fire-and-forget.
+ * SECOND CLICKS ADD A TAB. The profile is single-instance, so a second launch
+ * while the first window is open would fail. Instead, the first click launches
+ * with a CDP port open (localhost only), and every later click connects to the
+ * running browser over that port and opens the link as a NEW TAB — additive,
+ * nothing tracked, the browser window is the only state. If nothing answers
+ * the port, this IS the first click and a fresh launch happens.
+ *
+ * REMAINING LIMITATION (deferred by decision): a click while a headless
+ * REFRESH holds the profile still fails — the refresh launches without the
+ * port. It degrades to a clear message and a non-zero exit, never a crash;
+ * the app treats the spawn as fire-and-forget.
  */
 import { pathToFileURL } from "node:url";
 
@@ -49,6 +56,37 @@ export function initiateLoginTarget(deepLink, entityId = SAML_ENTITY_ID) {
   );
 }
 
+/**
+ * The rendezvous for tab-adding: the first click launches Chromium with CDP on
+ * this port (bound to localhost by Chromium itself), and later clicks find the
+ * running browser here. Fixed, not discovered — a port is the whole protocol.
+ */
+export const CDP_PORT = Number(process.env.BSB_OPEN_CDP_PORT ?? 9223);
+
+/**
+ * Try to add `deepLink` as a new tab in an already-running view browser.
+ * @returns {Promise<boolean>} true if a running browser took the tab.
+ */
+async function addTabToRunningBrowser(chromium, deepLink) {
+  let browser;
+  try {
+    browser = await chromium.connectOverCDP(`http://127.0.0.1:${CDP_PORT}`, { timeout: 2_000 });
+  } catch {
+    return false; // Nothing listening: this is the first click.
+  }
+  try {
+    const context = browser.contexts()[0];
+    if (!context) return false;
+    const page = await context.newPage();
+    await page.goto(initiateLoginTarget(deepLink), { waitUntil: "domcontentloaded", timeout: 60_000 });
+    return true;
+  } finally {
+    // Detach only — the browser and its tabs are the user's, not this
+    // process's; disconnecting leaves everything on screen.
+    await browser.close().catch(() => {});
+  }
+}
+
 /** Open `deepLink` in the persistent profile, headed, and hold the window. */
 async function openInProfile(deepLink) {
   // Imported lazily and locally so the pure function above stays importable by
@@ -56,6 +94,9 @@ async function openInProfile(deepLink) {
   const { chromium } = await import("playwright");
   const { resolvePaths } = await import("./paths.mjs");
   const { mkdirSync } = await import("node:fs");
+
+  // A browser from an earlier click already up? Add a tab and get out.
+  if (await addTabToRunningBrowser(chromium, deepLink)) return;
 
   const { profileDir } = resolvePaths();
   mkdirSync(profileDir, { recursive: true });
@@ -65,9 +106,12 @@ async function openInProfile(deepLink) {
     context = await chromium.launchPersistentContext(profileDir, {
       headless: false,
       viewport: null,
+      // Leaves the door open for every subsequent click to add its tab.
+      args: [`--remote-debugging-port=${CDP_PORT}`],
     });
   } catch (error) {
-    // The single-instance case: a refresh or another view window holds it.
+    // A headless refresh holds the profile (the one launch path with no CDP
+    // port), or the launch lost a race with another first click.
     console.error("could not open the browser — the profile is in use");
     console.error(String(error?.message ?? error).split("\n")[0]);
     process.exit(1);
