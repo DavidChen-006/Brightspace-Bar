@@ -1,4 +1,0 @@
-# The probe runs on a COPY of a persistent profile — a credential store.
-artifacts/profile*/
-artifacts/*.png
-node_modules/

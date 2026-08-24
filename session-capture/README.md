@@ -19,7 +19,7 @@ Both capture scripts run on a **persistent browser profile**
 keeps the Microsoft Entra cookie (`ESTSAUTHPERSISTENT`, ~90-day lifetime) from
 your last real login, so most captures complete **silently in seconds** — the
 dead D2L session re-mints itself through SSO with no password and no MFA
-(proven in `../experiments/experiment-10-entra-silent-sso`). You are only asked to sign in
+(proven in `experiment-10-entra-silent-sso`). You are only asked to sign in
 when the Entra session itself has expired.
 
 Then install it into the app:
@@ -43,7 +43,7 @@ path safe to run from an agent's shell. It is also the closer analogue of
 where the app is heading: an in-app `WKWebView` login window where the user
 signs in and the app only reads the resulting cookie store.
 
-**`auto-capture.mjs`** (ported from `../experiments/experiment-1-fresh-cookie`, which stays
+**`auto-capture.mjs`** (ported from `experiment-1-fresh-cookie`, which stays
 frozen as the experiment record) types `BS_EMAIL`/`BS_PASSWORD` for you, so a
 full login costs only the MFA tap on your phone. Credentials are demanded only
 *after* the silent path has actually failed — a cron can run it with no
@@ -78,7 +78,7 @@ Useful on its own too: XSRF tokens rotate independently of the cookie.
 The D2L cookie dying daily no longer matters much: with the persistent
 profile, a capture re-mints it silently for as long as the Entra session
 lives. The Entra cookie claims 90 days; its *real* honored lifetime is being
-measured by `../experiments/experiment-10-entra-silent-sso`'s daily journal.
+measured by `experiment-10-entra-silent-sso`'s daily journal.
 
 Note the two different death signatures on the same endpoint; code that keys on
 status alone will misread one of them. Whether expiry is idle-based or absolute is
@@ -93,6 +93,6 @@ src/refresh-xsrf.mjs     live cookie -> fresh CSRF token, merged in place
 artifacts/session.json   the capture. A CREDENTIAL — gitignored, never committed
 ```
 
-`node_modules` is a symlink to `../experiments/experiment-1-fresh-cookie`'s Playwright install so
+`node_modules` is a symlink to `experiment-1-fresh-cookie`'s Playwright install so
 there is one 300 MB browser download in this repo, not two. `npm install` here
 works if that ever breaks.

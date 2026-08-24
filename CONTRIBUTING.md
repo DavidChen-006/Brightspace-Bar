@@ -40,5 +40,6 @@ Run the Swift tests before pushing — they include the architecture checks belo
 
 ## Experiments
 
-`experiments/` contains historical one-off probes kept for reference. They are
-not subject to the review standards above.
+The historical one-off probes referenced throughout the code (`experiment-*`)
+live on the `experiments` branch, kept for reference. They are not subject to
+the review standards above.

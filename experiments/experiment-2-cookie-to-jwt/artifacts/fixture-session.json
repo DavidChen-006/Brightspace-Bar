@@ -1,7 +1,0 @@
-{
-  "capturedAt": 1786230000000,
-  "baseUrl": "https://purdue.brightspace.com",
-  "cookieHeader": "d2lSessionVal=FAKE; d2lSecureSessionVal=FAKE",
-  "csrfToken": "FAKE",
-  "landedUrl": "https://purdue.brightspace.com/d2l/home"
-}

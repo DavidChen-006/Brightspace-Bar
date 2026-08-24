@@ -2,7 +2,7 @@
 
 Hand-built from a **live capture** of
 `GET /d2l/api/le/1.96/{orgUnitId}/dropbox/folders/`, recorded by
-`experiments/experiment-7-assignment-deeplinks/artifacts/approach-a.json` against the real
+`experiment-7-assignment-deeplinks/artifacts/approach-a.json` against the real
 Purdue tenant on 2026-08-09.
 
 They are hand-built rather than saved verbatim for one reason: experiment 6
