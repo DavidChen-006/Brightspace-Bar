@@ -2,12 +2,12 @@
 
 ## Phase 1 — Freeze the Working Baseline
 
-- [ ] **1. Confirm the app actually works locally**
+- [x] **1. Confirm the app actually works locally**
   - Start from a clean restart.
   - Test the main user flow.
   - Make sure you know the exact commands required to run it.
 
-- [ ] **2. Commit the known-good local version**
+- [x] **2. Commit the known-good local version**
   - Get to a clean `git status`.
   - Make one baseline commit before doing open-source cleanup.
   - Tag it mentally as: *this is the version that worked before I touched packaging/docs.*
