@@ -6,7 +6,9 @@
  *                      (experiment 10, which ran headless).
  *   fullLoginCapture — also headless (D3 as amended: the status-bar icon shows
  *                      the number, so the window has nothing left to display).
- *                      Tries silent first, then autofills BS_EMAIL/BS_PASSWORD
+ *                      Tries silent first, then autofills the stored credentials
+ *                      (env BS_EMAIL/BS_PASSWORD or credentials.json, via
+ *                      credentials.mjs)
  *                      and waits for the human to approve the number-match on
  *                      their phone. `BSB_FULL_HEADED=1` opens a window for a
  *                      developer who wants to watch a login go by.
@@ -26,6 +28,7 @@
  * cookies leave through the return value only.
  */
 import { mkdirSync } from "node:fs";
+import { loadCredentials } from "../credentials.mjs";
 import {
   clickThroughSilentSurfaces,
   extractXsrf,
@@ -95,11 +98,16 @@ export async function fullLoginCapture({ profileDir, baseUrl, log, onMfaNumber }
       return harvest({ page, context, baseUrl, log });
     }
 
-    const email = process.env.BS_EMAIL;
-    const password = process.env.BS_PASSWORD;
-    if (!email || !password) {
-      return { ok: false, reason: "silent SSO failed and BS_EMAIL/BS_PASSWORD are not set" };
+    // Env first, then the stored credentials.json — one lookup, one priority.
+    const credentials = loadCredentials();
+    if (!credentials) {
+      return {
+        ok: false,
+        reason:
+          "silent SSO failed and no credentials found — run `make start` (it prompts and stores them) or set BS_EMAIL/BS_PASSWORD",
+      };
     }
+    const { email, password } = credentials;
 
     if (!(await autofillCredentials(page, { email, password, log }))) {
       // A step that never found its field means the login was never submitted,
