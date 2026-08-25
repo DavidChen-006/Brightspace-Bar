@@ -1,6 +1,8 @@
 # BrightspaceBar
 
-A macOS menu-bar app showing your Purdue Brightspace courses. Click the icon,
+A macOS menu-bar app showing your Brightspace (D2L) courses — any school on
+Brightspace works; point `BS_BASE_URL` at your tenant (e.g.
+`https://yourschool.brightspace.com`, defaults to Purdue's). Click the icon,
 see your classes, click one, Brightspace opens. Modeled on
 [RepoBar](https://github.com/steipete/RepoBar)'s pattern; zero external
 dependencies.
