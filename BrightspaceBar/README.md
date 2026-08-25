@@ -5,7 +5,8 @@ Brightspace works; point `BS_BASE_URL` at your tenant (e.g.
 `https://yourschool.brightspace.com`, defaults to Purdue's). Click the icon,
 see your classes, click one, Brightspace opens. Modeled on
 [RepoBar](https://github.com/steipete/RepoBar)'s pattern; zero external
-dependencies.
+dependencies. Local-only: no server, no telemetry — your credentials go only
+to your school's own sign-in page.
 
 ## Run it
 
@@ -35,6 +36,25 @@ make live         # + live-tenant tests, which spawn the real daemon
 make smoke        # launch and verify the process survives
 make -C Modules/CoursePipeline test   # one module's slice
 ```
+
+## Privacy: everything stays on your Mac
+
+There is no server behind this app. No account with us, no telemetry, no
+analytics, no third-party API — the Swift app has zero external dependencies
+and only ever reads local files.
+
+- **Your password never leaves your machine except to your school's own
+  sign-in page.** The login daemon drives a local Chromium against the same
+  Microsoft Entra / Brightspace pages you'd use in Safari — nothing in
+  between, nowhere else.
+- **Login state is stored locally, readable only by you.** The browser
+  profile and `session.json` live under
+  `~/Library/Application Support/BrightspaceBar`, gitignored and never
+  uploaded.
+- **Session cookies are treated as credentials too** — cached locally, sent
+  only to your Brightspace tenant.
+- **The menu-bar app itself never touches secrets.** It renders cached JSON;
+  the daemon owns the login (see ARCHITECTURE.md).
 
 ## Understand it
 
