@@ -221,7 +221,7 @@
   - First paragraph should answer:
     > What does this do and why would I use it?
 
-- [ ] **31. Show the project**
+- [x] **31. Show the project**
   - Screenshot.
   - GIF.
   - Demo.
@@ -461,9 +461,9 @@
 
 - [x] **82. Push the repository to GitHub**
 
-- [ ] **83. Verify the README renders correctly on GitHub**
+- [x] **83. Verify the README renders correctly on GitHub**
 
-- [ ] **84. Verify links and images work**
+- [x] **84. Verify links and images work**
 
 - [x] **85. Verify a fresh GitHub clone still works**
 
