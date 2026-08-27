@@ -4,7 +4,7 @@ A macOS menu-bar app for Purdue Brightspace (D2L): your courses, a GitHub-style
 due-date heatmap per class, and one-click deep links that land already signed
 in — without your credentials ever touching the app.
 
-<img src="docs/screenshot.png" alt="BrightspaceBar menu" width="416">
+<img src="docs/screenshot.png" alt="BrightspaceBar menu" width="382">
 
 ## What it does
 
