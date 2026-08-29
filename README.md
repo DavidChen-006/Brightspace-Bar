@@ -1,4 +1,10 @@
-# BrightspaceBar
+# BrightspaceBar 📅 — Brightspace without the tab sprawl
+
+[![CI](https://img.shields.io/github/actions/workflow/status/DavidChen-006/BrightspaceBar/ci.yml?branch=main&label=ci)](https://github.com/DavidChen-006/BrightspaceBar/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/DavidChen-006/BrightspaceBar?label=release&color=orange)](https://github.com/DavidChen-006/BrightspaceBar/releases/latest)
+![macOS 14+](https://img.shields.io/badge/macOS-14%2B-black?logo=apple)
+![Swift 6.2](https://img.shields.io/badge/Swift-6.2-F05138?logo=swift&logoColor=white)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 A macOS menu-bar app for Brightspace (D2L): your courses, a GitHub-style
 due-date heatmap per class, and one-click deep links that land already signed
