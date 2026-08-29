@@ -210,11 +210,12 @@ struct CurrentnessRenderingTests {
         #expect(messages(model).isEmpty)
     }
 
-    @Test("a current-but-untermed course still renders under Other")
-    func currentUntermedStillGetsOther() {
+    @Test("a current-but-untermed course still renders, ordered last")
+    func currentUntermedStillRendersLast() {
         // Arrange — the nil-bucket grouping machinery is deliberately kept: a
         // course that IS current but whose code carries no term (STARS 2025's
-        // shape) still needs a header, and "which semester?" is unanswerable.
+        // shape) still renders, filed after every termed course. No header
+        // names the bucket any more (term headers left the menu 2026-08-29).
         let enrolled = [
             course(id: 1, start: "2025-08-14T04:00:00.000Z", end: "2025-12-29T04:59:00.000Z"),
             course(id: 5, code: "stars_2025", start: nil, end: "2026-01-12T18:01:00.000Z"),
@@ -225,7 +226,7 @@ struct CurrentnessRenderingTests {
 
         // Assert
         #expect(renderedIds(model) == [1, 5])
-        #expect(headers(model).last == "Other")
+        #expect(headers(model).isEmpty)
     }
 
     @Test("no current courses but some exist → honest message, nothing else rendered")

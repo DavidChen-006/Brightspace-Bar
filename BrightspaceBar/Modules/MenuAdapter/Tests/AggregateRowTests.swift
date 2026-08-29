@@ -112,13 +112,11 @@ struct AggregateRowTests {
             return
         }
         #expect(aggregate.id == -1)
-        #expect(aggregate.title == "All classes")
+        #expect(aggregate.title == "Fall 2025 All classes")  // 202610, per the fixtures
         #expect(aggregate.url == RealData.baseURL.appending(path: "d2l/home"))
         #expect(aggregate.submenu.isEmpty, "the aggregate is a view, not a course")
         #expect(model.rows[1] == .separator)
-        if case .sectionHeader = model.rows[2] {} else {
-            Issue.record("the section headers must follow the aggregate prelude")
-        }
+        #expect(model.rows[2] == .hairline, "the course list follows the aggregate prelude directly")
     }
 
     @Test("with a single course there is no aggregate row")
@@ -127,11 +125,9 @@ struct AggregateRowTests {
         // leading "All classes" row would just duplicate it.
         let model = menu(courses: [Self.hostA])
 
-        // Assert — no id == -1 anywhere, and the menu opens on its header.
+        // Assert — no id == -1 anywhere, and the menu opens on the course list.
         #expect(!model.courses.contains { $0.id == -1 })
-        if case .sectionHeader = model.rows.first {} else {
-            Issue.record("a single-course menu must open on its section header")
-        }
+        #expect(model.rows.first == .hairline, "a single-course menu opens on its course boundary")
     }
 
     @Test("an empty enrollment has no aggregate row either")

@@ -154,13 +154,14 @@ public enum MenuTranslation {
 
     // MARK: - Grouping
 
-    /// Header for courses whose code carries no term.
-    private static let untermedHeader = "Other"
-
-    /// `[.sectionHeader, .course...]` per term, newest term first, untermed last.
-    /// Undated courses group under "Other" even when their code carries a term:
-    /// with no dates, "which semester is this?" is unanswerable, and filing it
-    /// under a term header would claim otherwise.
+    /// `[.course...]` per term, newest term first, untermed last. The term no
+    /// longer earns its own `.sectionHeader` row (user decision, 2026-08-29):
+    /// the raw code read as noise ("202710"), and with only current courses
+    /// rendered there is one term on screen — so its name moved into the
+    /// aggregate's title ("Fall 2026 All classes") and the grouping here
+    /// survives purely as ORDER: term codes descending, then code ascending.
+    /// Undated courses group last even when their code carries a term: with no
+    /// dates, "which semester is this?" is unanswerable.
     private static func groupedCourseRows(
         _ courses: [Course],
         baseURL: URL,
@@ -178,11 +179,11 @@ public enum MenuTranslation {
         // explicitly — otherwise the menu would reshuffle between refreshes and
         // `MenuModel`'s `Equatable` (which the GUI uses to skip rebuilding)
         // would compare unequal on identical data.
-        var groups: [(header: String, courses: [Course])] = grouped
+        var groups: [(term: String, courses: [Course])] = grouped
             .compactMap { key, value in key.map { ($0, value) } }
-            .sorted { $0.header > $1.header }  // raw term codes, descending = newest first
+            .sorted { $0.term > $1.term }  // raw term codes, descending = newest first
         if let untermed = grouped[nil] {
-            groups.append((self.untermedHeader, untermed))
+            groups.append(("", untermed))
         }
 
         return groups.flatMap { group -> [MenuRow] in
@@ -191,9 +192,8 @@ public enum MenuTranslation {
             // A `.hairline` leads EVERY course (NewVertical-3 §3.1). Stated as
             // "before each course" rather than "between courses" because that is
             // the form with no fence posts to get wrong: one boundary per course,
-            // never two adjacent, never trailing, and a group of one still gets
-            // its line under the header.
-            return [.sectionHeader(group.header)] + sorted.flatMap { course -> [MenuRow] in
+            // never two adjacent, never trailing.
+            return sorted.flatMap { course -> [MenuRow] in
                 [.hairline, .course(self.row(
                     for: course, baseURL: baseURL,
                     // Absent key == `neverFetched`, which `AssignmentTranslation`
@@ -264,9 +264,16 @@ public enum MenuTranslation {
             )
         }
 
+        // The term lives in this title now, not in a section header of its own
+        // (user decision, 2026-08-29): "Fall 2026 All classes". Newest term
+        // wins when courses somehow span terms; no term degrades to the bare
+        // title rather than showing a raw code.
+        let newestTerm = visible.compactMap { self.term(of: $0.code) }.max()
+        let title = newestTerm.map { "\(self.termDisplayName($0)) All classes" } ?? "All classes"
+
         return CourseRow(
             id: -1,  // Reserved: real course ids are positive (D2L orgUnitIds).
-            title: "All classes",
+            title: title,
             url: baseURL.appending(path: "d2l/home"),
             submenu: [],  // No submenu: the aggregate is a view, not a course.
             graph: cells,
@@ -357,6 +364,24 @@ public enum MenuTranslation {
         let parts = code.components(separatedBy: ".")
         guard parts.count >= 2, self.isDigits(parts[1], exactly: 6) else { return nil }
         return parts[1]
+    }
+
+    /// Purdue term code → human name: `202710` → "Fall 2026".
+    ///
+    /// The scheme is `YYYYTT` where `YYYY` is the ACADEMIC year (which starts
+    /// the fall before) and `TT` the term within it: 10 = Fall of `YYYY - 1`,
+    /// 20 = Spring of `YYYY`, 30 = Summer of `YYYY`. Pure and total: anything
+    /// outside the scheme comes back verbatim — honest over pretty, so a code
+    /// D2L invents tomorrow degrades to exactly what the menu showed before
+    /// this function existed.
+    public static func termDisplayName(_ code: String) -> String {
+        guard self.isDigits(code, exactly: 6), let year = Int(code.prefix(4)) else { return code }
+        switch code.suffix(2) {
+        case "10": return "Fall \(year - 1)"
+        case "20": return "Spring \(year)"
+        case "30": return "Summer \(year)"
+        default: return code
+        }
     }
 
     // MARK: - Per-course derivations

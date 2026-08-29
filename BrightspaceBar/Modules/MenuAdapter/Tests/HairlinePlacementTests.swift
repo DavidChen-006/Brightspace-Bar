@@ -43,13 +43,11 @@ import MenuAdapter
 //
 // At TOP LEVEL, a `.hairline` sits immediately BEFORE every `.course` row:
 //
-//     .sectionHeader("202620")
-//     .hairline                  ← between a header and its first course
-//     .course(…)
-//     .hairline                  ← between consecutive courses
-//     .course(…)
-//     .sectionHeader("202610")
-//     .hairline
+//     .hairline                  ← before a group's first course
+//     .course(…)                    (term headers left the menu 2026-08-29;
+//     .hairline                  ← between consecutive courses      groups
+//     .course(…)                    survive as order only)
+//     .hairline                  ← the next group's edge, same rule
 //     .course(…)
 //     .separator                 ← UNCHANGED: the footer stays a native separator
 //     .status(…)
@@ -103,7 +101,7 @@ struct HairlinePlacementTests {
 
     // ── Priority 1: the fence-post cases ─────────────────────────────────────
 
-    @Test("a single-term menu reads header, hairline, course, hairline, course")
+    @Test("a single-term menu reads hairline, course, hairline, course")
     func oneGroupGetsABoundaryBeforeEachCourse() {
         // Arrange — two courses under one term: the smallest model that shows both
         // fence posts at once, the header→first-course boundary and the
@@ -124,13 +122,13 @@ struct HairlinePlacementTests {
         // Intent 3) — an unbounded prelude, not part of the hairline rule.
         #expect(shape(model.rows) == [
             "course", "separator",
-            "header", "hairline", "course", "hairline", "course",
+            "hairline", "course", "hairline", "course",
             "separator", "command", "command",
         ])
     }
 
-    @Test("each group's first course gets its own boundary under its header")
-    func everyGroupRepeatsTheHeaderBoundary() {
+    @Test("each group's first course gets its own boundary at the group edge")
+    func everyGroupRepeatsTheBoundary() {
         // Arrange — two terms, so the rule is exercised at a group edge and not
         // just once at the top of the menu.
         let courses = [
@@ -148,8 +146,8 @@ struct HairlinePlacementTests {
         // the grouped shape as before.
         #expect(shape(model.rows) == [
             "course", "separator",
-            "header", "hairline", "course",
-            "header", "hairline", "course", "hairline", "course",
+            "hairline", "course",
+            "hairline", "course", "hairline", "course",
             "separator", "command", "command",
         ])
     }
@@ -271,7 +269,7 @@ struct HairlinePlacementTests {
         ])
     }
 
-    @Test("a current-but-untermed course still gets its boundary under the Other header")
+    @Test("a current-but-untermed course still gets its boundary, filed last")
     func theOtherGroupStillBoundsItsCourses() {
         // Arrange — the nil-bucket machinery is intentionally kept: a course
         // that is current but untermed (STARS 2025's shape — nil start, real
@@ -293,8 +291,8 @@ struct HairlinePlacementTests {
         // (aggregate row, Intent 3); the Other group's boundary holds after it.
         #expect(shape(model.rows) == [
             "course", "separator",
-            "header", "hairline", "course",
-            "header", "hairline", "course",
+            "hairline", "course",
+            "hairline", "course",
             "separator", "command", "command",
         ])
     }

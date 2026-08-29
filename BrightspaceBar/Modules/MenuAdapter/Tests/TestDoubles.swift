@@ -215,6 +215,4 @@ enum RealData {
 
     /// "Other" survives only because STARS 2025 is current-but-untermed — the
     /// nil-bucket machinery still renders, undated courses just never reach it.
-    static let headersAtMidFall2025 = ["202610", "Other"]
-    static let countsAtMidFall2025: [String: Int] = ["202610": 6, "Other": 1]
 }

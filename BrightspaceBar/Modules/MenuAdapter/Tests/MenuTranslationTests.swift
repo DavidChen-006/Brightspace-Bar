@@ -91,7 +91,9 @@ import MenuAdapter
 //   status row no longer makes identical menus compare unequal across time.
 //
 // ── overall shape ────────────────────────────────────────────────────────────
-//   [headers + courses, grouped] + .separator + .status? + .refresh + .quit
+//   [courses, grouped newest term first] + .separator + .status? + .refresh + .quit
+//   (term section headers left the menu 2026-08-29 — the term names the
+//   aggregate's title instead; grouping survives as order only)
 //
 //   Empty courses + nil lastFetch  →  exactly MenuModel.placeholder
 //   Empty courses + a lastFetch    →  a message and the commands
@@ -360,12 +362,10 @@ struct MenuTranslationTests {
 
     // ── Derivations: term grouping ──────────────────────────────────────────
 
-    @Test("term header first, Other last — regardless of input order")
-    func termsAreDescendingAndUntermedComesLast() throws {
+    @Test("no term section header renders — the real fixture included")
+    func noTermHeadersRender() throws {
         // Arrange — deliberately shuffled input so a passing test cannot be an
-        // artifact of the input already being in order. With the currentness
-        // filter, one term is current at any instant; multi-term descending
-        // order is pinned by the fabricated-course tests below.
+        // artifact of the input already being in order.
         let courses = try CrossPackageFixture.realCourses.shuffled()
 
         // Act
@@ -374,33 +374,29 @@ struct MenuTranslationTests {
             now: RealData.midFall2025, baseURL: RealData.baseURL
         )
 
-        // Assert
-        #expect(model.headers == RealData.headersAtMidFall2025)
+        // Assert — the term names the aggregate's title now, never a header
+        // row of its own; the count guard proves courses still rendered.
+        try #require(model.realCourses.count == RealData.visibleIDsAtMidFall2025.count)
+        #expect(model.headers.isEmpty)
     }
 
-    @Test("each group holds exactly its own courses")
-    func groupMembershipMatchesTheData() throws {
-        // Arrange
-        let courses = try CrossPackageFixture.realCourses
+    @Test("termed courses precede untermed, newest term first")
+    func groupOrderSurvivesWithoutHeaders() throws {
+        // Arrange — two terms plus a dated-but-untermed course, shuffled: the
+        // grouping machinery survives header removal purely as ORDER.
+        let courses = [
+            makeCourse(id: 3, code: "stars_2025"),
+            makeCourse(id: 1, code: "wl.202620.CS.25200.LE1"),
+            makeCourse(id: 2, code: "wl.202610.CS.25100.LE1"),
+        ].shuffled()
+
+        // Act
         let model = MenuTranslation.menu(
-            courses: courses, lastFetch: RealData.midFall2025,
-            now: RealData.midFall2025, baseURL: RealData.baseURL
+            courses: courses, lastFetch: epoch, now: epoch, baseURL: RealData.baseURL
         )
 
-        // Act — walk the rows, attributing each course to the header above it.
-        var counts: [String: Int] = [:]
-        var current: String?
-        for row in model.rows {
-            switch row {
-            case .sectionHeader(let name): current = name
-            case .course: if let current { counts[current, default: 0] += 1 }
-            default: break
-            }
-        }
-
-        // Assert
-        try #require(!counts.isEmpty, "no course was attributed to any header")
-        #expect(counts == RealData.countsAtMidFall2025)
+        // Assert — newest term, older term, untermed last.
+        #expect(model.realCourses.map(\.id) == [1, 2, 3])
     }
 
     @Test("courses within a term are ordered by code")
@@ -439,12 +435,13 @@ struct MenuTranslationTests {
             courses: courses, lastFetch: epoch, now: epoch, baseURL: RealData.baseURL
         )
 
-        // Assert — newest term code first.
-        #expect(model.headers == ["202620", "202610"])
+        // Assert — newest term's course first; no header rows.
+        #expect(model.realCourses.map(\.id) == [2, 1, 3])
+        #expect(model.headers.isEmpty)
     }
 
-    @Test("a single-term list still carries its header")
-    func oneTermStillGetsAHeader() throws {
+    @Test("a single-term list names its term in the aggregate title, not a header")
+    func oneTermNamesItsTermInTheAggregate() throws {
         // Arrange
         let courses = [
             makeCourse(id: 1, code: "wl.202620.CS.25200.LE1"),
@@ -456,9 +453,36 @@ struct MenuTranslationTests {
             courses: courses, lastFetch: epoch, now: epoch, baseURL: RealData.baseURL
         )
 
-        // Assert
-        #expect(model.headers == ["202620"])
+        // Assert — 202620 reads as "Spring 2026" on the aggregate row.
+        #expect(model.headers.isEmpty)
         #expect(model.realCourses.count == 2)
+        guard case .course(let aggregate) = try #require(model.rows.first) else {
+            Issue.record("the menu must open on the aggregate row"); return
+        }
+        #expect(aggregate.title == "Spring 2026 All classes")
+    }
+
+    // ── Derivations: term display names ─────────────────────────────────────
+
+    @Test("Purdue term codes map to their human names", arguments: [
+        ("202710", "Fall 2026"),
+        ("202610", "Fall 2025"),
+        ("202720", "Spring 2027"),
+        ("202730", "Summer 2027"),
+    ])
+    func termCodesReadAsSeasons(code: String, name: String) {
+        #expect(MenuTranslation.termDisplayName(code) == name)
+    }
+
+    @Test("anything outside the term scheme comes back verbatim", arguments: [
+        "202740",   // unknown season suffix
+        "20271",    // five digits
+        "2027100",  // seven digits
+        "abcdef",   // not digits
+        "Other",
+    ])
+    func unknownCodesDegradeToThemselves(code: String) {
+        #expect(MenuTranslation.termDisplayName(code) == code)
     }
 
     // ── Derivations: status ─────────────────────────────────────────────────
@@ -620,7 +644,6 @@ struct MenuTranslationTests {
         // empty models are trivially equal. Verified: it did exactly that against a
         // do-nothing stub until this guard was added.
         try #require(a.realCourses.count == RealData.visibleIDsAtMidFall2025.count)
-        try #require(!a.headers.isEmpty)
         #expect(a == b, "translation depends on input order or on dictionary iteration order")
     }
 }
