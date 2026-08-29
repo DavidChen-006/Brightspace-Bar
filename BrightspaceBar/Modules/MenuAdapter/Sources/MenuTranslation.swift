@@ -186,15 +186,17 @@ public enum MenuTranslation {
             groups.append(("", untermed))
         }
 
-        return groups.flatMap { group -> [MenuRow] in
-            // Intra-group order: code ascending (id breaks ties for determinism).
-            let sorted = group.courses.sorted { ($0.code, $0.id) < ($1.code, $1.id) }
-            // A `.hairline` leads EVERY course (NewVertical-3 §3.1). Stated as
-            // "before each course" rather than "between courses" because that is
-            // the form with no fence posts to get wrong: one boundary per course,
-            // never two adjacent, never trailing.
-            return sorted.flatMap { course -> [MenuRow] in
-                [.hairline, .course(self.row(
+        // Intra-group order: code ascending (id breaks ties for determinism).
+        let ordered = groups.flatMap { group in
+            group.courses.sorted { ($0.code, $0.id) < ($1.code, $1.id) }
+        }
+        // A `.hairline` sits BETWEEN consecutive courses — never before the
+        // first (user decision, 2026-08-29, amending NewVertical-3 §3.1: a
+        // leading hairline stacked against the aggregate's native separator
+        // and read as a double rule). Group edges need no special case: the
+        // last course of one group and the first of the next are consecutive.
+        return ordered.enumerated().flatMap { index, course -> [MenuRow] in
+            (index == 0 ? [] : [.hairline]) + [.course(self.row(
                     for: course, baseURL: baseURL,
                     // Absent key == `neverFetched`, which `AssignmentTranslation`
                     // renders as "No assignments" — the same rows as loaded-empty,
@@ -209,7 +211,6 @@ public enum MenuTranslation {
                     manualItems: manualItems[course.id] ?? [],
                     now: now, timeZone: timeZone
                 ))]
-            }
         }
     }
 

@@ -116,7 +116,9 @@ struct AggregateRowTests {
         #expect(aggregate.url == RealData.baseURL.appending(path: "d2l/home"))
         #expect(aggregate.submenu.isEmpty, "the aggregate is a view, not a course")
         #expect(model.rows[1] == .separator)
-        #expect(model.rows[2] == .hairline, "the course list follows the aggregate prelude directly")
+        if case .course = model.rows[2] {} else {
+            Issue.record("the course list follows the aggregate prelude directly, no leading hairline")
+        }
     }
 
     @Test("with a single course there is no aggregate row")
@@ -127,7 +129,9 @@ struct AggregateRowTests {
 
         // Assert — no id == -1 anywhere, and the menu opens on the course list.
         #expect(!model.courses.contains { $0.id == -1 })
-        #expect(model.rows.first == .hairline, "a single-course menu opens on its course boundary")
+        if case .course = model.rows.first {} else {
+            Issue.record("a single-course menu opens on the course itself, no leading hairline")
+        }
     }
 
     @Test("an empty enrollment has no aggregate row either")

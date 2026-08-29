@@ -319,7 +319,7 @@ struct GraphEndToEndTests {
         // Boundaries: exactly one hairline row per REAL course, all inert —
         // the aggregate fold is bounded by its own separator, not a hairline.
         let hairlines = menu.items.filter { $0.view is HairlineRowView }
-        #expect(hairlines.count == model.courses.count { $0.id != -1 })
+        #expect(hairlines.count == model.courses.count { $0.id != -1 } - 1)  // between courses only (2026-08-29)
         #expect(hairlines.allSatisfy { !$0.isEnabled && $0.title.isEmpty })
     }
 }

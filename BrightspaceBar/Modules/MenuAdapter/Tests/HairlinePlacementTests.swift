@@ -41,13 +41,15 @@ import MenuAdapter
 // ─────────────────────────────────────────────────────────────────────────────
 // PINNED PLACEMENT — the builder implements exactly this.
 //
-// At TOP LEVEL, a `.hairline` sits immediately BEFORE every `.course` row:
+// At TOP LEVEL, a `.hairline` sits BETWEEN consecutive `.course` rows — never
+// before the first (2026-08-29: a leading hairline stacked on the aggregate's
+// native separator and read as a double rule; term headers are gone too, so
+// groups survive as order only):
 //
-//     .hairline                  ← before a group's first course
-//     .course(…)                    (term headers left the menu 2026-08-29;
-//     .hairline                  ← between consecutive courses      groups
-//     .course(…)                    survive as order only)
-//     .hairline                  ← the next group's edge, same rule
+//     .course(…)
+//     .hairline                  ← between consecutive courses
+//     .course(…)
+//     .hairline                  ← a group edge is just two consecutive courses
 //     .course(…)
 //     .separator                 ← UNCHANGED: the footer stays a native separator
 //     .status(…)
@@ -101,7 +103,7 @@ struct HairlinePlacementTests {
 
     // ── Priority 1: the fence-post cases ─────────────────────────────────────
 
-    @Test("a single-term menu reads hairline, course, hairline, course")
+    @Test("a single-term menu reads course, hairline, course")
     func oneGroupGetsABoundaryBeforeEachCourse() {
         // Arrange — two courses under one term: the smallest model that shows both
         // fence posts at once, the header→first-course boundary and the
@@ -122,7 +124,7 @@ struct HairlinePlacementTests {
         // Intent 3) — an unbounded prelude, not part of the hairline rule.
         #expect(shape(model.rows) == [
             "course", "separator",
-            "hairline", "course", "hairline", "course",
+            "course", "hairline", "course",
             "separator", "command", "command",
         ])
     }
@@ -146,7 +148,7 @@ struct HairlinePlacementTests {
         // the grouped shape as before.
         #expect(shape(model.rows) == [
             "course", "separator",
-            "hairline", "course",
+            "course",
             "hairline", "course", "hairline", "course",
             "separator", "command", "command",
         ])
@@ -193,7 +195,7 @@ struct HairlinePlacementTests {
         #expect(doubled.isEmpty, "boundaries stack at rows \(doubled)")
     }
 
-    @Test("there is exactly one boundary per course")
+    @Test("there is exactly one boundary between each pair of courses")
     func countMatchesTheCourses() throws {
         // Arrange — the whole-menu form of the rule, on real data.
         let courses = try CrossPackageFixture.realCourses
@@ -205,16 +207,17 @@ struct HairlinePlacementTests {
         // Act
         let hairlines = model.rows.count { $0 == .hairline }
 
-        // Assert — one boundary per REAL course: the "All classes" fold
-        // (id == -1 — aggregate row, Intent 3) sits above the headers and is
-        // bounded by its own separator, not a hairline.
+        // Assert — N courses, N-1 boundaries: hairlines sit BETWEEN courses,
+        // never before the first (2026-08-29). The "All classes" fold
+        // (id == -1 — aggregate row, Intent 3) is bounded by its own
+        // separator, not a hairline.
         let realCourses = model.courses.filter { $0.id != -1 }
         try #require(!realCourses.isEmpty)
-        #expect(hairlines == realCourses.count)
+        #expect(hairlines == realCourses.count - 1)
     }
 
-    @Test("every course row has a hairline immediately above it")
-    func everyCourseIsPreceded() throws {
+    @Test("every course row after the first has a hairline immediately above it")
+    func everyCourseAfterTheFirstIsPreceded() throws {
         // Arrange
         let courses = try CrossPackageFixture.realCourses
         let model = MenuTranslation.menu(
@@ -224,13 +227,18 @@ struct HairlinePlacementTests {
 
         // Act — the local claim, stated per row rather than as a total, so a menu
         // with the right COUNT of hairlines in the wrong PLACES still fails.
-        // The leading "All classes" fold (id == -1 — aggregate row, Intent 3)
-        // is deliberately unbounded: it sits above the headers with its own
-        // separator, so the per-course rule applies to real courses only.
+        // Unbounded by design (2026-08-29): the "All classes" fold (id == -1)
+        // with its own separator, AND the first real course — a leading
+        // hairline stacked on that separator and read as a double rule.
         let rows = model.rows
-        let unbounded = rows.indices.filter { index in
-            guard case .course(let course) = rows[index], course.id != -1 else { return false }
-            return index == 0 || rows[index - 1] != .hairline
+        var seenFirstCourse = false
+        var unbounded: [Int] = []
+        for index in rows.indices {
+            guard case .course(let course) = rows[index], course.id != -1 else { continue }
+            defer { seenFirstCourse = true }
+            if seenFirstCourse, index == 0 || rows[index - 1] != .hairline {
+                unbounded.append(index)
+            }
         }
 
         // Assert
@@ -291,7 +299,7 @@ struct HairlinePlacementTests {
         // (aggregate row, Intent 3); the Other group's boundary holds after it.
         #expect(shape(model.rows) == [
             "course", "separator",
-            "hairline", "course",
+            "course",
             "hairline", "course",
             "separator", "command", "command",
         ])
