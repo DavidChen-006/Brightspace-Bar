@@ -65,9 +65,11 @@ menu-bar icon**, you type it into Authenticator on your phone, and the icon
 reverts. After that, the daemon refreshes the session silently for weeks. If
 courses ever stop refreshing, run `make start` again.
 
-Two finer-grained targets exist for when you want the steps separately:
-`make login` (interactive Chromium login only) and `make run` (build & launch
-the app only). `make start` is the primary path.
+Day to day, `make start` is only needed once — and again whenever the session
+needs a fresh login. If you've quit the app and just want it back, `make run`
+is the "reopen" gesture: build and launch, nothing else (there's no `.app`
+bundle to double-click yet). A third target, `make login`, runs the
+interactive Chromium login alone.
 
 ### Environment configuration
 
