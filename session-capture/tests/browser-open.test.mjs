@@ -9,7 +9,7 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { initiateLoginTarget, SAML_ENTITY_ID } from "../src/browser-open.mjs";
+import { initiateLoginTarget, SAML_ENTITY_ID, transplantCookies } from "../src/browser-open.mjs";
 
 const DEEP_LINK =
   "https://purdue.brightspace.com/d2l/lms/dropbox/user/folder_submit_files.d2l?db=648911&grpid=0&ou=412690";
@@ -47,4 +47,30 @@ test("encodes a quiz link's parameters so they survive as one `target`", () => {
   const quiz = "https://purdue.brightspace.com/d2l/lms/quizzing/user/quiz_summary.d2l?qi=555&ou=412690";
   const target = new URL(initiateLoginTarget(quiz)).searchParams.get("target");
   assert.equal(target, "/d2l/lms/quizzing/user/quiz_summary.d2l?qi=555&ou=412690");
+});
+
+// The cookie transplant (experiment 20): session.json's cookies, reshaped for
+// addCookies(). What can silently rot is the scoping — a cookie leaking to a
+// foreign origin, or losing the flags that let D2L accept it.
+test("transplant scopes every cookie to the session's own host", () => {
+  const cookies = transplantCookies({
+    baseUrl: "https://purdue.brightspace.com",
+    cookies: [
+      { name: "d2lSessionVal", value: "abc" },
+      { name: "d2lSecureSessionVal", value: "def" },
+    ],
+  });
+  assert.equal(cookies.length, 2);
+  for (const c of cookies) {
+    assert.equal(c.domain, "purdue.brightspace.com");
+    assert.equal(c.path, "/");
+    assert.equal(c.secure, true);
+    assert.equal(c.httpOnly, true);
+    assert.equal(c.sameSite, "Lax");
+  }
+  assert.equal(cookies[0].value, "abc");
+});
+
+test("transplant of a session with no cookies is empty, not a throw", () => {
+  assert.deepEqual(transplantCookies({ baseUrl: "https://purdue.brightspace.com" }), []);
 });
