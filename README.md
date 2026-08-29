@@ -1,4 +1,4 @@
-# BrightspaceBar 📅 — Brightspace without the tab sprawl
+# BrightspaceBar 📅 — No More Login. No More Friction.
 
 [![CI](https://img.shields.io/github/actions/workflow/status/DavidChen-006/BrightspaceBar/ci.yml?branch=main&label=ci)](https://github.com/DavidChen-006/BrightspaceBar/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/DavidChen-006/BrightspaceBar?label=release&color=orange)](https://github.com/DavidChen-006/BrightspaceBar/releases/latest)
