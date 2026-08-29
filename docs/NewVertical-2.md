@@ -2,7 +2,7 @@
 
 The next vertical slice created by adding quizzes is the **graph**.
 
-RepoBar has a GitHub-style activity graph; BrightspaceBar needs the same idea
+RepoBar has a GitHub-style activity graph; Brightspace Bar needs the same idea
 pointed at the future instead of the past: cells represent upcoming assignments
 and quizzes rather than past commits. The quiz slice (shipped, `2c1e598`) is what
 makes this possible — the code now distinguishes the two kinds via `ItemKind`,
@@ -140,13 +140,13 @@ dates relative to real today.
 `HeatmapRasterNSView` is ~540 lines and roughly 450 of them are performance
 machinery (async CGImage rendering, `NSCache`, render-key memoization, pixel
 snapping, generation counters) for redrawing 371-cell year grids across many
-repos. BrightspaceBar has ~6 courses × a few dozen cells. **Do not port the
+repos. Brightspace Bar has ~6 courses × a few dozen cells. **Do not port the
 raster engine.** A plain `draw(_:)` filling rects is sufficient.
 
 Worth taking:
 
 - The `NSMenuItem.view` hosting technique (`MenuItemHostingView`) — the real new
-  GUI capability BrightspaceBar lacks; `MenuAssembler` currently builds plain
+  GUI capability Brightspace Bar lacks; `MenuAssembler` currently builds plain
   text items, and highlight-state handling inside menu item views is the fiddly
   part RepoBar already solved.
 - The window/range logic shape (decision 3 above).

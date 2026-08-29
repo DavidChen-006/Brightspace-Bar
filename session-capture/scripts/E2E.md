@@ -132,7 +132,7 @@ is doing.
 
 `screencapture` is TCC-denied in the session this was written in, so the
 automated evidence is the status item's **window geometry**: `ICON_WITNESS`
-points at a helper that prints BrightspaceBar's window bounds (logo ≈ 30pt
+points at a helper that prints Brightspace Bar's window bounds (logo ≈ 30pt
 wide, a two-digit badge ≈ 62pt). Three readings — before the wipe, with the
 number live, after the login — give two assertions: the item **grew** for the
 badge, and **shrank back** afterwards. When the helper is missing or prints no

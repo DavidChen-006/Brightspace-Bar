@@ -1,4 +1,4 @@
-# BrightspaceBar — how the app actually works
+# Brightspace Bar — how the app actually works
 
 One Swift package, six modules, zero external dependencies. Each module lives in
 `Modules/<Name>/` with its own `Sources/`, `Tests/`, and `Makefile`. Logging in
@@ -13,7 +13,7 @@ and fetching are not this package's job at all: a Node daemon next door
 │      the ONE file allowed to see everything; wires the stack        │
 └─────────────────────────────────────────────────────────────────────┘
 
-  triggers                CoursePipeline            CourseMenu    BrightspaceBar
+  triggers                CoursePipeline            CourseMenu    Brightspace Bar
   launch / timer / manual (the backend)            (the contract)   (the GUI)
        │                                                 ↑              │
        ▼                                                 │   depends on │

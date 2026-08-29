@@ -1,6 +1,6 @@
 ---
 name: Bug report
-about: Something in BrightspaceBar isn't working
+about: Something in Brightspace Bar isn't working
 labels: bug
 ---
 

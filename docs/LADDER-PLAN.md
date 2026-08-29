@@ -22,7 +22,7 @@ Each E2E run costs at most what its tier says. Tier 2 is run rarely by design.
 ## Architecture (the four parts)
 
 ```
-SWIFT APP (BrightspaceBar)                NODE DAEMON (session-capture grows into it)
+SWIFT APP (Brightspace Bar)                NODE DAEMON (session-capture grows into it)
  triggers: launch / timer / manual        refresh.mjs (orchestrator entry, run-and-exit)
  DaemonCourseSource.fetchCourses()  ──spawns──►  ladder: creds → rung1 → rung2 (seams)
  DaemonAssignmentSource             ◄──reads──  fetcher: David's endpoints (JWT mint, enrollments, dropbox, quizzes)
@@ -270,7 +270,7 @@ exit codes) are the load-bearing decisions.
   there's no compiler-enforced schema, so these defensive habits are load-bearing.
 - **Paint disk → then network**: one `updateSession` publish function serves both
   the cached paint and the live result (`AppState+Refresh.swift:312-333`).
-  (BrightspaceBar's `CourseCache.load()` already does the equivalent.)
+  (Brightspace Bar's `CourseCache.load()` already does the equivalent.)
 - **Menu-open staleness gate**: 1s debounce + 30s snapshot gate + in-flight gate
   + 250ms deferred kick so the menu paints before network (`AppState+Refresh.swift:5-29`).
 - **Status channel**: one `session.lastError` written on failure, cleared on
@@ -485,7 +485,7 @@ spike commits scoped files only and pushes).**
 - **Phase 0 (orchestrator)** — this contract. Commit+push.
 - **Phase A (backend, session-capture)** — A1 test-writer red, A2 builder
   green. Parallel with B.
-- **Phase B (frontend, BrightspaceBar)** — B1 test-writer red, B2 builder
+- **Phase B (frontend, Brightspace Bar)** — B1 test-writer red, B2 builder
   green. Parallel with A.
 - **Phase C (intent E2E, stub mode)** — C1 test-writer writes the intent test
   (designed gradebook fixtures → daemon writes data.json → Swift renders the
@@ -493,7 +493,7 @@ spike commits scoped files only and pushes).**
   spike only if it reads red.
 
 **Tree caveat (2026-08-16):** experiment-18 refresh-countdown work sits
-UNCOMMITTED in BrightspaceBar (MenuAssembler, MenuModel, MenuTranslation,
+UNCOMMITTED in Brightspace Bar (MenuAssembler, MenuModel, MenuTranslation,
 RefreshScheduler, StatusText + tests). Both suites green with it in-tree
 (node 195 pass / Swift 577 pass — the BUILD 4 baseline). No BUILD 4 file
 overlaps it; agents stage explicit paths only, never `git add -A`.

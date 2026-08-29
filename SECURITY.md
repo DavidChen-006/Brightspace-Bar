@@ -1,6 +1,6 @@
 # Security Policy
 
-BrightspaceBar handles university credentials. If you find a way to make it
+Brightspace Bar handles university credentials. If you find a way to make it
 mishandle them — or any other vulnerability — please report it privately.
 
 ## Reporting a vulnerability
