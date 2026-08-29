@@ -1,7 +1,7 @@
 # Brightspace Bar 📅 — No More Login. No More Friction.
 
-[![CI](https://img.shields.io/github/actions/workflow/status/DavidChen-006/BrightspaceBar/ci.yml?branch=main&label=ci)](https://github.com/DavidChen-006/BrightspaceBar/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/DavidChen-006/BrightspaceBar?label=release&color=orange)](https://github.com/DavidChen-006/BrightspaceBar/releases/latest)
+[![CI](https://img.shields.io/github/actions/workflow/status/DavidChen-006/Brightspace-Bar/ci.yml?branch=main&label=ci)](https://github.com/DavidChen-006/Brightspace-Bar/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/DavidChen-006/Brightspace-Bar?label=release&color=orange)](https://github.com/DavidChen-006/Brightspace-Bar/releases/latest)
 ![macOS 14+](https://img.shields.io/badge/macOS-14%2B-black?logo=apple)
 ![Swift 6.2](https://img.shields.io/badge/Swift-6.2-F05138?logo=swift&logoColor=white)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
@@ -53,12 +53,12 @@ only ever spawns the daemon in its non-interactive mode (invariant **D8**).
 
 This is a build-from-source app today — no binary release yet. The latest
 tagged state is
-[`v0.1.0`](https://github.com/DavidChen-006/BrightspaceBar/releases/tag/v0.1.0).
+[`v0.1.0`](https://github.com/DavidChen-006/Brightspace-Bar/releases/tag/v0.1.0).
 
 ## Quick Start
 
 ```sh
-git clone https://github.com/DavidChen-006/BrightspaceBar.git
+git clone https://github.com/DavidChen-006/Brightspace-Bar.git
 cd BrightspaceBar
 make setup    # checks prerequisites, installs the daemon's dependencies
 make start    # THE one command — see below
@@ -95,7 +95,7 @@ the stored file.
 | `docs/` | Design documents |
 
 The numbered `experiment-*` probes that de-risked each design decision live on
-the [`experiments` branch](https://github.com/DavidChen-006/BrightspaceBar/tree/experiments/experiments)
+the [`experiments` branch](https://github.com/DavidChen-006/Brightspace-Bar/tree/experiments/experiments)
 — kept as engineering notes, off the main tree.
 
 ## Architecture
