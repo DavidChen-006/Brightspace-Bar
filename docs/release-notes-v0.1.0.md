@@ -1,4 +1,4 @@
-# BrightspaceBar v0.1.0
+# Brightspace Bar v0.1.0
 
 The first working baseline — a macOS menu-bar app for Purdue Brightspace, run
 from source.

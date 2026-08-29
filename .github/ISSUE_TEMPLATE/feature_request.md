@@ -1,6 +1,6 @@
 ---
 name: Feature request
-about: Suggest an idea for BrightspaceBar
+about: Suggest an idea for Brightspace Bar
 labels: enhancement
 ---
 

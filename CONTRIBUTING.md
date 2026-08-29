@@ -12,7 +12,7 @@ make test                       # the Swift suite — should be green before you
 ## Build and test
 
 ```sh
-make -C BrightspaceBar test     # hermetic Swift suite (no network, no daemon)
+make -C Brightspace Bar test     # hermetic Swift suite (no network, no daemon)
 cd session-capture && npm test  # daemon unit tests (node:test, no browser launched)
 ```
 

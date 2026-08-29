@@ -1,4 +1,4 @@
-# BrightspaceBar
+# Brightspace Bar
 
 A macOS menu-bar app showing your Brightspace (D2L) courses — any school on
 Brightspace works; point `BS_BASE_URL` at your tenant (e.g.

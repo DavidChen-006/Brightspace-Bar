@@ -1,4 +1,4 @@
-# BrightspaceBar 📅 — No More Login. No More Friction.
+# Brightspace Bar 📅 — No More Login. No More Friction.
 
 [![CI](https://img.shields.io/github/actions/workflow/status/DavidChen-006/BrightspaceBar/ci.yml?branch=main&label=ci)](https://github.com/DavidChen-006/BrightspaceBar/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/DavidChen-006/BrightspaceBar?label=release&color=orange)](https://github.com/DavidChen-006/BrightspaceBar/releases/latest)
@@ -10,7 +10,7 @@ A macOS menu-bar app for Brightspace (D2L): your courses, a GitHub-style
 due-date heatmap per class, and one-click deep links that land already signed
 in — without your credentials ever touching the app.
 
-<img src="docs/screenshot.png" alt="BrightspaceBar menu" width="382">
+<img src="docs/screenshot.png" alt="Brightspace Bar menu" width="382">
 
 ## What it does
 
