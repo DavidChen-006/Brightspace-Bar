@@ -22,6 +22,20 @@
  * nothing tracked, the browser window is the only state. If nothing answers
  * the port, this IS the first click and a fresh launch happens.
  *
+ * THE COOKIE TRANSPLANT (experiment 20). The profile's Entra cookies age on
+ * their own clock and can be dead while the daemon is green (measured
+ * 2026-08-29: every refresh exits at rung "none", so the SSO rung never runs
+ * and never renews them). But session.json is at most one refresh interval
+ * old, and injecting its D2L cookies into the context signs the page in with
+ * no Entra involvement at all. So every open injects first, then navigates
+ * the RAW deep link — initiate-login must not be used after a transplant,
+ * because it unconditionally starts the SAML chain and re-authenticates at
+ * Entra no matter how warm the D2L session is (measured 2026-08-29: a
+ * transplanted tab sent through the wrap still landed on the password page).
+ * Only when there is no session.json to transplant does the wrap run as the
+ * fallback. session.json is the single source of truth; the browser derives
+ * from it.
+ *
  * REMAINING LIMITATION (deferred by decision): a click while a headless
  * REFRESH holds the profile still fails — the refresh launches without the
  * port. It degrades to a clear message and a non-zero exit, never a crash;
@@ -57,6 +71,54 @@ export function initiateLoginTarget(deepLink, entityId = SAML_ENTITY_ID) {
 }
 
 /**
+ * session.json's cookies as playwright addCookies() input.
+ *
+ * Pure and total over its input shape: scopes every cookie to the session's
+ * own host so a transplant can never leak a cookie to another origin. httpOnly
+ * mirrors how D2L itself sets them; being stricter than the original does not
+ * hurt a transplant (the page never needs script access to them).
+ *
+ * @param {{baseUrl: string, cookies: Array<{name: string, value: string}>}} session
+ * @returns {Array<object>} playwright cookie descriptors
+ */
+export function transplantCookies(session) {
+  const domain = new URL(session.baseUrl).hostname;
+  return (session.cookies ?? []).map(({ name, value }) => ({
+    name,
+    value,
+    domain,
+    path: "/",
+    secure: true,
+    httpOnly: true,
+    sameSite: "Lax",
+  }));
+}
+
+/**
+ * Read session.json and inject its cookies into `context`, best-effort: a
+ * missing or malformed file injects nothing and the navigation falls back to
+ * the profile's own (possibly Entra-mediated) sign-in.
+ *
+ * @returns {Promise<boolean>} true if cookies were injected — the caller must
+ *   then navigate the RAW deep link (the wrap would discard the transplant by
+ *   re-authenticating at Entra).
+ */
+async function injectSessionCookies(context) {
+  try {
+    const { readFileSync } = await import("node:fs");
+    const { resolvePaths } = await import("./paths.mjs");
+    const session = JSON.parse(readFileSync(resolvePaths().sessionFile, "utf8"));
+    const cookies = transplantCookies(session);
+    if (cookies.length === 0) return false;
+    await context.addCookies(cookies);
+    return true;
+  } catch {
+    // No session.json (or unreadable): the SAML wrap still authenticates.
+    return false;
+  }
+}
+
+/**
  * The rendezvous for tab-adding: the first click launches Chromium with CDP on
  * this port (bound to localhost by Chromium itself), and later clicks find the
  * running browser here. Fixed, not discovered — a port is the whole protocol.
@@ -77,8 +139,12 @@ async function addTabToRunningBrowser(chromium, deepLink) {
   try {
     const context = browser.contexts()[0];
     if (!context) return false;
+    const transplanted = await injectSessionCookies(context);
     const page = await context.newPage();
-    await page.goto(initiateLoginTarget(deepLink), { waitUntil: "domcontentloaded", timeout: 60_000 });
+    await page.goto(transplanted ? deepLink : initiateLoginTarget(deepLink), {
+      waitUntil: "domcontentloaded",
+      timeout: 60_000,
+    });
     return true;
   } finally {
     // Detach only — the browser and its tabs are the user's, not this
@@ -117,8 +183,12 @@ async function openInProfile(deepLink) {
     process.exit(1);
   }
 
+  const transplanted = await injectSessionCookies(context);
   const page = context.pages()[0] ?? (await context.newPage());
-  await page.goto(initiateLoginTarget(deepLink), { waitUntil: "domcontentloaded", timeout: 60_000 });
+  await page.goto(transplanted ? deepLink : initiateLoginTarget(deepLink), {
+    waitUntil: "domcontentloaded",
+    timeout: 60_000,
+  });
 
   // The window is the user's now; hold the process open until they close it.
   await new Promise((resolve) => context.on("close", resolve));
