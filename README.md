@@ -106,6 +106,10 @@ version, enforced by tests: the GUI imports only the `CourseMenu` contract
 module; adapters translate between pipelines and the menu model; the
 composition root is `main.swift`. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
+Looking for something to pick up? The
+[open issues](https://github.com/DavidChen-006/BrightspaceBar/issues) include
+`good first issue`s with acceptance criteria spelled out.
+
 ## Development
 
 ```sh
