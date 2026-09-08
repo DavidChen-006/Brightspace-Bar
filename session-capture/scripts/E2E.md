@@ -68,7 +68,7 @@ the shell environment, so a non-default root needs the binary or an explicit
 
 ```sh
 cd ~/PaperShelf/BrightspaceBar && ./Scripts/run.sh          # production root
-BSB_ROOT="$ROOT" .build/debug/BrightspaceBar                # rehearsal root
+BSB_ROOT="$ROOT" .build/debug/BrightspaceBar.app/Contents/MacOS/BrightspaceBar
 open -n --env BSB_ROOT="$ROOT" .build/debug/BrightspaceBar.app
 ```
 

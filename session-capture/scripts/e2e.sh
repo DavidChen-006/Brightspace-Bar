@@ -317,7 +317,7 @@ print_app_step() {
   against a non-default root, run.sh's launch will read the PRODUCTION root.
   For a rehearsal root, launch one of these instead:
 
-    BSB_ROOT="$ROOT" $SWIFT_DIR/.build/debug/BrightspaceBar
+    BSB_ROOT="$ROOT" $SWIFT_DIR/.build/debug/BrightspaceBar.app/Contents/MacOS/BrightspaceBar
     open -n --env BSB_ROOT="$ROOT" $SWIFT_DIR/.build/debug/BrightspaceBar.app
 
   BRIGHTSPACEBAR_STUB must NOT be set, or the menu shows fabricated courses.

@@ -7,8 +7,9 @@
 # lines because it also handles Sparkle, notarization, provisioning profiles, and
 # keychain groups — none of which a local menu-bar experiment needs.
 #
-# Usage:  ./Scripts/run.sh          build, bundle, launch
-#         ./Scripts/run.sh --smoke  build, bundle, launch, verify alive, then kill
+# Usage:  ./Scripts/run.sh           build, bundle, launch
+#         ./Scripts/run.sh --bundle  build, bundle, sign
+#         ./Scripts/run.sh --smoke   build, bundle, launch, verify alive, then kill
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
@@ -18,12 +19,23 @@ APP="${ROOT_DIR}/.build/${CONFIG}/${APP_NAME}.app"
 EXE="${ROOT_DIR}/.build/${CONFIG}/${APP_NAME}"
 PROCESS_PATTERN="${APP_NAME}.app/Contents/MacOS/${APP_NAME}"
 SMOKE=0
-[ "${1:-}" = "--smoke" ] && SMOKE=1
+BUNDLE_ONLY=0
+case "${1:-}" in
+  "") ;;
+  --bundle) BUNDLE_ONLY=1 ;;
+  --smoke) SMOKE=1 ;;
+  *)
+    echo "Usage: $0 [--bundle|--smoke]" >&2
+    exit 64
+    ;;
+esac
 
 log() { printf '==> %s\n' "$*"; }
 
-log "Stopping any running instance"
-pkill -f "${PROCESS_PATTERN}" 2>/dev/null || true
+if [ "${BUNDLE_ONLY}" -eq 0 ]; then
+    log "Stopping any running instance"
+    pkill -f "${PROCESS_PATTERN}" 2>/dev/null || true
+fi
 
 log "swift build (${CONFIG})"
 swift build -c "${CONFIG}" --package-path "${ROOT_DIR}"
@@ -46,6 +58,11 @@ cp -f "${ROOT_DIR}/Modules/${APP_NAME}/Resources/MotionP.pdf" \
 # Developer ID and notarization, which is out of scope for this experiment.
 log "Signing (ad-hoc)"
 codesign --force --sign - "${APP}" >/dev/null 2>&1
+
+if [ "${BUNDLE_ONLY}" -eq 1 ]; then
+    log "Bundled at ${APP}"
+    exit 0
+fi
 
 log "Launching"
 open -n "${APP}"

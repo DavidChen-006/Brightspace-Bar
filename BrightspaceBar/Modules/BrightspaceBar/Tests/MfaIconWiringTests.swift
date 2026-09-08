@@ -104,6 +104,13 @@ struct MfaIconWiringTests {
         try self.source("Modules/BrightspaceBar/Sources/main.swift")
     }
 
+    private func repositorySource(_ path: String) throws -> String {
+        try String(
+            contentsOf: Self.packageRoot.deletingLastPathComponent().appending(path: path),
+            encoding: .utf8
+        )
+    }
+
     @Test("the scan finds both files")
     func theScanIsNotVacuous() throws {
         // Arrange / Act — a read that returned an empty string would pass every
@@ -209,5 +216,20 @@ struct MfaIconWiringTests {
             text.contains("show(code:"),
             "main.swift must hand the watcher's reports to StatusBarController.show(code:)"
         )
+    }
+
+    @Test("the normal start path packages the custom menu-bar icon")
+    func theNormalStartPathUsesTheAppBundle() throws {
+        let makefile = try self.repositorySource("Makefile")
+        let launcher = try self.repositorySource("session-capture/src/start.mjs")
+        let bundler = try self.source("Scripts/run.sh")
+        let controller = try self.controllerSource()
+
+        #expect(makefile.contains("start:\n\t$(MAKE) -C BrightspaceBar bundle"))
+        #expect(launcher.contains("BrightspaceBar.app"))
+        #expect(launcher.contains("Contents\", \"MacOS\", \"BrightspaceBar"))
+        #expect(bundler.contains("Modules/${APP_NAME}/Resources/MotionP.pdf"))
+        #expect(bundler.contains("${APP}/Contents/Resources/MotionP.pdf"))
+        #expect(controller.contains("Bundle.main.url(forResource: \"MotionP\", withExtension: \"pdf\")"))
     }
 }
