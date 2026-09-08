@@ -163,6 +163,13 @@ an assertion that fails that way is a collision, not a regression. Re-run.
 | `ICON_LOGIN_TIMEOUT` | seconds for the whole run, default 600 (mostly your phone). |
 | `ICON_REQUIRE_APP` | 1 (default) demands a running app; 0 is for rehearsals only. |
 
+Both human-present runs (`e2e.sh tier2` and this script) set
+`BSB_FULL_LOGIN_BACKOFF_MS=0`: the daemon otherwise attempts the full login at
+most once per four hours, measured from the `lastFullLoginAttemptAt` stamp in
+`status.json`, so that the app's unattended ticks cannot turn a dead wristband
+into a night of MFA pushes. A tier-2 run that skipped the full rung with
+"backed off until …" in `status.json` ran without that variable.
+
 `BSB_ROOT` and `BSB_REFRESH_CLI` mean what they mean above, and rehearsing is
 the same trick: a throwaway root plus a stub CLI that writes `mfa.json`, sleeps,
 deletes it, writes a good cache and exits 0 (with `ICON_REQUIRE_APP=0`, since a

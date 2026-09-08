@@ -395,8 +395,10 @@ tier2() {
 EOF
 
   started="$(date +%s)"
-  step "running the full ladder: refresh.mjs (full login on by default)"
-  run_daemon "$LOGIN_TIMEOUT"
+  # A human is present (they were just told to hold their phone), so the
+  # backoff that guards the app's unattended ticks does not apply here.
+  step "running the full ladder: refresh.mjs (full login on by default, backoff lifted)"
+  BSB_FULL_LOGIN_BACKOFF_MS=0 run_daemon "$LOGIN_TIMEOUT"
   assert_exit 0 "a fresh cache was written"
   assert_status fresh full
   assert_data_fresh "$started"

@@ -7,6 +7,16 @@
  * ever going stale. A caller that must not reach a phone — a test suite, a
  * shared machine — opts out with `allowFullLogin: false` (`--no-full-login`).
  *
+ * The full rung is rate-limited, because it is the one rung with a cost outside
+ * the machine: every attempt pushes a number-match to a phone. The app ticks
+ * every 30 minutes, and a wristband that dies overnight would otherwise become
+ * a night of MFA pushes and, eventually, a throttled Entra account. So the run
+ * that attempts the full rung stamps `lastFullLoginAttemptAt` into status.json,
+ * and later runs skip that rung until `fullLoginBackoffMs` has passed. One
+ * approval fixes the wristband for ~90 days, so the backoff only ever costs a
+ * few hours on the nights nobody was there. A present human (`make start`)
+ * sets the backoff to zero via `BSB_FULL_LOGIN_BACKOFF_MS`.
+ *
  * Two invariants outrank freshness, because the menu bar is read by a human who
  * cannot tell "loading" from "gone":
  *
@@ -26,6 +36,13 @@
  */
 import { readFileSync } from "node:fs";
 import { writeJsonAtomic } from "./atomic-write.mjs";
+
+/**
+ * How long after a full-login attempt the next one may begin. Four hours: long
+ * enough that a night away costs two or three pushes rather than sixteen,
+ * short enough that a wristband dead at breakfast is healed by lunch.
+ */
+export const DEFAULT_FULL_LOGIN_BACKOFF_MS = 4 * 60 * 60 * 1000;
 
 /**
  * A rung: takes the world, tries to produce live credentials, reports honestly.
@@ -59,7 +76,8 @@ import { writeJsonAtomic } from "./atomic-write.mjs";
  * back as a status. Returns exactly the status object it wrote to disk.
  *
  * @param {{paths: object, fetcher: {fetch: Function}, clock: () => Date,
- *          rungs?: Rung[], allowFullLogin?: boolean, log?: (m: string) => void}} deps
+ *          rungs?: Rung[], allowFullLogin?: boolean, fullLoginBackoffMs?: number,
+ *          log?: (m: string) => void}} deps
  */
 export async function runRefresh({
   paths,
@@ -67,21 +85,27 @@ export async function runRefresh({
   clock,
   rungs = [],
   allowFullLogin = true,
+  fullLoginBackoffMs = DEFAULT_FULL_LOGIN_BACKOFF_MS,
   log = () => {},
 }) {
   const now = clock().toISOString();
-  const lastSuccessAt = readLastSuccessAt(paths.statusFile);
+  const previous = readPreviousStatus(paths.statusFile);
 
   let outcome;
   try {
-    outcome = await climb({ paths, fetcher, rungs, allowFullLogin, log });
+    outcome = await climb({
+      paths, fetcher, rungs, allowFullLogin, log,
+      now,
+      fullLoginBackoffMs,
+      lastFullLoginAttemptAt: previous.lastFullLoginAttemptAt,
+    });
     // Inside the try: a cache we cannot write is a failed run, not a fresh one.
     if (outcome.ok) writeJsonAtomic(paths.dataFile, { fetchedAt: now, ...outcome.data });
   } catch (error) {
     outcome = { ok: false, state: "error", rungUsed: "none", error: describe(error) };
   }
 
-  const status = statusFrom(outcome, { now, lastSuccessAt });
+  const status = statusFrom(outcome, { now, previous });
   try {
     writeJsonAtomic(paths.statusFile, status);
   } catch (error) {
@@ -106,33 +130,66 @@ export function exitCode(result) {
 /**
  * Fetch, and on an expired session walk the rungs until one restores it. Pure
  * control flow over two injected effects; returns a plain outcome.
+ *
+ * The outcome carries `fullLoginAttemptedAt` — the run's own `now` when a full
+ * rung was entered, else undefined — so the status can stamp the attempt
+ * whether the rung then succeeded, failed, or threw. Stamped BEFORE the attempt
+ * on purpose: an attempt that is SIGKILLed mid-MFA still pushed to the phone.
  */
-async function climb({ paths, fetcher, rungs, allowFullLogin, log }) {
+async function climb({
+  paths, fetcher, rungs, allowFullLogin, log, now, fullLoginBackoffMs, lastFullLoginAttemptAt,
+}) {
   const world = { paths, log };
   let attempt = await fetcher.fetch(world);
   if (attempt.ok) return { ok: true, data: attempt.data, rungUsed: "none" };
   if (attempt.reason !== "sessionExpired") return failedFetch(attempt, "none");
 
+  let fullLoginAttemptedAt;
+  let backedOffUntil = null;
   for (const [index, rung] of rungs.entries()) {
     const name = `rung ${index + 1} (${rung.kind})`;
-    if (rung.kind === "full" && !allowFullLogin) {
-      log(`skipping ${name}: full login opted out (--no-full-login)`);
-      continue;
+    if (rung.kind === "full") {
+      if (!allowFullLogin) {
+        log(`skipping ${name}: full login opted out (--no-full-login)`);
+        continue;
+      }
+      const until = backoffEnds(lastFullLoginAttemptAt, fullLoginBackoffMs);
+      if (until && Date.parse(now) < until) {
+        backedOffUntil = new Date(until).toISOString();
+        log(`skipping ${name}: a full login was attempted at ${lastFullLoginAttemptAt}; next one after ${backedOffUntil}`);
+        continue;
+      }
+      fullLoginAttemptedAt = now;
     }
     if (!(await climbed(rung, world, name, log))) continue;
 
     attempt = await fetcher.fetch(world);
-    if (attempt.ok) return { ok: true, data: attempt.data, rungUsed: rung.kind };
+    if (attempt.ok) return { ok: true, data: attempt.data, rungUsed: rung.kind, fullLoginAttemptedAt };
     // Still expired after a rung claimed success: keep climbing.
-    if (attempt.reason !== "sessionExpired") return failedFetch(attempt, rung.kind);
+    if (attempt.reason !== "sessionExpired") return { ...failedFetch(attempt, rung.kind), fullLoginAttemptedAt };
   }
 
   return {
     ok: false,
     state: "needs-login",
     rungUsed: "none",
-    error: "the session is expired and no rung could restore it",
+    fullLoginAttemptedAt,
+    error: backedOffUntil
+      ? `the session is expired and no rung could restore it; full login backed off until ${backedOffUntil}`
+      : "the session is expired and no rung could restore it",
   };
+}
+
+/**
+ * When the backoff window closes, as epoch ms — or null when there is nothing
+ * to back off from: no previous attempt, an unparseable stamp (treated as
+ * "never", since the alternative is a rung that can never run again), or a
+ * backoff of zero (a present human asked for the login now).
+ */
+function backoffEnds(lastFullLoginAttemptAt, fullLoginBackoffMs) {
+  if (!(fullLoginBackoffMs > 0)) return null;
+  const last = Date.parse(lastFullLoginAttemptAt ?? "");
+  return Number.isNaN(last) ? null : last + fullLoginBackoffMs;
 }
 
 /** One rung attempt. A rung that throws is a rung that failed — the ladder goes on. */
@@ -156,29 +213,38 @@ function failedFetch(attempt, rungUsed) {
   return { ok: false, state: "error", rungUsed, error: `${attempt.reason}${detail}` };
 }
 
-/** The pure core: an outcome plus two timestamps becomes the status contract. */
-function statusFrom(outcome, { now, lastSuccessAt }) {
+/** The pure core: an outcome, the run's instant and the previous status become the status contract. */
+function statusFrom(outcome, { now, previous }) {
   return {
     state: outcome.ok ? "fresh" : outcome.state,
     rungUsed: outcome.rungUsed,
     lastAttemptAt: now,
-    lastSuccessAt: outcome.ok ? now : lastSuccessAt,
+    lastSuccessAt: outcome.ok ? now : previous.lastSuccessAt,
+    // Carried forward across runs that never reached the full rung: the
+    // backoff is measured from the last attempt, whenever that was.
+    lastFullLoginAttemptAt: outcome.fullLoginAttemptedAt ?? previous.lastFullLoginAttemptAt,
     error: outcome.ok ? null : outcome.error,
   };
 }
 
 /**
- * When the last success was, per the status we wrote last time. A missing or
- * corrupt file means "we don't know", not a crash — the reader is the daemon's
- * own past self and its disk can be anything.
+ * The two stamps carried forward from the status we wrote last time. A missing
+ * or corrupt file means "we don't know", not a crash — the reader is the
+ * daemon's own past self and its disk can be anything — and a status written
+ * before a stamp existed simply lacks it.
  */
-function readLastSuccessAt(statusFile) {
+function readPreviousStatus(statusFile) {
+  let previous = {};
   try {
-    const previous = JSON.parse(readFileSync(statusFile, "utf8"));
-    return typeof previous.lastSuccessAt === "string" ? previous.lastSuccessAt : null;
+    previous = JSON.parse(readFileSync(statusFile, "utf8")) ?? {};
   } catch {
-    return null;
+    // Fall through with nothing known.
   }
+  const stamp = (value) => (typeof value === "string" ? value : null);
+  return {
+    lastSuccessAt: stamp(previous.lastSuccessAt),
+    lastFullLoginAttemptAt: stamp(previous.lastFullLoginAttemptAt),
+  };
 }
 
 const describe = (error) => String(error?.message ?? error);

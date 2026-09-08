@@ -431,9 +431,10 @@ EOF
 DAEMON_LOG="$(mktemp -t bsb-e2e-icon)"
 STARTED="$(date +%s)"
 
-step "starting the full ladder in the background: refresh.mjs"
-say "    node $REFRESH_CLI"
-node "$REFRESH_CLI" >"$DAEMON_LOG" 2>&1 &
+# A human is present, so the backoff that guards unattended ticks is lifted.
+step "starting the full ladder in the background: refresh.mjs (backoff lifted)"
+say "    BSB_FULL_LOGIN_BACKOFF_MS=0 node $REFRESH_CLI"
+BSB_FULL_LOGIN_BACKOFF_MS=0 node "$REFRESH_CLI" >"$DAEMON_LOG" 2>&1 &
 DAEMON_PID=$!
 say "    pid $DAEMON_PID · log $DAEMON_LOG"
 

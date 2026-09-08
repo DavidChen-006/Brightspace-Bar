@@ -60,8 +60,9 @@ if (running) {
 // cache it watches — cosmetic, not correctness (the writes are atomic).
 await new Promise((resolve) => setTimeout(resolve, 2000));
 
-// 3. One refresh. The full rung is on by default (no flag needed); a human is
-//    present by definition — they just ran `make start`.
+// 3. One refresh. The full rung is on by default (no flag needed), and its
+//    backoff is lifted: a human is present by definition — they just ran
+//    `make start` — so a timer tick's earlier attempt must not delay them.
 console.error("");
 console.error("Refreshing the session (headless). If an MFA prompt fires, the number");
 console.error("appears ON THE MENU-BAR ICON — approve it on your phone.");
@@ -75,6 +76,7 @@ const refresh = spawn(
     stdio: "inherit",
     env: {
       ...process.env,
+      BSB_FULL_LOGIN_BACKOFF_MS: "0",
       ...(credentials ? { BS_EMAIL: credentials.email, BS_PASSWORD: credentials.password } : {}),
     },
   },

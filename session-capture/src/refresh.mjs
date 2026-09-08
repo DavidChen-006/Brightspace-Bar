@@ -15,7 +15,7 @@
  * the one command a human runs to find out what this thing does.
  */
 import { createFetcher } from "./fetch-engine.mjs";
-import { exitCode, runRefresh } from "./orchestrate.mjs";
+import { DEFAULT_FULL_LOGIN_BACKOFF_MS, exitCode, runRefresh } from "./orchestrate.mjs";
 import { resolvePaths } from "./paths.mjs";
 import { createFullLoginRung } from "./rungs/full-login.mjs";
 import { createSilentRung } from "./rungs/silent.mjs";
@@ -31,6 +31,15 @@ Climbs the session ladder and writes the course cache under BSB_ROOT
                    rung short of a working session. Pass this for runs that
                    must never reach a phone: tests, a shared machine.
   --help           print this and exit
+
+Environment:
+  BSB_FULL_LOGIN_BACKOFF_MS
+                   how long after one full-login attempt the next may begin,
+                   in ms (default ${DEFAULT_FULL_LOGIN_BACKOFF_MS} = 4 hours).
+                   Each attempt pushes an MFA number to a phone, and the app
+                   ticks every 30 minutes; the backoff keeps a night away from
+                   becoming a night of pushes. 0 disables it — what
+                   \`make start\` sets, because a human is present.
 
 Exit codes: 0 fresh cache written · 2 needs login · 1 error`;
 
@@ -55,8 +64,16 @@ const status = await runRefresh({
   fetcher: createFetcher(),
   clock: () => new Date(),
   allowFullLogin: !args.includes("--no-full-login"),
+  fullLoginBackoffMs: backoffFromEnv(process.env.BSB_FULL_LOGIN_BACKOFF_MS),
   log: (message) => console.error(message),
 });
 
 console.error(`${status.state} (rung: ${status.rungUsed})${status.error ? ` — ${status.error}` : ""}`);
 process.exit(exitCode(status));
+
+/** Unset or unparseable means the default — a typo must not disable the backoff. */
+function backoffFromEnv(value) {
+  if (value === undefined || value === "") return DEFAULT_FULL_LOGIN_BACKOFF_MS;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : DEFAULT_FULL_LOGIN_BACKOFF_MS;
+}

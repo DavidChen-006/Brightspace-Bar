@@ -13,6 +13,10 @@
  *     timer spawns the daemon with no arguments and the last rung is what keeps
  *     the menu from going stale. A caller that opts out (`--no-full-login`)
  *     gets rung 1 and nothing more; if this is wrong, a test suite pushes MFA.
+ *  3. FULL-LOGIN BACKOFF. The full rung is attempted at most once per backoff
+ *     window, measured from the `lastFullLoginAttemptAt` stamp the previous
+ *     run left in status.json. If this is wrong, a wristband that dies
+ *     overnight is sixteen MFA pushes by morning and a throttled account.
  *
  * Scope: small. The clock, the rungs and the fetcher are injected fakes; the
  * only real I/O is a temp BSB_ROOT, because atomicity is a claim about files
@@ -21,7 +25,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
-import { exitCode, runRefresh } from "../src/orchestrate.mjs";
+import { DEFAULT_FULL_LOGIN_BACKOFF_MS, exitCode, runRefresh } from "../src/orchestrate.mjs";
 import {
   FIXED_ISO,
   REFETCHED_DATA,
@@ -80,6 +84,7 @@ test("reports state fresh with rungUsed none in status.json", async (t) => {
     rungUsed: "none",
     lastAttemptAt: FIXED_ISO,
     lastSuccessAt: FIXED_ISO,
+    lastFullLoginAttemptAt: null,
     error: null,
   });
 });
@@ -256,6 +261,208 @@ test("treats a rung that throws as a failed rung and climbs on", async (t) => {
   // Assert
   assert.deepStrictEqual(attempted, ["silent-1", "silent-2"]);
   assert.equal(result.state, "fresh");
+});
+
+// ---------------------------------------------------------------------------
+// The full-login backoff — one phone push per window, measured off status.json.
+// ---------------------------------------------------------------------------
+
+/** A status.json from an earlier run, as the previous self left it. */
+function previousStatus(paths, fields) {
+  mkdirSync(paths.cacheDir, { recursive: true });
+  writeFileSync(
+    paths.statusFile,
+    JSON.stringify({
+      state: "needs-login",
+      rungUsed: "none",
+      lastAttemptAt: "2026-08-01T00:00:00.000Z",
+      lastSuccessAt: "2026-08-01T00:00:00.000Z",
+      lastFullLoginAttemptAt: null,
+      error: "the session is expired and no rung could restore it",
+      ...fields,
+    }),
+  );
+}
+
+/** A silent rung that fails and a full rung that succeeds — the self-heal ladder. */
+function healingLadder() {
+  const { attempted, rung } = ladder();
+  return {
+    attempted,
+    rungs: [
+      rung("silent-1", { result: { ok: false, reason: "entra expired" } }),
+      rung("full-1", { kind: "full" }),
+    ],
+  };
+}
+
+const minutesBefore = (iso, minutes) => new Date(Date.parse(iso) - minutes * 60_000).toISOString();
+
+test("stamps lastFullLoginAttemptAt with the run's clock when the full rung is attempted", async (t) => {
+  // Arrange
+  const paths = tempPaths(t);
+  const { rungs } = healingLadder();
+
+  // Act
+  const result = await runRefresh(
+    deps(paths, { rungs, fetcher: scriptedFetcher([expired(), ok(SAMPLE_DATA)]) }),
+  );
+
+  // Assert
+  assert.equal(result.lastFullLoginAttemptAt, FIXED_ISO);
+  assert.equal(readJson(paths.statusFile).lastFullLoginAttemptAt, FIXED_ISO);
+});
+
+test("stamps the attempt even when the full rung fails — the phone was still pushed", async (t) => {
+  // Arrange
+  const paths = tempPaths(t);
+  const { rung } = ladder();
+  const rungs = [rung("full-1", { kind: "full", result: { ok: false, reason: "timed out waiting for the MFA approval" } })];
+
+  // Act
+  const result = await runRefresh(deps(paths, { rungs, fetcher: scriptedFetcher([expired()]) }));
+
+  // Assert
+  assert.equal(result.state, "needs-login");
+  assert.equal(result.lastFullLoginAttemptAt, FIXED_ISO);
+});
+
+test("stamps the attempt even when the full rung throws", async (t) => {
+  // Arrange
+  const paths = tempPaths(t);
+  const { rung } = ladder();
+  const rungs = [rung("full-1", { kind: "full", throws: "playwright exploded" })];
+
+  // Act
+  const result = await runRefresh(deps(paths, { rungs, fetcher: scriptedFetcher([expired()]) }));
+
+  // Assert
+  assert.equal(result.lastFullLoginAttemptAt, FIXED_ISO);
+});
+
+test("skips the full rung when the previous attempt is inside the backoff window", async (t) => {
+  // Arrange — the 3am case: a tick tried thirty minutes ago and nobody approved.
+  const paths = tempPaths(t);
+  previousStatus(paths, { lastFullLoginAttemptAt: minutesBefore(FIXED_ISO, 30) });
+  const { attempted, rungs } = healingLadder();
+
+  // Act
+  const result = await runRefresh(deps(paths, { rungs, fetcher: scriptedFetcher([expired()]) }));
+
+  // Assert
+  assert.deepStrictEqual(attempted, ["silent-1"]);
+  assert.equal(result.state, "needs-login");
+});
+
+test("says in the error until when the full login is backed off", async (t) => {
+  // Arrange
+  const paths = tempPaths(t);
+  const attemptedAt = minutesBefore(FIXED_ISO, 30);
+  previousStatus(paths, { lastFullLoginAttemptAt: attemptedAt });
+  const { rungs } = healingLadder();
+
+  // Act
+  const result = await runRefresh(deps(paths, { rungs, fetcher: scriptedFetcher([expired()]) }));
+
+  // Assert — status.json must say the true thing: not "no rung could", but "not yet".
+  const until = new Date(Date.parse(attemptedAt) + DEFAULT_FULL_LOGIN_BACKOFF_MS).toISOString();
+  assert.match(result.error, new RegExp(`backed off until ${until.replace(/[.]/g, "\\.")}`));
+});
+
+test("carries the previous stamp forward through a run that skipped the full rung", async (t) => {
+  // Arrange — the window is measured from the ATTEMPT, not from the last skip,
+  // or a tick every 30 minutes would push the window forever.
+  const paths = tempPaths(t);
+  const attemptedAt = minutesBefore(FIXED_ISO, 30);
+  previousStatus(paths, { lastFullLoginAttemptAt: attemptedAt });
+  const { rungs } = healingLadder();
+
+  // Act
+  const result = await runRefresh(deps(paths, { rungs, fetcher: scriptedFetcher([expired()]) }));
+
+  // Assert
+  assert.equal(result.lastFullLoginAttemptAt, attemptedAt);
+});
+
+test("climbs the full rung again once the backoff window has passed", async (t) => {
+  // Arrange — the morning case: four hours and a minute since the last push.
+  const paths = tempPaths(t);
+  previousStatus(paths, {
+    lastFullLoginAttemptAt: minutesBefore(FIXED_ISO, DEFAULT_FULL_LOGIN_BACKOFF_MS / 60_000 + 1),
+  });
+  const { attempted, rungs } = healingLadder();
+
+  // Act
+  const result = await runRefresh(
+    deps(paths, { rungs, fetcher: scriptedFetcher([expired(), ok(SAMPLE_DATA)]) }),
+  );
+
+  // Assert
+  assert.deepStrictEqual(attempted, ["silent-1", "full-1"]);
+  assert.equal(result.state, "fresh");
+  assert.equal(result.lastFullLoginAttemptAt, FIXED_ISO);
+});
+
+test("a backoff of zero never skips — the make start case, a human present", async (t) => {
+  // Arrange
+  const paths = tempPaths(t);
+  previousStatus(paths, { lastFullLoginAttemptAt: minutesBefore(FIXED_ISO, 1) });
+  const { attempted, rungs } = healingLadder();
+
+  // Act
+  await runRefresh(
+    deps(paths, { rungs, fullLoginBackoffMs: 0, fetcher: scriptedFetcher([expired(), ok(SAMPLE_DATA)]) }),
+  );
+
+  // Assert
+  assert.deepStrictEqual(attempted, ["silent-1", "full-1"]);
+});
+
+test("never backs off the silent rung", async (t) => {
+  // Arrange — the backoff is about phones; the silent rung has none.
+  const paths = tempPaths(t);
+  previousStatus(paths, { lastFullLoginAttemptAt: minutesBefore(FIXED_ISO, 1) });
+  const { attempted, rung } = ladder();
+
+  // Act
+  const result = await runRefresh(
+    deps(paths, { rungs: [rung("silent-1")], fetcher: scriptedFetcher([expired(), ok(SAMPLE_DATA)]) }),
+  );
+
+  // Assert
+  assert.deepStrictEqual(attempted, ["silent-1"]);
+  assert.equal(result.state, "fresh");
+});
+
+test("treats an unparseable stamp as no attempt rather than as a rung that can never run", async (t) => {
+  // Arrange
+  const paths = tempPaths(t);
+  previousStatus(paths, { lastFullLoginAttemptAt: "not a date" });
+  const { attempted, rungs } = healingLadder();
+
+  // Act
+  await runRefresh(deps(paths, { rungs, fetcher: scriptedFetcher([expired(), ok(SAMPLE_DATA)]) }));
+
+  // Assert
+  assert.deepStrictEqual(attempted, ["silent-1", "full-1"]);
+});
+
+test("reads a status.json written before the stamp existed as no attempt", async (t) => {
+  // Arrange — the previous self predates this build.
+  const paths = tempPaths(t);
+  mkdirSync(paths.cacheDir, { recursive: true });
+  writeFileSync(
+    paths.statusFile,
+    JSON.stringify({ state: "needs-login", rungUsed: "none", lastAttemptAt: FIXED_ISO, lastSuccessAt: null, error: "x" }),
+  );
+  const { attempted, rungs } = healingLadder();
+
+  // Act
+  const result = await runRefresh(deps(paths, { rungs, fetcher: scriptedFetcher([expired(), ok(SAMPLE_DATA)]) }));
+
+  // Assert
+  assert.deepStrictEqual(attempted, ["silent-1", "full-1"]);
+  assert.equal(result.lastFullLoginAttemptAt, FIXED_ISO);
 });
 
 // ---------------------------------------------------------------------------
