@@ -37,6 +37,13 @@ public struct DaemonPaths: Sendable, Equatable {
     /// path. Under `cache/` with the rest: it is ephemeral status, and the app
     /// watches that one directory for all of it.
     public var mfaFile: URL { self.cacheDirectory.appending(path: "mfa.json") }
+    /// The student's own items — written by the add-form and by the agent CLI
+    /// (`bsb add`), read by the menu. At the root, NOT under `cache/`: `cache/`
+    /// is the daemon's output directory, which it may clear wholesale, and
+    /// this file is user data the daemon must never touch. Named here so the
+    /// store that writes it and the watcher that repaints on it cannot
+    /// disagree about where it is.
+    public var manualItemsFile: URL { self.root.appending(path: "manual-items.json") }
 
     /// Where the install lives when `BSB_ROOT` is unset — `paths.mjs`'s
     /// `DEFAULT_ROOT`, so writer and reader agree without being told.

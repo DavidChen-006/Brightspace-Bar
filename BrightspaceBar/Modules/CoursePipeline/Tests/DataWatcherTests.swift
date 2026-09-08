@@ -18,6 +18,11 @@ import CoursePipeline
 //     as a feature. → "a write to another cache file is not reported".
 //   - Rapid writes coalesce. The reaction is a model rebuild, not an icon
 //     repaint. → "five rapid writes debounce to fewer callbacks than writes".
+//   - The agent's file counts too. `bsb add` publishes `manual-items.json` at
+//     the ROOT (not under `cache/`), and the square must appear without a
+//     relaunch or a menu click. → "an atomic write of manual-items.json at the
+//     root fires the callback"; and a write to `session.json` beside it — the
+//     daemon rewrites that one on every rung success — must not.
 //
 // SCOPE: medium, deliberately — kqueue is a kernel facility, a fake would only
 // test the fake. Each test gets its own temp `BSB_ROOT` (MfaWorld: it owns the
@@ -47,8 +52,20 @@ private func settle(_ seconds: TimeInterval = 0.4) async {
 /// a dot-prefixed temp file beside the target, then `rename(2)` over it.
 @MainActor
 private func publish(_ world: MfaWorld, file: String, contents: String) {
-    let target = world.cacheDirectory.appending(path: file)
-    let temp = world.cacheDirectory.appending(path: ".\(file).\(getpid()).\(UUID().uuidString).tmp")
+    publish(into: world.cacheDirectory, file: file, contents: contents)
+}
+
+/// The same publish at the ROOT — how `bsb add` (and `ManualItemStore`) land
+/// `manual-items.json`, and how the daemon lands `session.json`.
+@MainActor
+private func publishAtRoot(_ world: MfaWorld, file: String, contents: String) {
+    publish(into: world.root, file: file, contents: contents)
+}
+
+@MainActor
+private func publish(into directory: URL, file: String, contents: String) {
+    let target = directory.appending(path: file)
+    let temp = directory.appending(path: ".\(file).\(getpid()).\(UUID().uuidString).tmp")
     try? Data(contents.utf8).write(to: temp)
     _ = rename(temp.path, target.path)
 }
@@ -131,6 +148,100 @@ struct DataWatcherTests {
 
         // Assert
         #expect(fired == 5)
+    }
+
+    // MARK: - The agent's file
+
+    @Test("an atomic write of manual-items.json at the root fires the callback")
+    func aManualItemsWriteIsPickedUp() async {
+        // Arrange — the agent flow: app up, `bsb add` publishes at the root.
+        let world = MfaWorld()
+        publish(world, file: "data.json", contents: #"{"courses":[]}"#)
+        let watcher = DataWatcher(paths: world.paths, debounce: 0.05)
+        var fired = 0
+        watcher.start { fired += 1 }
+
+        // Act — temp file beside the target, then rename(2), as bsb does it.
+        publishAtRoot(world, file: "manual-items.json", contents: "[]")
+        await pumpData(until: { fired >= 1 })
+        watcher.stop()
+
+        // Assert
+        #expect(fired >= 1, "a published manual-items.json never reached the callback")
+    }
+
+    @Test("manual-items.json is picked up even when cache/ has never existed")
+    func aManualItemsWriteNeedsNoCache() async {
+        // Arrange — an agent can add an item before the daemon has ever run.
+        let world = MfaWorld(createsCacheDirectory: false)
+        let watcher = DataWatcher(paths: world.paths, debounce: 0.05)
+        var fired = 0
+        watcher.start { fired += 1 }
+
+        // Act
+        publishAtRoot(world, file: "manual-items.json", contents: "[]")
+        await pumpData(until: { fired >= 1 })
+        watcher.stop()
+
+        // Assert
+        #expect(fired >= 1)
+    }
+
+    @Test("start does not report a manual-items.json already on disk")
+    func startIsSilentAboutExistingManualItems() async {
+        // Arrange — the launch read serves the file itself.
+        let world = MfaWorld()
+        publishAtRoot(world, file: "manual-items.json", contents: "[]")
+        let watcher = DataWatcher(paths: world.paths, debounce: 0.05)
+        var fired = 0
+
+        // Act
+        watcher.start { fired += 1 }
+        await settle()
+        watcher.stop()
+
+        // Assert
+        #expect(fired == 0)
+    }
+
+    @Test("every rewrite of manual-items.json is reported — add, then remove")
+    func manualItemsRewritesAreEachReported() async {
+        // Arrange — an agent adds, the student deletes, the agent adds again;
+        // each rename is a new inode and each must repaint.
+        let world = MfaWorld()
+        let watcher = DataWatcher(paths: world.paths, debounce: 0.05)
+        var fired = 0
+        watcher.start { fired += 1 }
+
+        // Act
+        for round in 1...3 {
+            publishAtRoot(world, file: "manual-items.json", contents: "[\(round)]")
+            await pumpData(until: { fired >= round })
+        }
+        watcher.stop()
+
+        // Assert
+        #expect(fired == 3)
+    }
+
+    @Test("a write to another root file is not reported")
+    func otherFilesAtTheRootAreIgnored() async {
+        // Arrange — the daemon rewrites session.json on every rung success and
+        // credentials.json on setup; neither changes what the menu shows.
+        let world = MfaWorld()
+        publish(world, file: "data.json", contents: #"{"courses":[]}"#)
+        let watcher = DataWatcher(paths: world.paths, debounce: 0.05)
+        var fired = 0
+        watcher.start { fired += 1 }
+
+        // Act
+        publishAtRoot(world, file: "session.json", contents: #"{"cookieHeader":"x"}"#)
+        publishAtRoot(world, file: "credentials.json", contents: #"{"email":"x"}"#)
+        await settle()
+        watcher.stop()
+
+        // Assert
+        #expect(fired == 0, "an unrelated root file triggered a reload")
     }
 
     // MARK: - The changes that must NOT be reported

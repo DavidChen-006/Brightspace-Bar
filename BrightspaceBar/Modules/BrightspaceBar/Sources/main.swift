@@ -283,6 +283,11 @@ mfaWatcher.start { state in
 // a new `data.json` into place, and the reaction is the poll's own reload path:
 // cheap and idempotent, repainting only when the model actually changed.
 //
+// The same watcher hears `manual-items.json` land at the root — which is how
+// an agent's `bsb add` reaches the menu: the reload reads the store fresh (see
+// `manualItems:` above), so the square is on screen before the agent's
+// command has returned to its prompt. No relaunch, no click, no second path.
+//
 // Wired in both modes for the same reasons as `mfaWatcher` — a reader of one
 // directory, spawns nothing (D8) — and top-level `let` for the same reason too:
 // a watcher bound inside a branch is deallocated at the end of it. The callback

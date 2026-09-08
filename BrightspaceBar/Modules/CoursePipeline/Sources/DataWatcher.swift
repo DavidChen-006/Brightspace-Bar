@@ -1,6 +1,7 @@
 import Foundation
 
-/// Watches `cache/` and says when `data.json` has been published anew.
+/// Watches the install and says when `cache/data.json` — or the student's own
+/// `manual-items.json` at the root — has been published anew.
 ///
 /// The one-command start flow launches the app FIRST and runs the login/fetch
 /// after it, so the freshest courses land on disk minutes after the launch read
@@ -8,6 +9,14 @@ import Foundation
 /// watcher closes that gap: when the daemon renames a new `data.json` into
 /// place, the callback fires and the composition root re-runs the same cheap,
 /// idempotent reload the poll uses.
+///
+/// The second file is the agent's. `bsb add` (session-capture/src/bsb.mjs)
+/// writes `manual-items.json` from a terminal the app cannot see, and the
+/// whole promise of that surface is that the square appears *now* — an agent
+/// that imported a syllabus and a student who then opens the menu must see
+/// the same thing. The file is at the root, which this watcher already holds
+/// a descriptor on (the "nearest living ancestor" of `cache/`), so the cost of
+/// watching it is one more `stat` per event and no more sources.
 ///
 /// The watching itself is `MfaWatcher`'s, trap for trap (experiment 17 — read
 /// that file's header for the measurements):
@@ -19,10 +28,10 @@ import Foundation
 ///   - **Re-read, never trust the event.** One atomic write is two directory
 ///     events and the first is a lie (the temp file appearing). No event says
 ///     *what* changed; each one means "look again". This watcher looks again by
-///     fingerprinting `data.json` (identity + mtime + size) and stays silent
-///     when the fingerprint is the one it last reported — which also silences
-///     every event for OTHER files in `cache/` (`mfa.json`, `status.json`,
-///     temp files) without reading a byte of the payload.
+///     fingerprinting both files (identity + mtime + size) and stays silent
+///     when the pair is the one it last reported — which also silences every
+///     event for OTHER files in either directory (`mfa.json`, `status.json`,
+///     `session.json`, temp files) without reading a byte of the payload.
 ///   - **The directory can be replaced under us.** `reset.sh --cache` removes
 ///     `cache/` wholesale; each source remembers which inode it was armed on
 ///     and re-arms when the path names a different one, with a second source on
@@ -42,7 +51,7 @@ public final class DataWatcher {
     private let debounce: TimeInterval
 
     private var onChange: (() -> Void)?
-    private var reported: Fingerprint?
+    private var reported: Published?
     private var cache: DirectoryWatch?
     private var ancestor: DirectoryWatch?
     private var pending: DispatchWorkItem?
@@ -62,7 +71,7 @@ public final class DataWatcher {
         self.stop()
         self.onChange = onChange
         self.rearm()
-        self.reported = self.fingerprint()
+        self.reported = self.published()
     }
 
     /// Ends the reports and releases everything they held. Safe to call before
@@ -93,20 +102,36 @@ public final class DataWatcher {
         DispatchQueue.main.asyncAfter(deadline: .now() + self.debounce, execute: work)
     }
 
-    /// Looks at `data.json` from scratch and tells the caller only if it is a
-    /// different published file than the one last reported. The comparison is
-    /// what keeps the temp-file event, and every event about a *different*
-    /// file in `cache/`, from triggering a reload.
+    /// Looks at both files from scratch and tells the caller only if either is
+    /// a different published file than the one last reported. The comparison
+    /// is what keeps the temp-file event, and every event about a *different*
+    /// file in either directory, from triggering a reload. Nothing at all on
+    /// disk is never reported: there is nothing new to show.
     private func publish() {
         self.pending = nil
         guard let onChange = self.onChange else { return }
-        let now = self.fingerprint()
-        guard now != self.reported, now != nil else { return }
+        let now = self.published()
+        guard now != self.reported, !now.isEmpty else { return }
         self.reported = now
         onChange()
     }
 
-    /// What `data.json` is right now: which inode, written when, how big.
+    /// The two files that repaint the menu, as they stand — nil for one that
+    /// is not there.
+    private struct Published: Equatable {
+        let data: Fingerprint?
+        let manualItems: Fingerprint?
+        var isEmpty: Bool { self.data == nil && self.manualItems == nil }
+    }
+
+    private func published() -> Published {
+        Published(
+            data: self.fingerprint(of: self.paths.dataFile),
+            manualItems: self.fingerprint(of: self.paths.manualItemsFile)
+        )
+    }
+
+    /// What one file is right now: which inode, written when, how big.
     /// An atomic publish always changes the inode; mtime and size are belt and
     /// braces for an editor that rewrote in place.
     private struct Fingerprint: Equatable {
@@ -123,9 +148,9 @@ public final class DataWatcher {
         }
     }
 
-    private func fingerprint() -> Fingerprint? {
+    private func fingerprint(of file: URL) -> Fingerprint? {
         var info = stat()
-        guard stat(self.paths.dataFile.path, &info) == 0, (info.st_mode & S_IFMT) == S_IFREG else {
+        guard stat(file.path, &info) == 0, (info.st_mode & S_IFMT) == S_IFREG else {
             return nil
         }
         return Fingerprint(
@@ -152,7 +177,9 @@ public final class DataWatcher {
 
     /// Points both sources at whatever exists right now. Called before the first
     /// read and on every event, which is what lets a directory that is deleted,
-    /// recreated, or has never existed yet all resolve themselves.
+    /// recreated, or has never existed yet all resolve themselves. Once the
+    /// root exists, the ancestor source IS the root — which is what makes a
+    /// rename of `manual-items.json` into it an event this watcher hears.
     private func rearm() {
         self.ancestor = self.arm(on: self.nearestLivingAncestor(), keeping: self.ancestor)
         self.cache = self.arm(on: self.paths.cacheDirectory.path, keeping: self.cache)

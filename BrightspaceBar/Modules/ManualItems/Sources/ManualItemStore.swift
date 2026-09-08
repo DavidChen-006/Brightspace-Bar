@@ -41,9 +41,11 @@ public struct ManualItemStore: Sendable {
     /// `manual-items.json` under the resolved root.
     public let fileURL: URL
 
-    /// Production wiring: the same root the daemon and the cache reader use.
+    /// Production wiring: the same root the daemon and the cache reader use,
+    /// and the same file `DataWatcher` repaints on — `DaemonPaths` names it
+    /// once, so the writer and the watcher cannot drift apart.
     public init(paths: DaemonPaths = .resolve()) {
-        self.fileURL = paths.root.appending(path: "manual-items.json")
+        self.fileURL = paths.manualItemsFile
     }
 
     /// Test seam: point the store anywhere (a temp directory in tests).

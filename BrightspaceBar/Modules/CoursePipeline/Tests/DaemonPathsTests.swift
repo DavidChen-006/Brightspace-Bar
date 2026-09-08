@@ -107,5 +107,8 @@ struct DaemonPathsTests {
         #expect(paths.cacheDirectory.path == "/tmp/bsb-layout/cache")
         #expect(paths.dataFile.path == "/tmp/bsb-layout/cache/data.json")
         #expect(paths.statusFile.path == "/tmp/bsb-layout/cache/status.json")
+        // User data sits at the root, beside the daemon's own files — never
+        // under cache/, which the daemon may clear wholesale.
+        #expect(paths.manualItemsFile.path == "/tmp/bsb-layout/manual-items.json")
     }
 }
