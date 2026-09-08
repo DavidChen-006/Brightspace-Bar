@@ -51,7 +51,7 @@ BS_EMAIL='you@purdue.edu' BS_PASSWORD='…' scripts/e2e.sh all --yes --with-swif
 ```
 
 `--with-swift` runs `BS_LIVE=1 swift test` in `BrightspaceBar/`, which spawns the
-real daemon (cron-safe, no `--allow-full-login`) against the same root. It cannot
+real daemon (with `--no-full-login`, so no MFA can fire) against the same root. It cannot
 pass until a tier-2 login has seeded that root.
 
 ## When a tier skips (exit 3)
@@ -117,7 +117,7 @@ BS_EMAIL='you@purdue.edu' BS_PASSWORD='…' scripts/e2e-icon.sh --yes
 ```
 
 What it does, in order: check the preconditions (credentials, a running app) →
-wipe the root → start `refresh.mjs --allow-full-login` in the **background** →
+wipe the root → start `refresh.mjs` (full login on by default) in the **background** →
 poll for `cache/mfa.json` → the instant it appears, print an unmissable banner
 with the number and measure the icon → wait for the login → assert exit 0,
 `mfa.json` **gone**, the icon back to logo width, `status.json` `fresh`/`full`,
@@ -151,11 +151,10 @@ deleting anything.
 The script never launches the app: `run.sh` rebuilds, which is not a test
 script's decision. If nothing is running it prints the command and exits 3.
 
-Note that the running app polls on its own every 15 minutes without
-`--allow-full-login`. Such a tick cannot touch `mfa.json` (the full rung is
-skipped before it is entered), but it *can* overwrite `status.json` with
-`needs-login` while the root is empty — a `status.json` assertion that fails
-that way is a collision, not a regression. Re-run.
+Note that the running app polls on its own every 30 minutes, and its ticks may
+climb the full rung too (D8 inverted). A tick that lands on this window can
+race this run for the profile and for `mfa.json`, or overwrite `status.json` —
+an assertion that fails that way is a collision, not a regression. Re-run.
 
 | Variable | Meaning |
 |---|---|

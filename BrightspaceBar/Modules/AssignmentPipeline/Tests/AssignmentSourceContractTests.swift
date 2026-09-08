@@ -59,14 +59,14 @@ private struct SourceCase: Sendable, CustomStringConvertible {
     ///
     /// The source cannot spawn — that is its design — so the *arrangement* runs
     /// the daemon, once, the way a refresh does. Where the hermetic case seeds a
-    /// canned cache, this one earns a real one. Cron-safe: no
-    /// `--allow-full-login`, so a run that needs a headed login fails as
-    /// `.sessionExpired` rather than opening a browser mid-suite (D8).
+    /// canned cache, this one earns a real one. Opted out of the full login
+    /// (`--no-full-login`), so a run that needs it fails as `.sessionExpired`
+    /// rather than pushing MFA to a phone mid-suite.
     static let live = SourceCase(name: "DaemonAssignmentSource (live)") {
         let paths = DaemonPaths.resolve()
         _ = await DaemonRunner(
             executable: URL(fileURLWithPath: "/usr/bin/env"),
-            arguments: ["node", liveDaemonCLI],
+            arguments: ["node", liveDaemonCLI, "--no-full-login"],
             paths: paths,
             timeout: 180
         ).run()

@@ -49,13 +49,13 @@ private struct SourceCase: Sendable, CustomStringConvertible {
     /// credentials and writes the real cache, so a dead session or a broken
     /// endpoint fails the live run loudly — never silently green.
     ///
-    /// Cron-safe, deliberately: no `--allow-full-login`, so this can never open a
-    /// browser window mid-suite. A run that needs a headed login fails as
-    /// `.sessionExpired`, which is the honest answer (D8).
+    /// Opted out of the full login, deliberately (`--no-full-login`): a test
+    /// suite must never push an MFA prompt to a phone. A run that needs the full
+    /// rung fails as `.sessionExpired`, which is the honest answer.
     static let live = SourceCase(name: "DaemonCourseSource (live)") {
         DaemonCourseSource(runner: DaemonRunner(
             executable: URL(fileURLWithPath: "/usr/bin/env"),
-            arguments: ["node", liveDaemonCLI],
+            arguments: ["node", liveDaemonCLI, "--no-full-login"],
             paths: DaemonPaths.resolve(),
             timeout: 180
         ))

@@ -11,18 +11,18 @@ import Testing
 // make claims about its text. Crude, and better than the alternative, which is a
 // green suite over an app still wired to the retired network path.
 //
-// The negative claim is the important one. **D8: the app NEVER passes
-// `--allow-full-login`.** `CourseSource.fetchCourses()` carries no trigger
-// context and `Contracts.swift` is frozen, so the app cannot tell a manual click
-// from a timer tick at the source — which makes every spawn it can make a
-// cron-safe one. A flag leaking in here would pop a headed browser window on a
-// timer while nobody is at the machine. The check is on the quoted string
-// literal, so prose about the flag in a comment stays legal.
+// The negative claim is the important one. **D8 (inverted 2026-09-08): the app
+// NEVER passes `--no-full-login`.** The daemon climbs its whole ladder by
+// default, full login included — that last rung is what lets a dead Entra
+// wristband self-heal from a timer tick, with the MFA number on the icon. The
+// app passes no argument at all; an opt-out leaking in here would leave the
+// menu stale forever once the silent rung stops working. The check is on the
+// quoted string literal, so prose about the flag in a comment stays legal.
 //
 // SCOPE: small. Reads one file from the repository; no build products, no app.
 // ═════════════════════════════════════════════════════════════════════════════
 
-@Suite("main.swift wires the daemon, and only the cron-safe half of it")
+@Suite("main.swift wires the daemon, and never opts out of its full ladder")
 struct DaemonWiringTests {
 
     /// Four parents up from `Modules/BrightspaceBar/Tests/<this file>`, so the
@@ -81,23 +81,24 @@ struct DaemonWiringTests {
         #expect(text.contains("RefreshScheduler"))
     }
 
-    @Test("the app never passes --allow-full-login")
-    func theAppNeverAsksForAHeadedLogin() throws {
+    @Test("the app never passes --no-full-login")
+    func theAppNeverOptsOutOfTheFullLogin() throws {
         // Arrange
         let text = try self.source()
 
         // Act — the quoted literal only: D8 is about what gets spawned, not
         // about what the comments are allowed to mention.
-        let leaks = text.contains("\"--allow-full-login\"")
+        let leaks = text.contains("\"--no-full-login\"")
 
         // Assert
         #expect(
             !leaks,
             """
-            main.swift passes --allow-full-login. Every app spawn must be cron-safe \
-            (D8): the source cannot tell a manual refresh from a timer tick, so the \
-            flag would let a timer open a headed login window with nobody present. \
-            Full login stays terminal-initiated: npm run refresh -- --allow-full-login.
+            main.swift passes --no-full-login. Every app spawn must be allowed the \
+            whole ladder (D8, inverted): the full rung is the only thing that can \
+            restore a session once the Entra wristband has died, and the MFA number \
+            reaches the human through the icon. Opting out here leaves the menu \
+            stale until someone opens a terminal.
             """
         )
     }

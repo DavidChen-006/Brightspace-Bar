@@ -441,18 +441,18 @@ struct MfaWatcherSourceTests {
         )
     }
 
-    @Test("the watcher never asks for a headed login")
-    func theWatcherCannotTripD8() throws {
-        // Arrange — D8: the app never passes --allow-full-login. The watcher sits
-        // closest to the login story of anything in the app, and it is a plain
-        // reader of a file: it spawns nothing, and must never grow a "log in for
-        // me" shortcut that a timer could reach with nobody at the machine.
+    @Test("the watcher spawns nothing")
+    func theWatcherIsOnlyAReader() throws {
+        // Arrange — the watcher sits closest to the login story of anything in
+        // the app, and it is a plain reader of a file. The daemon is spawned in
+        // exactly one place (`DaemonRunner`); a second spawner here would be a
+        // second ladder, racing the first for the same profile and phone.
         let text = try self.source()
 
         // Act
-        let leaks = text.contains("--allow-full-login")
+        let spawns = text.contains("Process(") || text.contains("DaemonRunner")
 
         // Assert
-        #expect(leaks == false, "the MFA watcher must not name --allow-full-login")
+        #expect(spawns == false, "the MFA watcher must not spawn the daemon")
     }
 }

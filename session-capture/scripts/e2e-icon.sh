@@ -4,7 +4,7 @@
 #
 # One story, top to bottom, against the REAL tenant:
 #
-#   empty root → refresh.mjs --allow-full-login → Entra shows a number →
+#   empty root → refresh.mjs (full login on by default) → Entra shows a number →
 #   cache/mfa.json appears → the STATUS BAR ICON reads it → David types it into
 #   Authenticator → the login finishes → mfa.json is deleted → the icon is a logo
 #   again and the cache is fresh.
@@ -217,8 +217,8 @@ assert_status() {
       "found:    state=${found_state:-<unreadable>} rungUsed=${found_rung:-<unreadable>}" \
       "error:    $(json_field "$STATUS_FILE" error)" \
       "file:     $STATUS_FILE" \
-      "(the app polls every 15 minutes without --allow-full-login; a tick that" \
-      " landed on this window would overwrite the status with needs-login)"
+      "(the app polls on its own; a tick that landed on this window may have" \
+      " overwritten the status, or raced this run for the same profile)"
   fi
   ok "status.json: state=$1 rungUsed=$2 (lastSuccessAt=$(json_field "$STATUS_FILE" lastSuccessAt))"
 }
@@ -367,11 +367,11 @@ if [ "$REQUIRE_APP" -eq 1 ]; then
   fi
   ok "BrightspaceBar is running (pid $(pgrep -f "$APP_PATTERN" | tr '\n' ' '))"
   say ""
-  say "  Heads up: the app also refreshes on its own every 15 minutes, WITHOUT"
-  say "  --allow-full-login. Such a tick cannot touch mfa.json (the full rung is"
-  say "  skipped before it is ever entered), but it CAN overwrite status.json with"
-  say "  needs-login while this root is empty. If the end-of-run status assertion"
-  say "  fails that way, it is a collision, not a regression — re-run."
+  say "  Heads up: the app also refreshes on its own every 30 minutes, and its"
+  say "  ticks may climb the full rung too (D8 inverted). A tick that lands on"
+  say "  this window can race this run for the profile and for mfa.json, or"
+  say "  overwrite status.json. If an end-of-run assertion fails that way, it is"
+  say "  a collision, not a regression — re-run."
 else
   note "ICON_REQUIRE_APP=0 — not checking for a running app (rehearsal mode; no icon exists)"
 fi
@@ -431,9 +431,9 @@ EOF
 DAEMON_LOG="$(mktemp -t bsb-e2e-icon)"
 STARTED="$(date +%s)"
 
-step "starting the full ladder in the background: refresh.mjs --allow-full-login"
-say "    node $REFRESH_CLI --allow-full-login"
-node "$REFRESH_CLI" --allow-full-login >"$DAEMON_LOG" 2>&1 &
+step "starting the full ladder in the background: refresh.mjs"
+say "    node $REFRESH_CLI"
+node "$REFRESH_CLI" >"$DAEMON_LOG" 2>&1 &
 DAEMON_PID=$!
 say "    pid $DAEMON_PID · log $DAEMON_LOG"
 

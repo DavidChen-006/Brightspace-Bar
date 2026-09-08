@@ -9,9 +9,10 @@
  *     This is the anti-pattern the plan names — the auth trapdoor that wipes
  *     the cache when login lapses. The menu must never blank.
  *  2. LADDER PERMISSION. Rungs are walked in order, and a `full` rung — the one
- *     that puts a browser in front of a human — is attempted ONLY when the
- *     caller proved a human is present. A timer spawn may climb rung 1 and
- *     nothing more; if this is wrong, cron pops browsers at 3am.
+ *     that reaches for a phone — is attempted by DEFAULT, because the app's
+ *     timer spawns the daemon with no arguments and the last rung is what keeps
+ *     the menu from going stale. A caller that opts out (`--no-full-login`)
+ *     gets rung 1 and nothing more; if this is wrong, a test suite pushes MFA.
  *
  * Scope: small. The clock, the rungs and the fetcher are injected fakes; the
  * only real I/O is a temp BSB_ROOT, because atomicity is a claim about files
@@ -43,7 +44,7 @@ function deps(paths, overrides = {}) {
     clock: fixedClock,
     rungs: [],
     fetcher: scriptedFetcher([ok(SAMPLE_DATA)]),
-    allowFullLogin: false,
+    allowFullLogin: true,
     log: () => {},
     ...overrides,
   };
@@ -184,7 +185,6 @@ test("records rungUsed full when a full rung restored the session", async (t) =>
   const result = await runRefresh(
     deps(paths, {
       rungs: [rung("full-1", { kind: "full" })],
-      allowFullLogin: true,
       fetcher: scriptedFetcher([expired(), ok(SAMPLE_DATA)]),
     }),
   );
@@ -193,8 +193,25 @@ test("records rungUsed full when a full rung restored the session", async (t) =>
   assert.equal(result.rungUsed, "full");
 });
 
-test("skips a full rung when full login was not allowed", async (t) => {
-  // Arrange — the cron case: a timer spawn may climb rung 1 and no further.
+test("climbs the full rung by default — the app's timer passes no flag", async (t) => {
+  // Arrange — the self-heal case: silent fails (dead wristband), full restores.
+  const paths = tempPaths(t);
+  const { attempted, rung } = ladder();
+  const rungs = [rung("silent-1", { result: { ok: false, reason: "entra expired" } }), rung("full-1", { kind: "full" })];
+
+  // Act
+  const result = await runRefresh(
+    deps(paths, { rungs, fetcher: scriptedFetcher([expired(), ok(SAMPLE_DATA)]) }),
+  );
+
+  // Assert
+  assert.deepStrictEqual(attempted, ["silent-1", "full-1"]);
+  assert.equal(result.state, "fresh");
+  assert.equal(result.rungUsed, "full");
+});
+
+test("skips a full rung when the caller opted out (--no-full-login)", async (t) => {
+  // Arrange — the opt-out case: a test suite may climb rung 1 and no further.
   const paths = tempPaths(t);
   const { attempted, rung } = ladder();
   const rungs = [rung("silent-1", { result: { ok: false, reason: "entra expired" } }), rung("full-1", { kind: "full" })];
@@ -217,7 +234,7 @@ test("keeps climbing when a rung succeeds but the session is still expired", asy
   const fetcher = scriptedFetcher([expired(), expired(), ok(SAMPLE_DATA)]);
 
   // Act
-  const result = await runRefresh(deps(paths, { rungs, allowFullLogin: true, fetcher }));
+  const result = await runRefresh(deps(paths, { rungs, fetcher }));
 
   // Assert
   assert.deepStrictEqual(attempted, ["silent-1", "full-1"]);

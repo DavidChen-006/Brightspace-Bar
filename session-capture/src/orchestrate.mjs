@@ -1,9 +1,11 @@
 /**
  * The ladder: fetch with the credentials already on disk, and only if the
- * SESSION is what failed, climb the rungs — silent first, and the `full` rung
- * (the one that puts a browser in front of a human) only when the caller proved
- * a human is present. A timer spawn may climb rung 1 and no further; otherwise
- * cron pops a login window at 3am.
+ * SESSION is what failed, climb the rungs — silent first, then the `full` rung
+ * (the one that types the stored credentials and puts an MFA number on the
+ * status-bar icon). Every rung is allowed by default: the app's timer spawns
+ * this with no arguments, and the last rung is what keeps the menu bar from
+ * ever going stale. A caller that must not reach a phone — a test suite, a
+ * shared machine — opts out with `allowFullLogin: false` (`--no-full-login`).
  *
  * Two invariants outrank freshness, because the menu bar is read by a human who
  * cannot tell "loading" from "gone":
@@ -27,7 +29,7 @@ import { writeJsonAtomic } from "./atomic-write.mjs";
 
 /**
  * A rung: takes the world, tries to produce live credentials, reports honestly.
- * `kind` is "silent" (no human, cron-safe) or "full" (needs a present human).
+ * `kind` is "silent" (no human involved) or "full" (a phone must approve it).
  * Success is a side effect on session.json; the return value is only a verdict.
  *
  * @typedef {{kind: "silent"|"full",
@@ -64,7 +66,7 @@ export async function runRefresh({
   fetcher,
   clock,
   rungs = [],
-  allowFullLogin = false,
+  allowFullLogin = true,
   log = () => {},
 }) {
   const now = clock().toISOString();
@@ -114,7 +116,7 @@ async function climb({ paths, fetcher, rungs, allowFullLogin, log }) {
   for (const [index, rung] of rungs.entries()) {
     const name = `rung ${index + 1} (${rung.kind})`;
     if (rung.kind === "full" && !allowFullLogin) {
-      log(`skipping ${name}: full login needs a present human`);
+      log(`skipping ${name}: full login opted out (--no-full-login)`);
       continue;
     }
     if (!(await climbed(rung, world, name, log))) continue;

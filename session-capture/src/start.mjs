@@ -60,7 +60,8 @@ if (running) {
 // cache it watches — cosmetic, not correctness (the writes are atomic).
 await new Promise((resolve) => setTimeout(resolve, 2000));
 
-// 3. One full refresh, human present by definition (they just ran `make start`).
+// 3. One refresh. The full rung is on by default (no flag needed); a human is
+//    present by definition — they just ran `make start`.
 console.error("");
 console.error("Refreshing the session (headless). If an MFA prompt fires, the number");
 console.error("appears ON THE MENU-BAR ICON — approve it on your phone.");
@@ -68,7 +69,7 @@ console.error("");
 
 const refresh = spawn(
   process.execPath,
-  [path.join(__dirname, "refresh.mjs"), "--allow-full-login"],
+  [path.join(__dirname, "refresh.mjs")],
   {
     cwd: path.join(__dirname, ".."),
     stdio: "inherit",

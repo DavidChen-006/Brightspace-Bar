@@ -340,16 +340,17 @@ struct EndToEndTests {
     /// the contract stays green while David's menu goes empty.
     @Test("the real tenant produces a clickable menu", .enabled(if: bsLiveEnabled))
     func liveTenantYieldsAClickableMenu() async throws {
-        // Arrange — the real daemon, run cron-safe: no `--allow-full-login`, so
-        // this can never open a browser window mid-suite (D8). Credentials stay on
-        // the daemon's side of the boundary entirely; nothing here reads a session.
+        // Arrange — the real daemon, opted out of the full login
+        // (`--no-full-login`), so a suite can never push MFA to a phone.
+        // Credentials stay on the daemon's side of the boundary entirely;
+        // nothing here reads a session.
         let scratch = try ScratchDir()
         let clock = ManualClock(Date())
         let cache = CourseCache(fileURL: scratch.file(), clock: clock, staleAfter: 3600)
         let poller = Poller(
             source: DaemonCourseSource(runner: DaemonRunner(
                 executable: URL(fileURLWithPath: "/usr/bin/env"),
-                arguments: ["node", liveDaemonCLI],
+                arguments: ["node", liveDaemonCLI, "--no-full-login"],
                 paths: DaemonPaths.resolve(),
                 timeout: 180
             )),

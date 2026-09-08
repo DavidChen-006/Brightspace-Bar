@@ -127,12 +127,13 @@ if ProcessInfo.processInfo.environment["BRIGHTSPACEBAR_STUB"] == "1" {
     // handed to the child and read back from — so the writer and the reader
     // cannot disagree about which install they mean.
     //
-    // ⚠️ D8: no argument is passed, and in particular never --allow-full-login.
-    // `CourseSource.fetchCourses()` carries no trigger context, so the app cannot
-    // tell a manual click from a timer tick at the source; every spawn it can make
-    // is therefore a cron-safe one, which may climb the silent rung and no
-    // further. A headed login is terminal-initiated, with David present:
-    // `npm run refresh -- --allow-full-login`.
+    // ⚠️ D8 (inverted 2026-09-08): no argument is passed, and in particular
+    // never --no-full-login. The daemon climbs its whole ladder by default —
+    // existing session → silent Entra SSO → full headless login with the MFA
+    // number on the icon — so a dead wristband heals from a timer tick without
+    // anyone opening a terminal. `CourseSource.fetchCourses()` carries no trigger
+    // context, so every spawn gets the same permission; the daemon's own backoff
+    // is what keeps a night of ticks from becoming a night of MFA pushes.
     let source = DaemonCourseSource(runner: DaemonRunner(
         executable: URL(fileURLWithPath: "/usr/bin/env"),
         arguments: ["node", daemonCLI],

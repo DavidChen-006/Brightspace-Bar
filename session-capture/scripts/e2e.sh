@@ -395,8 +395,8 @@ tier2() {
 EOF
 
   started="$(date +%s)"
-  step "running the full ladder: refresh.mjs --allow-full-login"
-  run_daemon "$LOGIN_TIMEOUT" --allow-full-login
+  step "running the full ladder: refresh.mjs (full login on by default)"
+  run_daemon "$LOGIN_TIMEOUT"
   assert_exit 0 "a fresh cache was written"
   assert_status fresh full
   assert_data_fresh "$started"
@@ -414,8 +414,8 @@ EOF
 }
 
 # Tier 1 — the silent re-mint. Zero human input: this function must never read
-# from stdin, and the daemon runs WITHOUT --allow-full-login so a headed window
-# is impossible even if the wristband turns out to be dead.
+# from stdin, and the daemon runs with --no-full-login so an MFA push is
+# impossible even if the wristband turns out to be dead.
 tier1() {
   step "TIER 1 — credentials deleted, Entra profile kept: the silent rung re-mints"
 
@@ -434,8 +434,8 @@ tier1() {
   ok "session.json is gone, profile/ is intact"
 
   started="$(date +%s)"
-  step "running the cron-safe ladder: refresh.mjs (NO --allow-full-login)"
-  run_daemon "$TIMEOUT"
+  step "running the silent-only ladder: refresh.mjs --no-full-login"
+  run_daemon "$TIMEOUT" --no-full-login
   assert_exit 0 "the silent rung restored the session and the fetch succeeded"
   assert_status fresh silent
   assert_data_fresh "$started"

@@ -1,9 +1,10 @@
 /**
  * Rung 2 — the full login. Kind "full": it needs a human at their phone to
- * approve a number-match, so the orchestrator only climbs it when the caller
- * proved a human is present (`--allow-full-login`, passed by the manual Refresh
- * click). Nothing is shown to that human except the number on the status-bar
- * icon — the browser itself runs headless (D3 as amended by BUILD 3).
+ * approve a number-match. It is climbed by default — the app's own timer
+ * reaches it, which is what makes a dead Entra wristband self-heal — and only
+ * skipped when the caller opted out (`--no-full-login`). Nothing is shown to
+ * that human except the number on the status-bar icon — the browser itself
+ * runs headless (D3 as amended by BUILD 3).
  *
  * The mechanics are `auto-capture.mjs`'s: autofilling BS_EMAIL/BS_PASSWORD,
  * generous MFA wait. Everything playwright is in `browser.mjs`; everything

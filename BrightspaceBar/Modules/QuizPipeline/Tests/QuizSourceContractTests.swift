@@ -98,8 +98,9 @@ struct QuizSourceContractTests {
     /// Phase 5: the live quiz source is the daemon. There is no `BrightspaceQuizSource`
     /// in the app any more — quizzes ride the same `cache/data.json` list as
     /// assignments, marked `kind: "quiz"` by the Node fetcher. So the arrangement runs
-    /// the real `refresh.mjs` once (cron-safe, no `--allow-full-login`, D8) and the
-    /// merged list is narrowed to quizzes before the contract is applied.
+    /// the real `refresh.mjs` once (opted out of the full login with
+    /// `--no-full-login`, so no MFA can reach a phone mid-suite) and the merged
+    /// list is narrowed to quizzes before the contract is applied.
     ///
     /// This is the ONLY live test that would notice the daemon's quiz route dying:
     /// `AssignmentSourceContractTests` keeps passing on the assignment half alone,
@@ -111,7 +112,7 @@ struct QuizSourceContractTests {
         let paths = DaemonPaths.resolve()
         _ = await DaemonRunner(
             executable: URL(fileURLWithPath: "/usr/bin/env"),
-            arguments: ["node", liveDaemonCLI],
+            arguments: ["node", liveDaemonCLI, "--no-full-login"],
             paths: paths,
             timeout: 180
         ).run()

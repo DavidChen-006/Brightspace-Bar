@@ -8,8 +8,8 @@ import CoursePipeline
 // PRIORITY: reliability of the spawn. This is the one place the app leaves its
 // own process, and every failure mode here is silent from the menu's point of
 // view: a deadlocked child hangs the refresh forever, a lost exit code turns
-// "needs login" into "everything is fine", a leaked `--allow-full-login` pops a
-// browser window on a cron-safe timer tick.
+// "needs login" into "everything is fine", an invented `--no-full-login` would
+// quietly cap every timer tick one rung short of a working session.
 //
 // Two claims are load-bearing and come from prior art rather than imagination:
 //
@@ -171,11 +171,11 @@ struct DaemonRunnerTests {
         #expect(world.recordedArguments == ["--quiet", "--attempts=2"])
     }
 
-    @Test("the runner never adds --allow-full-login of its own accord")
-    func theRunnerNeverInventsThePermissionFlag() async {
-        // Arrange — D8: every spawn the app makes is cron-safe. The flag is the
-        // difference between a silent re-mint and a browser window appearing
-        // while nobody is at the machine.
+    @Test("the runner never adds --no-full-login of its own accord")
+    func theRunnerNeverInventsTheOptOutFlag() async {
+        // Arrange — D8 (inverted): every spawn the app makes may climb the whole
+        // ladder. The opt-out is the difference between a session that heals
+        // itself from a timer tick and a menu that goes stale for good.
         let world = DaemonWorld()
         world.plan(.ok)
 
@@ -184,7 +184,7 @@ struct DaemonRunnerTests {
 
         // Assert
         #expect(world.recordedArguments.isEmpty)
-        #expect(!world.recordedArguments.contains("--allow-full-login"))
+        #expect(!world.recordedArguments.contains("--no-full-login"))
     }
 
     @Test("an executable that does not exist fails to spawn instead of crashing")

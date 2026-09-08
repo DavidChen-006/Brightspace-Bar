@@ -4,9 +4,12 @@
  *
  * Deliberately thin. Everything worth testing lives in orchestrate.mjs behind
  * injected seams; this file only turns argv into deps and a status into an exit
- * code. `--allow-full-login` is the permission bit: the timer spawn omits it
- * (cron may only ever climb the silent rung), the manual Refresh click passes
- * it, because the click is the proof that a human is present for the MFA.
+ * code. `--no-full-login` is the opt-out bit: by default every spawn — the
+ * app's timer, its launch, a terminal — may climb the whole ladder, full login
+ * included, because the last rung is the one that makes the menu bar never go
+ * stale. Pass the flag for a run that must not touch a phone: a test suite, a
+ * cron on a shared machine. (The full rung is headless either way; the MFA
+ * number reaches the human through the status-bar icon.)
  *
  * `--help` must stay free of side effects — no files, no browser import. It is
  * the one command a human runs to find out what this thing does.
@@ -17,15 +20,17 @@ import { resolvePaths } from "./paths.mjs";
 import { createFullLoginRung } from "./rungs/full-login.mjs";
 import { createSilentRung } from "./rungs/silent.mjs";
 
-const USAGE = `Usage: node src/refresh.mjs [--allow-full-login]
+const USAGE = `Usage: node src/refresh.mjs [--no-full-login]
 
 Climbs the session ladder and writes the course cache under BSB_ROOT
 (default ~/Library/Application Support/BrightspaceBar).
 
-  --allow-full-login  permit the full login rung, which needs a human
-                      present to approve the MFA prompt. Omit it for
-                      unattended runs (timer, launch).
-  --help              print this and exit
+  --no-full-login  skip the full login rung (the one that types the stored
+                   credentials and puts an MFA number on the menu-bar icon).
+                   By default it is allowed, so the ladder never stops one
+                   rung short of a working session. Pass this for runs that
+                   must never reach a phone: tests, a shared machine.
+  --help           print this and exit
 
 Exit codes: 0 fresh cache written · 2 needs login · 1 error`;
 
@@ -35,21 +40,21 @@ if (args.includes("--help") || args.includes("-h")) {
   process.exit(0);
 }
 
-const unknown = args.filter((arg) => arg !== "--allow-full-login");
+const unknown = args.filter((arg) => arg !== "--no-full-login");
 if (unknown.length > 0) {
-  // A typo'd permission flag must not silently become an unattended run.
+  // A typo'd opt-out must not silently become a run that reaches for a phone.
   console.error(`unknown argument: ${unknown[0]}\n\n${USAGE}`);
   process.exit(1);
 }
 
 const status = await runRefresh({
   paths: resolvePaths(),
-  // The ladder, cheapest rung first. The full one is skipped unless the caller
-  // passed --allow-full-login; the gate itself lives in orchestrate.mjs.
+  // The ladder, cheapest rung first. The full one is climbed unless the caller
+  // passed --no-full-login; the gate itself lives in orchestrate.mjs.
   rungs: [createSilentRung(), createFullLoginRung()],
   fetcher: createFetcher(),
   clock: () => new Date(),
-  allowFullLogin: args.includes("--allow-full-login"),
+  allowFullLogin: !args.includes("--no-full-login"),
   log: (message) => console.error(message),
 });
 

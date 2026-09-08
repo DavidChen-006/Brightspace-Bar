@@ -14,7 +14,7 @@ import assert from "node:assert/strict";
 import { readdirSync } from "node:fs";
 import { run, tempPaths } from "./helpers.mjs";
 
-test("--help exits 0 and documents the full-login permission flag", async (t) => {
+test("--help exits 0 and documents the full-login opt-out flag", async (t) => {
   // Arrange
   const paths = tempPaths(t);
 
@@ -27,7 +27,7 @@ test("--help exits 0 and documents the full-login permission flag", async (t) =>
   assert.equal(result.code, 0, `stderr: ${result.stderr}`);
   const output = `${result.stdout}${result.stderr}`;
   assert.match(output, /usage/i);
-  assert.match(output, /--allow-full-login/);
+  assert.match(output, /--no-full-login/);
 });
 
 test("--help touches no files", async (t) => {

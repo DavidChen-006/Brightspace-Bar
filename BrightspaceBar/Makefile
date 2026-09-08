@@ -28,8 +28,9 @@ build:
 	swift build
 
 # BS_LIVE gates the cases that reach the tenant. They spawn the real daemon
-# (cron-safe: never --allow-full-login), so they need a BSB_ROOT a login has
-# already seeded — `BSB_ROOT` (optional) points them at a specific one.
+# with --no-full-login (a suite must never push MFA to a phone), so they need
+# a BSB_ROOT a login has already seeded — `BSB_ROOT` (optional) points them at
+# a specific one.
 live:
 	BS_LIVE=1 swift test $(TEST_FLAGS)
 

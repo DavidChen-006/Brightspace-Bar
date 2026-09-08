@@ -1,6 +1,6 @@
 /**
- * Rung 1 — silent Entra SSO. Kind "silent": no human, so a timer spawn may climb
- * it and cron never pops a window.
+ * Rung 1 — silent Entra SSO. Kind "silent": no human and no phone, so even a
+ * run that opted out of the full login (`--no-full-login`) may climb it.
  *
  * The mechanics are experiment 10's, behind an injectable seam: the persistent
  * profile holds the Microsoft Entra cookie (~90 days), and a dead D2L session
