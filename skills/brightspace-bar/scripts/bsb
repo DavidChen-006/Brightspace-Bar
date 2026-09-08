@@ -1,0 +1,21 @@
+#!/bin/sh
+# The skill's copy of the `bsb` entry point. Finds the checkout this skill
+# directory really lives in (through any symlink `make skill` planted in a
+# skills directory) and runs the repo's ./bsb with the arguments untouched.
+#
+#   scripts/bsb courses
+#   scripts/bsb syllabus --course 1631476 --out ./syllabus
+set -eu
+
+self="$0"
+while [ -L "$self" ]; do
+  target="$(readlink "$self")"
+  case "$target" in
+    /*) self="$target" ;;
+    *) self="$(dirname "$self")/$target" ;;
+  esac
+done
+here="$(cd "$(dirname "$self")" && pwd -P)"
+
+# scripts/ → brightspace-bar/ → skills/ → the repo root
+exec "$here/../../../bsb" "$@"

@@ -6,8 +6,34 @@
 #   make login   one-time interactive Chromium login (captures the session)
 #   make run     build & run the menu-bar app (delegates to BrightspaceBar/)
 #   make test    run the Swift test suite   (delegates to BrightspaceBar/)
+#   make skill   install the agent skill (skills/brightspace-bar) into the
+#                skills directories agents read: ~/.claude/skills,
+#                ~/.agents/skills, ~/.codex/skills — as symlinks, so the
+#                skill tracks this checkout. SKILL_DIRS overrides the list.
+#   ./bsb        the agent CLI itself (`./bsb --help`)
 
-.PHONY: setup start login run test
+.PHONY: setup start login run test skill
+
+SKILL_DIRS ?= $(HOME)/.claude/skills $(HOME)/.agents/skills $(HOME)/.codex/skills
+
+# A symlink per directory, never a copy: the skill's scripts/bsb resolves the
+# checkout through the link, and a copy would go stale the next time the CLI
+# learned a command. An existing path that is NOT our link is left alone and
+# named, because replacing someone's skill folder is not this target's call.
+skill:
+	@for dir in $(SKILL_DIRS); do \
+	  mkdir -p "$$dir"; \
+	  target="$$dir/brightspace-bar"; \
+	  if [ -L "$$target" ] && [ "$$(readlink "$$target")" = "$(CURDIR)/skills/brightspace-bar" ]; then \
+	    echo "skill: already installed at $$target"; \
+	  elif [ -e "$$target" ] || [ -L "$$target" ]; then \
+	    echo "skill: $$target exists and is not this checkout's link — left alone"; \
+	  else \
+	    ln -s "$(CURDIR)/skills/brightspace-bar" "$$target"; \
+	    echo "skill: installed at $$target"; \
+	  fi; \
+	done
+	@echo "Agents that read those directories now see the 'brightspace-bar' skill (restart a running session to load it)."
 
 start:
 	$(MAKE) -C BrightspaceBar build
