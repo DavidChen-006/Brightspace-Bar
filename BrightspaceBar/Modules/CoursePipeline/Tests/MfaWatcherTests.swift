@@ -54,6 +54,11 @@ private func pumpMfa(until condition: () -> Bool, limit: TimeInterval = 2.0) asy
     }
 }
 
+/// How long a test may wait for a 0.3 s TTL to lapse. Ten times the TTL
+/// would be plenty on a quiet machine; a shared CI runner running every
+/// suite in parallel has been seen to hold the main queue past 1.5 s.
+private let lapseLimit: TimeInterval = 6.0
+
 /// Waits a fixed stretch with nothing to wait for — the shape a test needs when
 /// its claim is that NOTHING further happens.
 @MainActor
@@ -299,8 +304,11 @@ struct MfaWatcherTests {
         world.writeChallenge(number: "20", mintedAt: Date())
         await pumpMfa(until: { seen.count >= 2 })
 
-        // Act — no write, no delete, no touch. Only time passes.
-        await pumpMfa(until: { seen.count >= 3 }, limit: 1.5)
+        // Act — no write, no delete, no touch. Only time passes. The wait is
+        // generous on purpose: the lapse is a main-queue block, and a CI runner
+        // driving a hundred suites at once can starve the main queue for longer
+        // than the TTL itself. The claim is that it fires, not how promptly.
+        await pumpMfa(until: { seen.count >= 3 }, limit: lapseLimit)
         watcher.stop()
 
         // Assert
@@ -317,7 +325,11 @@ struct MfaWatcherTests {
         var seen: [IconState] = []
         watcher.start { seen.append($0) }
         world.writeChallenge(number: "20", mintedAt: Date())
-        await pumpMfa(until: { seen.count >= 3 }, limit: 1.5)
+        await pumpMfa(until: { seen.count >= 3 }, limit: lapseLimit)
+        // The second write must not race the first revert: if the lapse has
+        // not been seen yet, writing now would only reschedule it, and the
+        // test would be measuring the runner's load instead of the watcher.
+        #expect(seen == [.logo, .code("20"), .logo], "the lapse never came, so there is nothing to recover from")
 
         // Act
         world.writeChallenge(number: "88", mintedAt: Date())
