@@ -29,11 +29,11 @@
 import { readFileSync } from "node:fs";
 
 /** Confirmed against this tenant's own `GET /d2l/api/versions/`. */
-const LP_VERSION = "1.62";
-const LE_VERSION = "1.96";
+export const LP_VERSION = "1.62";
+export const LE_VERSION = "1.96";
 
 /** The marker in the HTTP-200 stub a dead cookie gets instead of a payload. */
-const EXPIRED_MARKER = "sessionExpired=1";
+export const EXPIRED_MARKER = "sessionExpired=1";
 
 const expired = () => ({ ok: false, reason: "sessionExpired" });
 const transport = (detail) => ({ ok: false, reason: "transport", detail });
@@ -178,7 +178,7 @@ async function route(http, request, parse) {
  * The credentials, or null when there are none to work with. A missing file and
  * a half-written one are the same answer: a rung can produce what is missing.
  */
-function readCredentials(sessionFile) {
+export function readCredentials(sessionFile) {
   let session;
   try {
     session = JSON.parse(readFileSync(sessionFile, "utf8"));
@@ -199,7 +199,7 @@ function readCredentials(sessionFile) {
 // ---------------------------------------------------------------------------
 
 /** Cookie-authenticated token mint — the one non-GET request the daemon makes. */
-const mintRequest = (credentials) => ({
+export const mintRequest = (credentials) => ({
   method: "POST",
   url: `${credentials.baseUrl}/d2l/lp/auth/oauth2/token`,
   headers: {
@@ -236,7 +236,7 @@ const contentRequest = (credentials, token, courseId, suffix) =>
  * `/d2l/login?sessionExpired=1`. There is no 401 on this path, so the marker —
  * not the status — is the only honest signal, and it is checked first.
  */
-function decodeMint({ status, body }) {
+export function decodeMint({ status, body }) {
   if (body.includes(EXPIRED_MARKER)) return { expired: true };
   if (!isSuccess(status)) return { detail: `the token mint answered HTTP ${status}` };
   const token = jsonOf(body)?.access_token;
