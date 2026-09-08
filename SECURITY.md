@@ -69,5 +69,5 @@ rest).
 
 | Version | Supported |
 | ------- | --------- |
-| v0.1.x  | yes       |
+| v0.2.x  | yes       |
 | earlier | no        |

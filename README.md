@@ -61,7 +61,8 @@ push or two, not a phone that will not stop.
 
 This is a build-from-source app today — no binary release yet. The latest
 tagged state is
-[`v0.1.0`](https://github.com/DavidChen-006/Brightspace-Bar/releases/tag/v0.1.0).
+[`v0.2.0`](https://github.com/DavidChen-006/Brightspace-Bar/releases/tag/v0.2.0)
+([release notes](docs/release-notes-v0.2.0.md)).
 
 ## Quick Start
 
