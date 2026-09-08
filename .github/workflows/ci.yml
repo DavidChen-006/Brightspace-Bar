@@ -8,8 +8,10 @@ on:
 
 jobs:
   swift-tests:
-    # Fall back to macos-14 if macos-15 runners are unavailable.
-    runs-on: macos-15
+    # Package.swift asks for Swift tools 6.2, which ships with Xcode 26 — the
+    # macos-26 image's default. macos-15 stops at Xcode 16 / Swift 6.1 and
+    # fails at manifest load.
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
       # The Makefile's CLT framework/rpath flags are conditional on
@@ -24,7 +26,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node-version: ["20", "22"]
+        # Node 20 reached end-of-life on 2026-04-30 and its test runner does
+        # not expand the `tests/**/*.test.mjs` glob; package.json's engines
+        # field says >=22 for the same reason.
+        node-version: ["22", "24"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
