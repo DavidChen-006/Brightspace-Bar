@@ -114,7 +114,10 @@ let package = Package(
         .testTarget(
             name: "ManualItemsTests",
             dependencies: ["ManualItems", "CoursePipeline"],
-            path: "Modules/ManualItems/Tests"
+            path: "Modules/ManualItems/Tests",
+            // Fixtures are read via #filePath (AgentContractTests), not as
+            // bundle resources — excluded so SPM does not complain about them.
+            exclude: ["Fixtures"]
         ),
 
         // ── Pure logic: N per-course graph strips → one "All classes" strip ──

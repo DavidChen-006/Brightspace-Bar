@@ -1,0 +1,26 @@
+[
+  {
+    "courseId": 1631476,
+    "due": "2026-09-16T03:59:00Z",
+    "id": "9718A94C-F950-4441-B993-CE9DAE75763F",
+    "kind": "quiz",
+    "link": "https://purdue.brightspace.com/d2l/home/1631476",
+    "name": "Quiz 1"
+  },
+  {
+    "courseId": 1631476,
+    "due": "2026-10-06T18:30:00Z",
+    "id": "C17A9177-BE73-43B4-843F-04CD67E3AC8C",
+    "kind": "test",
+    "link": "https://example.edu/midterm",
+    "name": "Midterm 1"
+  },
+  {
+    "courseId": 1641791,
+    "due": "2026-09-20T21:00:00Z",
+    "id": "9D3E201E-B5BF-4393-BE7A-265528493B28",
+    "kind": "assignment",
+    "link": "https://purdue.brightspace.com/d2l/home/1641791",
+    "name": "Reading response 2"
+  }
+]

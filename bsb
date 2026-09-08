@@ -1,0 +1,21 @@
+#!/bin/sh
+# bsb — Brightspace Bar for agents. The one entry point an agent (or a
+# terminal) needs: `./bsb courses`, `./bsb add …`, `./bsb --help`.
+#
+# A shim, so the command works from any working directory and from a skill
+# that only knows where the checkout is. Resolves its own location (through a
+# symlink, so `ln -s …/bsb /usr/local/bin/bsb` works) and runs the Node entry
+# point in session-capture with the arguments untouched.
+set -eu
+
+self="$0"
+while [ -L "$self" ]; do
+  target="$(readlink "$self")"
+  case "$target" in
+    /*) self="$target" ;;
+    *) self="$(dirname "$self")/$target" ;;
+  esac
+done
+here="$(cd "$(dirname "$self")" && pwd)"
+
+exec node "$here/session-capture/src/bsb.mjs" "$@"

@@ -6,12 +6,16 @@
   "engines": {
     "node": ">=20"
   },
+  "bin": {
+    "bsb": "src/bsb.mjs"
+  },
   "scripts": {
     "start": "node src/start.mjs",
     "capture": "node src/manual-capture.mjs",
     "auto": "node src/auto-capture.mjs",
     "xsrf": "node src/refresh-xsrf.mjs",
     "refresh": "node src/refresh.mjs",
+    "bsb": "node src/bsb.mjs",
     "test": "node --test \"tests/**/*.test.mjs\"",
     "postinstall": "playwright install chromium"
   },
