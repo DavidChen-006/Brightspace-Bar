@@ -136,7 +136,7 @@ public final class StatusBarController {
     /// go invisible against a dark menu bar the moment the menu is clicked.
     ///
     /// Vector PDF and not PNG so it stays sharp on every scale factor without
-    /// shipping an @1x/@2x pair — the asset carries its own 26.4 × 14pt size,
+    /// shipping an @1x/@2x pair — the asset carries its own 23.8 × 12.6pt size,
     /// which is why nothing here resizes it. That size is deliberate: the mark is
     /// nearly twice as wide as it is tall, so matching the menu bar's usual ~16pt
     /// glyph height would make it dominate its neighbours by area.
