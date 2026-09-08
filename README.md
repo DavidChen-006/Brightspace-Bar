@@ -125,5 +125,4 @@ make -C BrightspaceBar run    # run the app from source
 
 ## License
 
-[MIT](LICENSE). Not affiliated with Purdue University or D2L Corporation;
-Brightspace is a trademark of D2L.
+[MIT](LICENSE).
