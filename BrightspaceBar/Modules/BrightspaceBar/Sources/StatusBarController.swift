@@ -7,6 +7,8 @@ import CourseMenu
 /// by the launch smoke test instead.
 @MainActor
 public final class StatusBarController {
+    /// Fallback only — the shipped mark is `Resources/MotionP.pdf`. Kept so a
+    /// build with a missing resource still puts *something* in the menu bar.
     private static let iconSymbolName = "book.closed"
 
     private let dataSource: any MenuDataSource
@@ -125,9 +127,43 @@ public final class StatusBarController {
         _ = Self.badgeTitle("88").size()
     }
 
-    private static var logoImage: NSImage? {
-        NSImage(systemSymbolName: Self.iconSymbolName, accessibilityDescription: "Brightspace courses")
-    }
+    /// The Motion P, or the SF Symbol if the bundled asset ever goes missing.
+    ///
+    /// `isTemplate` is the whole trick and the reason this is a flat black
+    /// silhouette rather than the gold-and-black logo: a template image is a
+    /// stencil, so AppKit tints it black in Light Mode, white in Dark, and white
+    /// again while the menu is open. A colored image would be drawn literally and
+    /// go invisible against a dark menu bar the moment the menu is clicked.
+    ///
+    /// Vector PDF and not PNG so it stays sharp on every scale factor without
+    /// shipping an @1x/@2x pair — the asset carries its own 26.4 × 14pt size,
+    /// which is why nothing here resizes it. That size is deliberate: the mark is
+    /// nearly twice as wide as it is tall, so matching the menu bar's usual ~16pt
+    /// glyph height would make it dominate its neighbours by area.
+    ///
+    /// `Bundle.main` and NOT `Bundle.module`: SPM's generated accessor looks for
+    /// its bundle beside `Contents/`, which is not a place a signed .app may keep
+    /// one, and falls back to a hardcoded absolute .build path that exists only on
+    /// the machine that compiled it. Scripts/run.sh copies the PDF into
+    /// Contents/Resources instead, where Bundle.main finds it anywhere.
+    ///
+    /// `lazy`, not computed: this is read on every icon restore in
+    /// `show(code:)`, and decoding the PDF each time is waste.
+    private static let logoImage: NSImage? = {
+        guard let url = Bundle.main.url(forResource: "MotionP", withExtension: "pdf"),
+              let image = NSImage(contentsOf: url)
+        else {
+            return NSImage(
+                systemSymbolName: StatusBarController.iconSymbolName,
+                accessibilityDescription: StatusBarController.iconDescription
+            )
+        }
+        image.isTemplate = true
+        image.accessibilityDescription = StatusBarController.iconDescription
+        return image
+    }()
+
+    private static let iconDescription = "Brightspace courses"
 
     private func show(_ model: MenuModel) {
         // `MenuModel` is `Equatable` precisely so an unchanged menu is not rebuilt.

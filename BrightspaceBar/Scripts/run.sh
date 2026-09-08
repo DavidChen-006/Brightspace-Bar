@@ -34,6 +34,14 @@ mkdir -p "${APP}/Contents/MacOS"
 cp -f "${EXE}" "${APP}/Contents/MacOS/${APP_NAME}"
 cp -f "${ROOT_DIR}/Modules/${APP_NAME}/Sources/Info.plist" "${APP}/Contents/Info.plist"
 
+# The menu-bar mark. Not an SPM resource: `Bundle.module` looks for its bundle
+# beside Contents/ and otherwise falls back to an absolute .build path baked in
+# at compile time, so it only ever works on the machine that built it. A plain
+# copy into Contents/Resources is what `Bundle.main` reads, anywhere.
+mkdir -p "${APP}/Contents/Resources"
+cp -f "${ROOT_DIR}/Modules/${APP_NAME}/Resources/MotionP.pdf" \
+    "${APP}/Contents/Resources/MotionP.pdf"
+
 # Ad-hoc signature ("-"). Enough to launch locally; real distribution needs a
 # Developer ID and notarization, which is out of scope for this experiment.
 log "Signing (ad-hoc)"
