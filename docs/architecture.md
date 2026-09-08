@@ -8,7 +8,7 @@ than repeats them:
 - [`docs/LADDER-PLAN.md`](LADDER-PLAN.md) — the login ladder, file contracts,
   and the D-numbered invariants (ground truth for the daemon design).
 
-## Two components, one wall
+## Two components, one wall — and a door for agents
 
 **The Swift menu-bar app** (`BrightspaceBar/`) renders cached JSON. It has no
 network code, no credential types, and no way to log in — by construction, not
@@ -16,6 +16,18 @@ by policy. **The Node daemon** (`session-capture/`) owns the session: a
 persistent Chromium profile, a `session.json`, and a login ladder that
 escalates only as far as it must (existing credentials → silent Entra SSO →
 full headless login with an MFA number shown on the menu-bar icon).
+
+**The agent surface** (`bsb`, `session-capture/src/bsb.mjs`, and the skill
+in `skills/brightspace-bar/`) is a second entry point of the daemon's package,
+not a third process: it shares the daemon's `BSB_ROOT` layout, file contracts
+and session. It was the deliberate answer to "does an agent talk to the
+endpoints directly, or through the daemon?" — through, because the daemon is
+run-and-exit rather than a server, so "through" means sharing one mint, one
+dead-session classification and one root, with nothing to keep alive. An
+agent reads the same `data.json` the menu renders, reads Brightspace through
+the same session the fetcher uses (GET only, `/d2l/api/` only, the session's
+own origin only), and writes exactly one file: `manual-items.json`, the
+student's own items, which the add-form in the menu writes too.
 
 ## Data flow
 
@@ -28,11 +40,21 @@ trigger (launch / timer / Refresh click)
           → CourseCache.fold → MenuAdapter/MenuTranslation → NSMenu
 ```
 
+```
+agent (Claude Code, Codex, … via the skill)
+  → `bsb syllabus --course ID`   reads Brightspace through the daemon's session
+  → `bsb add --batch items.json` validates, then renames manual-items.json into $BSB_ROOT
+    → DataWatcher (kqueue on the root) fires → the same reload the poll uses
+      → MenuAdapter reads the store fresh → the square is on screen
+```
+
 `BSB_ROOT` defaults to `~/Library/Application Support/BrightspaceBar`; every
 daemon path hangs off it (`src/paths.mjs`), which is the entire test-isolation
 story — tests point it at a temp dir. Cache changes are picked up on the next
 fetch (fresh reads, plus a kqueue directory watcher for the ephemeral
-`mfa.json` that puts the MFA number on the icon).
+`mfa.json` that puts the MFA number on the icon). `DataWatcher` watches two
+files — `cache/data.json` and the root's `manual-items.json` — so both a
+daemon run and an agent's add repaint the menu without a relaunch.
 
 ## Key invariants
 
@@ -44,6 +66,13 @@ fetch (fresh reads, plus a kqueue directory watcher for the ephemeral
   icon), so a dead session heals from a timer tick. The daemon's own backoff
   (one full-login attempt per four hours, stamped as `lastFullLoginAttemptAt`
   in `status.json`) is what keeps unattended ticks from flooding a phone.
+- **D9** — the agent surface is read-only against Brightspace and writes
+  only to the bar. `bsb`'s API client has no method parameter (GET is
+  structural), resolves every target onto the session's own origin under
+  `/d2l/api/`, and the one file it writes is `manual-items.json` — never
+  `cache/`, never `session.json`. Every write is validated against the Swift
+  decoder's contract first, because one undecodable entry quarantines the
+  whole file.
 - **The GUI imports only `CourseMenu`** — enforced by `ArchitectureTests`
   reading import lines. Adapters translate between pipelines and the menu
   model; all wiring lives in `main.swift`.
@@ -69,7 +98,13 @@ fetch (fresh reads, plus a kqueue directory watcher for the ephemeral
   switch makes the new opener a compile-time obligation. `BSB_BROWSER_TARGET`
   selects at runtime.
 - **New endpoints**: behind the daemon's fetcher seam (`fetch-engine.mjs`);
-  the whole app-facing API is the `data.json` shape in LADDER-PLAN.
+  the whole app-facing API is the `data.json` shape in LADDER-PLAN. An agent
+  needs no new code for a new read route — `bsb api le:<ou>/…` reaches any
+  of them — so a route earns a named `bsb` command (and a row in the skill's
+  `references/endpoints.md`) only when it needs shaping, like `syllabus`.
+- **A new `bsb` command**: a handler in `src/bsb.mjs` over a pure module in
+  `src/agent/`; `tests/skill.test.mjs` fails until the skill names it, so the
+  manual cannot fall behind the tool.
 
 ## Intentionally strange decisions
 

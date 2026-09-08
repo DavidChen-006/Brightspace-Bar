@@ -43,6 +43,7 @@ Every path hangs off one root. Env `BSB_ROOT`, default
 | `session.json` | cookies + XSRF (0600) | daemon | daemon |
 | `cache/data.json` | courses + assignments | daemon | Swift app |
 | `cache/status.json` | ladder outcome, freshness | daemon | Swift app |
+| `manual-items.json` | the student's own items (added 2026-09-08 for agents: the add-form's file, also written by `bsb add`) | Swift app, `bsb` | Swift app, `bsb` |
 
 Tests point `BSB_ROOT` at a temp dir. Production credentials are never touched
 by tests (experiment 10 proved concurrent Entra profiles don't revoke each other).
@@ -122,6 +123,17 @@ backoff above, not a flag, is what protects an unattended machine.
   max from the app; full login terminal-only) held from the phase-3 swap until
   this date; it left the menu stale for good once the wristband expired, the
   exact failure the ladder exists to prevent.
+- **D9 (added 2026-09-08) — The agent surface reads Brightspace and writes
+  only the bar.** `bsb` (`session-capture/src/bsb.mjs`) is a second entry
+  point of the daemon's package, sharing `paths.mjs`, `session.json` and the
+  fetcher's mint and dead-session classification. Its API client sends GET
+  and nothing else (no method parameter exists), only to `/d2l/api/` on the
+  session's own origin. Its one write is `manual-items.json`, validated
+  against the Swift decoder's contract before anything lands, atomic
+  (temp+rename), never `cache/`. `bsb refresh` runs `refresh.mjs` — the
+  ladder stays the daemon's — and the skill tells the agent that it can put
+  an MFA number on the icon. D7 extends over it: no cookie, CSRF token or
+  bearer in any output, error or log.
 
 ### The rung seam
 

@@ -80,6 +80,22 @@ D7), so there is no credential type here to leak.
 `currentMenu()` (menu open) serves memory/disk only — there is deliberately no
 code path from it to a socket, and now not to a subprocess either.
 
+## The student's own items, and the agent's
+
+`ManualItems` owns `$BSB_ROOT/manual-items.json` — the assignments, quizzes
+and tests typed into the add-forms, at the root rather than under `cache/`
+because the daemon may clear `cache/` wholesale and this is user data. The
+same file is what the agent CLI (`../bsb`, `session-capture/src/bsb.mjs`)
+writes, in the same shape; `AgentContractTests` decodes a file the CLI really
+wrote to prove it. `DaemonPaths` names the file once so the store that writes
+it and the watcher that repaints on it agree.
+
+`DataWatcher` fingerprints two files, `cache/data.json` and that one, from
+the kqueue sources it already holds on `cache/` and on its parent. A daemon
+run and an agent's `bsb add` therefore take the same path to the screen: the
+watcher fires, the composition root re-runs the poll's reload, `MenuAdapter`
+reads the store fresh, and the square appears with no relaunch and no click.
+
 ## Sessions: someone else's problem now
 
 The D2L cookie still dies in hours (measured alive at 4.4h, dead at 15.6h). What

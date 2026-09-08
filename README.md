@@ -25,6 +25,9 @@ and add assignments.
 - **Your own items** — add assignments/quizzes/tests with a date picker from
   each course's submenu; they render in the grid like fetched ones and delete
   with an ✕ from the popup.
+- **Agent-native** — a `bsb` CLI and a matching skill let an AI agent read
+  your courses, syllabi, files and grades through the app's own session and
+  put syllabus dates on the heatmap. See [Agents](#agents).
 - **Background refresh** every 30 minutes, silently, via a session the app
   never sees.
 
@@ -82,6 +85,34 @@ is the "reopen" gesture: build and launch, nothing else (there's no `.app`
 bundle to double-click yet). A third target, `make login`, runs the
 interactive Chromium login alone.
 
+## Agents
+
+The app is deterministic on purpose: it shows what the D2L API reports as
+work. An AI agent can read a syllabus — and most professors put half their
+deadlines there and nowhere else. `bsb` is the bridge:
+
+```sh
+./bsb courses                                  # your current courses and their ids
+./bsb syllabus --course 1641791 --out ./syl    # overview text + every syllabus file, downloaded
+./bsb work --course 1641791                    # what Brightspace already lists as due
+./bsb add --course 1641791 --kind assignment --title "First Critical Response" --due 2026-10-19
+./bsb add --batch items.json                   # many at once, validated as a whole
+./bsb --help                                   # content, fetch, overview, grades, api, …
+```
+
+Items an agent adds appear on the heatmap the moment the file lands — no
+relaunch, no click — and delete like hand-entered ones. The rules are
+structural: every Brightspace call `bsb` makes is a GET, the only file it
+writes is the app's own `manual-items.json`, and the bearer token never
+leaves your tenant.
+
+The skill in [`skills/brightspace-bar/`](skills/brightspace-bar/SKILL.md)
+teaches an agent the commands, the endpoints and the syllabus-to-calendar
+recipe. `make skill` symlinks it into `~/.claude/skills`, `~/.agents/skills`
+and `~/.codex/skills`, so Claude Code, Codex and any Agent-Skills-aware tool
+pick it up on their next start. Then: "read my PHIL 219 syllabus and put the
+due dates on my calendar."
+
 ### Environment configuration
 
 See [`session-capture/.env.example`](session-capture/.env.example) for the
@@ -96,7 +127,9 @@ the stored file.
 | Path | What it is |
 | --- | --- |
 | `BrightspaceBar/` | The Swift package: the menu-bar app and its modules (`Modules/<Name>/`), tests included |
-| `session-capture/` | The Node daemon: login ladder, data fetch, deep-link opener |
+| `session-capture/` | The Node daemon: login ladder, data fetch, deep-link opener — and `src/bsb.mjs`, the agent CLI |
+| `skills/brightspace-bar/` | The agent skill: how to use `bsb`, the read endpoints, the write contract |
+| `bsb` | The CLI's entry point (`./bsb --help`) |
 | `docs/` | Design documents |
 
 The numbered `experiment-*` probes that de-risked each design decision live on

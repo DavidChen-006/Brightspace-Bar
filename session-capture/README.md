@@ -31,6 +31,24 @@ cd ../BrightspaceBar && ./Scripts/refresh-session.sh ../session-capture/artifact
 The app re-reads that file on every fetch, so a running app picks up a fresh
 session on its next poll — no relaunch needed.
 
+## `bsb` — the same session, opened to an agent
+
+```sh
+npm run bsb -- courses                       # or ../bsb courses from the repo root
+npm run bsb -- syllabus --course 1641791 --out ./syl
+npm run bsb -- add --course 1641791 --kind test --title "Final" --due 2026-12-14
+npm run bsb -- --help
+```
+
+`src/bsb.mjs` is a second entry point of this package for AI agents (and
+terminals). It reads the cache the daemon wrote, reads Brightspace through
+the daemon's own `session.json` — GET only, `/d2l/api/` only, this tenant
+only (`src/agent/api.mjs`) — and writes exactly one file, the app's
+`manual-items.json`, after validating every item against the Swift decoder's
+contract (`src/agent/manual-items.mjs`). `bsb refresh` runs `refresh.mjs`.
+The skill that teaches an agent to use it lives in
+`../skills/brightspace-bar/`; `make skill` at the repo root installs it.
+
 ## Why two capture scripts
 
 Both try the silent path first; they differ only in the **fallback** when a

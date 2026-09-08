@@ -30,6 +30,12 @@ Reports are especially welcome on:
   path (a localhost debug port on a signed-in browser is a sensitive surface).
 - The Swift↔daemon boundary: any way for credential material to reach the
   Swift process or the `cache/` directory.
+- **The agent surface** — `bsb` (`session-capture/src/bsb.mjs`,
+  `src/agent/api.mjs`): any way to make it send a non-GET to the tenant,
+  send the bearer token to another host, reach a path outside `/d2l/api/`,
+  write a file other than `manual-items.json`, or surface a cookie, CSRF
+  token or bearer in its output. A `Content-Disposition` that steers a
+  download outside the target directory counts too.
 
 Out of scope: vulnerabilities in Brightspace/D2L or Microsoft Entra themselves
 (report those to their vendors), and issues requiring an already-compromised
@@ -52,6 +58,12 @@ rest).
 - **MFA stays with Microsoft.** Sign-in happens on Microsoft's real Entra
   page in a real Chromium; this project never sees or handles the second
   factor, only displays the number-matching digits.
+- **D9 — agents read Brightspace, and write only the bar.** The `bsb` CLI
+  an AI agent uses has no way to send anything but a GET to the tenant, only
+  under `/d2l/api/` on the session's own origin; the one file it writes is
+  the app's `manual-items.json`. An agent with shell access already has the
+  session files — `bsb` adds no new exposure of them and prints none of
+  their contents.
 
 ## Supported versions
 
