@@ -6,9 +6,9 @@
 ![Swift 6.2](https://img.shields.io/badge/Swift-6.2-F05138?logo=swift&logoColor=white)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-A macOS menu-bar app for Brightspace (D2L): your courses, a GitHub-style
-due-date heatmap per class, and one-click deep links that land already signed
-in — without your credentials ever touching the app.
+Menu bar app for Brightspace (D2L). Never log in again. See every due date on
+one calendar. Click a course. Go straight there. Agents can read your courses
+and add assignments.
 
 <img src="docs/screenshot.png" alt="Brightspace Bar menu" width="382">
 
