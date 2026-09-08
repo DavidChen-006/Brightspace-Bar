@@ -69,9 +69,12 @@ comments that explain *why*, not what.
 - **D7 — credentials never cross into Swift.** Email, password, and session
   cookies live only in the Node daemon's world (`session-capture/`). Secrets
   never enter `cache/` and never appear in logs (lengths only).
-- **D8 — the app only ever spawns the daemon in cron-safe mode.** No app spawn
-  ever passes `--allow-full-login`; full login is terminal-initiated by a
-  present human (`npm run refresh -- --allow-full-login`).
+- **D8 — the app never caps the daemon's ladder.** No app spawn ever passes
+  `--no-full-login`; the daemon climbs to the full headless login by default
+  (MFA number on the icon), and its own four-hour backoff — not a flag — is
+  what keeps unattended ticks from becoming repeated MFA pushes. The opt-out
+  exists for callers that must never reach a phone: the live test suites pass
+  it.
 
 ## Experiments
 

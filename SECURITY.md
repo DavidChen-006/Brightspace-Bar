@@ -44,9 +44,11 @@ rest).
   in `credentials.json` (mode 0600) under
   `~/Library/Application Support/BrightspaceBar` — never in the repo, never in
   logs (lengths only), never in `cache/`.
-- **D8 — the app can only run the cron-safe ladder.** No spawn from the app
-  ever passes `--allow-full-login`; an interactive login is always
-  human-initiated from a terminal.
+- **D8 — the app never caps the daemon's ladder.** No spawn from the app
+  ever passes `--no-full-login`; the daemon climbs to the full headless login
+  on its own, and rate-limits it to one attempt per four hours so an
+  unattended machine cannot flood a phone with MFA pushes. The opt-out exists
+  for callers that must never reach a phone (the live test suites).
 - **MFA stays with Microsoft.** Sign-in happens on Microsoft's real Entra
   page in a real Chromium; this project never sees or handles the second
   factor, only displays the number-matching digits.

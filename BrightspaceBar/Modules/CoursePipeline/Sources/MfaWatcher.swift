@@ -60,7 +60,8 @@ public final class MfaWatcher {
     /// Begins watching, and reports the state as it is right now **before
     /// returning** — synchronously, so the caller never has a frame in which the
     /// icon and the disk disagree. A terminal-initiated login can be mid-
-    /// challenge when the app starts (D8: the app is not always the spawner),
+    /// challenge when the app starts (the app is not the only spawner —
+    /// `make start` and the e2e scripts run the daemon too),
     /// and an ordinary launch still has to be told there is nothing to show.
     public func start(onChange: @escaping (IconState) -> Void) {
         self.stop()

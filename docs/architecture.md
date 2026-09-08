@@ -21,7 +21,7 @@ full headless login with an MFA number shown on the menu-bar icon).
 
 ```
 trigger (launch / timer / Refresh click)
-  → app spawns `node refresh.mjs` (cron-safe args only)
+  → app spawns `node refresh.mjs` (no args: the whole ladder)
     → daemon climbs the ladder, fetches courses + assignments + quizzes
       → atomic write: $BSB_ROOT/cache/data.json + status.json
         → the app reads the cache fresh on every fetch (DaemonCache)
@@ -39,8 +39,11 @@ fetch (fresh reads, plus a kqueue directory watcher for the ephemeral
 - **D7** — credentials never leave the daemon's world: never in `cache/`,
   never in logs (lengths only), never in the Swift process. Stored 0600 under
   `BSB_ROOT`, never in git.
-- **D8** — the app never passes `--allow-full-login`. Every app-side spawn is
-  cron-safe; an interactive login is terminal-initiated by a present human.
+- **D8** — the app never passes `--no-full-login`. Every app-side spawn may
+  climb the whole ladder, full headless login included (MFA number on the
+  icon), so a dead session heals from a timer tick. The daemon's own backoff
+  (one full-login attempt per four hours, stamped as `lastFullLoginAttemptAt`
+  in `status.json`) is what keeps unattended ticks from flooding a phone.
 - **The GUI imports only `CourseMenu`** — enforced by `ArchitectureTests`
   reading import lines. Adapters translate between pipelines and the menu
   model; all wiring lives in `main.swift`.
@@ -59,8 +62,8 @@ fetch (fresh reads, plus a kqueue directory watcher for the ephemeral
   the existing contract suites.
 - **A new ladder rung**: a rung is a value implementing one seam —
   `{ kind: "silent" | "full", attempt({paths, log}) }` (see `src/rungs/`).
-  Register it in the ladder order; `full` rungs are gated behind
-  `--allow-full-login` automatically.
+  Register it in the ladder order; `full` rungs are skipped under
+  `--no-full-login` and rate-limited by the backoff automatically.
 - **A new browser target**: add a case to `BrowserTarget`
   (`Modules/BrightspaceBar/Sources/BrowserTarget.swift`) — the exhaustive
   switch makes the new opener a compile-time obligation. `BSB_BROWSER_TARGET`

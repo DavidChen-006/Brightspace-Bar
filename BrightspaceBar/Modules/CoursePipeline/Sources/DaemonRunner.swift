@@ -37,8 +37,9 @@ public enum DaemonOutcome: Equatable, Sendable {
 /// instead of hanging a menu-bar app forever.
 ///
 /// **D8: this type never invents an argument.** The child receives exactly
-/// `arguments`, so `--allow-full-login` can only ever appear if a caller passed
-/// it — and no app call site does. Every spawn the app makes is cron-safe.
+/// `arguments`, so `--no-full-login` can only ever appear if a caller passed
+/// it — and no app call site does. Every spawn the app makes may climb the
+/// daemon's whole ladder; only the live test suites opt out.
 public struct DaemonRunner: Sendable {
 
     private let executable: URL

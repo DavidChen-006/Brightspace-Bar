@@ -69,16 +69,24 @@ default-encoder file, which uses Apple reference-date doubles).
 ```json
 { "state": "fresh" | "needs-login" | "error",
   "rungUsed": "none" | "silent" | "full",
-  "lastAttemptAt": "ISO", "lastSuccessAt": "ISO|null", "error": "string|null" }
+  "lastAttemptAt": "ISO", "lastSuccessAt": "ISO|null",
+  "lastFullLoginAttemptAt": "ISO|null", "error": "string|null" }
 ```
+
+`lastFullLoginAttemptAt` (added 2026-09-08 with the D8 inversion) is the stamp
+the full-login backoff measures from: stamped when the full rung is entered,
+carried forward otherwise, and the rung is skipped while it is younger than
+`BSB_FULL_LOGIN_BACKOFF_MS` (default four hours; `0` lifts it, which `make
+start` sets because a human is present).
 
 Daemon exit codes: `0` fresh cache written · `2` needs-login (ladder exhausted
 without permission or success) · `1` unexpected error. A failed run NEVER
 deletes or truncates an existing `data.json` (mirror of `.preservedStale`).
 
-Rung 2 permission: CLI flag `--allow-full-login`. Timer/launch spawns omit it
-(cron may only ever climb rung 1); the manual Refresh click passes it (the
-click is the proof of presence).
+Rung 2 permission (inverted 2026-09-08): on by default. `--no-full-login` opts
+out, for callers that must never reach a phone (the live test suites). The
+app passes nothing, so timer, launch and click all get the whole ladder; the
+backoff above, not a flag, is what protects an unattended machine.
 
 ## Decisions (locked unless David unlocks them)
 
@@ -103,13 +111,17 @@ click is the proof of presence).
   `session-capture/scripts/`), implemented as deletion: `--cache`, `--session`, `--all`.
 - **D7 — Secrets never enter `cache/`**, never appear in logs (lengths only),
   never cross into Swift. Swift's old session.json read path retires with the swap.
-- **D8 — The app NEVER passes `--allow-full-login` in this build.**
-  `CourseSource.fetchCourses()` carries no trigger context and Contracts.swift is
-  frozen, so the app cannot distinguish manual from timer at the source. All app
-  spawns are cron-safe (rung 1 max). Full login is terminal-initiated
-  (`npm run refresh -- --allow-full-login`, David present — phase 4 tier 2 runs
-  it this way). Wiring a presence-gated full login into the Refresh click (or a
-  dedicated "Log in…" menu item) is an open item, not this build.
+- **D8 (inverted 2026-09-08) — The app NEVER passes `--no-full-login`.**
+  The permission bit flipped from opt-in (`--allow-full-login`, which no app
+  spawn ever passed) to opt-out: `refresh.mjs` climbs the whole ladder by
+  default, so a dead wristband heals from a timer tick with the MFA number on
+  the icon. `CourseSource.fetchCourses()` still carries no trigger context, so
+  every app spawn gets the same permission — which is why the daemon owns a
+  backoff (one full-login attempt per four hours, `lastFullLoginAttemptAt` in
+  status.json) rather than the app owning a presence gate. Original D8 (rung 1
+  max from the app; full login terminal-only) held from the phase-3 swap until
+  this date; it left the menu stale for good once the wristband expired, the
+  exact failure the ladder exists to prevent.
 
 ### The rung seam
 
@@ -173,7 +185,7 @@ exit codes) are the load-bearing decisions.
   (skip `full` unless allowed) → refetch after a rung succeeds → write
   `data.json`+`status.json` atomically → typed result. Ladder exhausted →
   status `needs-login`, old data preserved.
-- `src/refresh.mjs` CLI wrapper (exit codes, `--allow-full-login`), `npm run refresh`.
+- `src/refresh.mjs` CLI wrapper (exit codes, `--no-full-login`), `npm run refresh`.
 - `scripts/reset.sh`.
 - Tests (node:test, hermetic): temp BSB_ROOT, fake rungs (scripted
   succeed/fail), fake fetcher (scripted courses/sessionExpired/transport-error).
@@ -210,8 +222,8 @@ exit codes) are the load-bearing decisions.
   call, like FileSessionProvider). Exit 2 / status needs-login → throw
   `.sessionExpired` (fold then yields `.preservedStale` — menu never blanks).
 - Production timer: a repeating task in main.swift driving `Poller.tick(.timer)`
-  at the existing `pollInterval`. Per D8, no app spawn ever passes
-  `--allow-full-login` — manual Refresh and timer both run the cron-safe ladder.
+  at the existing `pollInterval`. Per D8 (as inverted), no app spawn ever
+  passes `--no-full-login` — manual Refresh and timer both run the whole ladder.
 - Wiring swap in main.swift ONLY (ArchitectureTests enforce this). Stub mode untouched.
 - Delete the retired Swift network path; migrate its BS_LIVE contract runs to the daemon sources.
 - Tests first: daemon sources through the existing contract suite
@@ -232,7 +244,7 @@ exit codes) are the load-bearing decisions.
   spawn and nothing else restores them mid-session). main.swift timer uses it.
 - `open -n` does NOT inherit shell env: E2E must use `open -n --env BSB_ROOT=…`
   or run the built binary directly.
-- `BS_LIVE=1 swift test` now spawns the real daemon (cron-safe) twice — it IS
+- `BS_LIVE=1 swift test` now spawns the real daemon (`--no-full-login`) twice — it IS
   the Swift half of tier 0/1, and cannot green until a tier-2 login has seeded
   the root.
 - DELETION DEFERRED to phase 5: retired sources are production-dead but kept
@@ -348,7 +360,7 @@ pipe. `cache/mfa.json` is ephemeral STATUS: not course data, not a secret
 - Phase B (Swift): test-writer pins the icon pure function + watcher (canned
   cache roots; technique per exp 17) + StatusBarController.show(code:) wiring.
   Builder implements.
-- Phase C (E2E, test-writer only): wipe root → `refresh.mjs --allow-full-login`
+- Phase C (E2E, test-writer only): wipe root → `refresh.mjs` (full login on by default)
   → assert mfa.json appears (orchestrator relays the number to David in chat —
   he is remote; he types it into Authenticator on his phone) → assert success
   path deletes mfa.json, status fresh, icon back to logo (screencapture of the

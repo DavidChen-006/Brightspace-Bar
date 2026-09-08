@@ -38,10 +38,15 @@ The app is two halves with a deliberate wall between them:
   one-time interactive login into a persistent Chromium profile, then silent
   cookie/JWT renewal on a ladder that only escalates as far as it must.
 
-Your email and password are typed once, by you, into Microsoft's real login
-page in a real browser window. They are never stored by this project, never
-logged, and never cross into the Swift process (invariant **D7**). The app
-only ever spawns the daemon in its non-interactive mode (invariant **D8**).
+Your email and password are typed into Microsoft's real login page in a real
+(headless) Chromium. They live only in the daemon's world — `credentials.json`,
+mode 0600, under `~/Library/Application Support/BrightspaceBar` — never in the
+repo, never in logs, and never in the Swift process (invariant **D7**). The
+app spawns the daemon with no arguments and lets it climb its whole ladder,
+full login included, so a dead session heals itself from a timer tick; the
+MFA number reaches you on the menu-bar icon (invariant **D8**). The daemon
+attempts that full login at most once per four hours, so a night away is a
+push or two, not a phone that will not stop.
 
 ## Supported
 

@@ -15,11 +15,12 @@ make run          # build, bundle, ad-hoc sign, launch into the menu bar
 ```
 
 No session yet? The app still runs and serves whatever is cached, with a
-staleness line. Logging in belongs to the Node daemon next door, and a headed
-login only ever happens with you present:
+staleness line, and its next tick climbs the daemon's ladder as far as it must
+— up to a headless full login whose MFA number lands on the menu-bar icon. To
+run that login right now from a terminal instead of waiting for a tick:
 
 ```sh
-cd ../session-capture && npm run refresh -- --allow-full-login
+make -C .. start          # or: cd ../session-capture && npm run refresh
 ```
 
 Stub mode (no network, seeded fake courses — the GUI demo):

@@ -54,13 +54,16 @@ D7), so there is no credential type here to leak.
    in the child's environment (`BSB_REFRESH_CLI` overrides which CLI), 180s
    timeout, stderr to a temp file — never a `Pipe`, which deadlocks once a
    chatty child fills the buffer. **No argument is ever added** (D8): the app
-   cannot tell a click from a timer at the source, so every spawn it can make is
-   cron-safe and can never open a login window with nobody present.
+   cannot tell a click from a timer at the source, so every spawn it makes gets
+   the same permission — the whole ladder. Nothing opens on screen either way;
+   the full rung is headless and its MFA number goes to the icon.
 3. The daemon climbs its ladder — existing credentials → silent Entra SSO →
-   headed login (that last rung only when a human passed `--allow-full-login` in
-   a terminal) — fetches courses, assignments and quizzes, and atomically writes
-   `$BSB_ROOT/cache/data.json` + `status.json`. Exit `0` fresh · `2` needs-login
-   · `1` unexpected; a failed run never truncates an existing `data.json`.
+   full headless login (typed from `credentials.json`, number-match on the
+   icon; attempted at most once per four hours so an unattended night is not
+   a night of pushes) — fetches courses, assignments and quizzes, and
+   atomically writes `$BSB_ROOT/cache/data.json` + `status.json`. Exit `0`
+   fresh · `2` needs-login · `1` unexpected; a failed run never truncates an
+   existing `data.json`.
 4. `DaemonCache` reads both files fresh, every time — a daemon run landing while
    the app is up takes effect on the next fetch, no relaunch. Exit 2 or a
    `needs-login` status becomes `.sessionExpired`; a success that wrote no cache
@@ -86,10 +89,9 @@ ladder itself when the cookie is dead. The app spawns it and reads `cache/`.
 
 The ladder, the rung seam, and the file contracts are specified in
 [`../docs/LADDER-PLAN.md`](../docs/LADDER-PLAN.md); the daemon lives in
-`../session-capture/`. Open item, written down rather than pretended away: a
-headed login can only be started from a terminal
-(`npm run refresh -- --allow-full-login`), so a session that has fallen past the
-silent rung shows stale data until David runs it.
+`../session-capture/`. A session that has fallen past the silent rung no longer
+waits for a terminal: the next tick attempts the full login itself, and the
+only thing David has to do is type the number on the icon into his phone.
 
 ## Tests (518, hermetic by default)
 
@@ -97,7 +99,7 @@ silent rung shows stale data until David runs it.
 (`Clock` protocol; `TestClock` advances by hand — nothing may call `Date()`
 except `SystemClock`), and the daemon is faked with a stub CLI writing canned
 cache files. `BS_LIVE=1` (`make live`) adds the live-tenant runs, which spawn the
-**real** daemon (cron-safe) and therefore need a `BSB_ROOT` a login has already
+**real** daemon (with `--no-full-login`, so no MFA can fire) and therefore need a `BSB_ROOT` a login has already
 seeded — they are the app half of tiers 0 and 1 in
 `../session-capture/scripts/e2e.sh`, which drives the whole ladder end to end
 and asserts on artifacts only.

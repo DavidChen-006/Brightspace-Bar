@@ -18,5 +18,6 @@
 
 - [ ] `make test` passes from the repo root (Swift + node suites)
 - [ ] Respects the D7/D8 invariants: no credential material enters the Swift
-      process, logs, or `cache/`; no app-side spawn gains `--allow-full-login`
+      process, logs, or `cache/`; no app-side spawn gains `--no-full-login`,
+      and the full-login backoff still guards unattended ticks
 - [ ] No secrets, tokens, or real credentials committed (code, tests, or fixtures)

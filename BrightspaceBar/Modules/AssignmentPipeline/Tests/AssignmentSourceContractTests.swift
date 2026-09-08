@@ -140,7 +140,7 @@ struct AssignmentSourceContractTests {
     ///
     /// Phase 5: rewritten onto the daemon, which is now the only thing that talks
     /// to the tenant. Two consequences, both deliberate. The arrangement runs the
-    /// real `refresh.mjs` (cron-safe) rather than reading a session file — that is
+    /// real `refresh.mjs` (`--no-full-login`) rather than reading a session file — that is
     /// what "live" means now. And the daemon serves ONE merged list per course,
     /// assignments first and then quizzes, so the pin filters to `.assignment`
     /// before comparing: the claim worth keeping is that these three folders, with
