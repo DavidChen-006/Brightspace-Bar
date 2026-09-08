@@ -55,7 +55,7 @@ push or two, not a phone that will not stop.
 
 - macOS 14+
 - Xcode Command Line Tools with Swift 6.2+ (`xcode-select --install`)
-- Node 20+ (`brew install node`)
+- Node 22+ (`brew install node`)
 - Purdue Brightspace via Entra specifically — the SAML entityId is
   Purdue-hardcoded today; PRs generalising it are welcome.
 
@@ -68,7 +68,7 @@ tagged state is
 ```sh
 git clone https://github.com/DavidChen-006/Brightspace-Bar.git
 cd BrightspaceBar
-make setup    # checks prerequisites, installs the daemon's dependencies
+make setup    # checks prerequisites, installs the daemon's dependencies and the agent skill
 make start    # THE one command — see below
 ```
 
@@ -106,12 +106,25 @@ structural: every Brightspace call `bsb` makes is a GET, the only file it
 writes is the app's own `manual-items.json`, and the bearer token never
 leaves your tenant.
 
-The skill in [`skills/brightspace-bar/`](skills/brightspace-bar/SKILL.md)
-teaches an agent the commands, the endpoints and the syllabus-to-calendar
-recipe. `make skill` symlinks it into `~/.claude/skills`, `~/.agents/skills`
-and `~/.codex/skills`, so Claude Code, Codex and any Agent-Skills-aware tool
-pick it up on their next start. Then: "read my PHIL 219 syllabus and put the
-due dates on my calendar."
+### The skill — how your agent learns this
+
+An agent does not know `bsb` exists until it reads the skill in
+[`skills/brightspace-bar/`](skills/brightspace-bar/SKILL.md): the commands,
+the read endpoints, the write contract, and the syllabus-to-calendar recipe.
+It follows the [Agent Skills](https://agentskills.io) format, so any agent
+that reads skills can use it. Three ways to install it, pick one:
+
+| You use… | Do this |
+| --- | --- |
+| `make setup` (already ran it) | Done — setup symlinks the skill into `~/.claude/skills`, `~/.agents/skills` and `~/.codex/skills`. `make skill` re-runs just that step. |
+| Claude Code, Codex, Cursor, Gemini CLI, Copilot, OpenCode… without cloning | `npx skills add DavidChen-006/Brightspace-Bar` — the [skills](https://github.com/vercel-labs/skills) CLI installs it into each agent's skills folder. Run `make setup` in your checkout once, so the copied skill can find the CLI. |
+| Claude Code inside this repo | Nothing — `.claude/skills/brightspace-bar` is in the repo, so it is a project skill the moment you open the folder. |
+
+Then start a new agent session and ask in plain words: "read my PHIL 219
+syllabus and put the due dates on my calendar", or "what's due this week in
+CS 252". In Claude Code you can also invoke it directly as
+`/brightspace-bar`. The skill tells the agent to show you the list before it
+writes anything, and how you undo it.
 
 ### Environment configuration
 

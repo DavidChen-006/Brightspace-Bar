@@ -1,6 +1,7 @@
 # BrightspaceBar — top-level entry points.
 #
-#   make setup   check prerequisites, install session-capture's npm deps
+#   make setup   check prerequisites, install session-capture's npm deps,
+#                install the agent skill, record where this checkout is
 #   make start   THE one command: build the app, ensure credentials (prompting
 #                once if needed), launch the menu bar, run the headless login
 #   make login   one-time interactive Chromium login (captures the session)
@@ -15,12 +16,19 @@
 .PHONY: setup start login run test skill
 
 SKILL_DIRS ?= $(HOME)/.claude/skills $(HOME)/.agents/skills $(HOME)/.codex/skills
+BSB_ROOT ?= $(HOME)/Library/Application Support/BrightspaceBar
 
 # A symlink per directory, never a copy: the skill's scripts/bsb resolves the
 # checkout through the link, and a copy would go stale the next time the CLI
 # learned a command. An existing path that is NOT our link is left alone and
 # named, because replacing someone's skill folder is not this target's call.
+#
+# Also records this checkout's path in $BSB_ROOT/checkout, which is how a
+# COPIED install of the skill (`npx skills add DavidChen-006/Brightspace-Bar`
+# copies the directory into an agent's skills folder) finds the CLI.
 skill:
+	@mkdir -p "$(BSB_ROOT)" && printf '%s\n' "$(CURDIR)" > "$(BSB_ROOT)/checkout" \
+	  && echo "skill: recorded this checkout in $(BSB_ROOT)/checkout"
 	@for dir in $(SKILL_DIRS); do \
 	  mkdir -p "$$dir"; \
 	  target="$$dir/brightspace-bar"; \
@@ -43,11 +51,14 @@ setup:
 	@test "$$(uname)" = Darwin || { echo "error: BrightspaceBar is a macOS menu-bar app — macOS required"; exit 1; }
 	@xcode-select -p >/dev/null 2>&1 || { echo "error: Xcode Command Line Tools missing — run: xcode-select --install"; exit 1; }
 	@swift --version 2>/dev/null | awk '/Swift version/ { split($$4, v, "."); if (v[1] < 6 || (v[1] == 6 && v[2] < 2)) { print "error: swift >= 6.2 required, found " $$4; exit 1 } }' || { echo "error: swift not found or too old (need >= 6.2)"; exit 1; }
-	@node --version >/dev/null 2>&1 || { echo "error: node not found — need node >= 20 (try: brew install node)"; exit 1; }
-	@node -e 'process.exit(parseInt(process.versions.node) >= 20 ? 0 : 1)' || { echo "error: node >= 20 required, found $$(node --version)"; exit 1; }
+	@node --version >/dev/null 2>&1 || { echo "error: node not found — need node >= 22 (try: brew install node)"; exit 1; }
+	@node -e 'process.exit(parseInt(process.versions.node) >= 22 ? 0 : 1)' || { echo "error: node >= 22 required, found $$(node --version)"; exit 1; }
 	cd session-capture && npm install
 	@echo
+	@$(MAKE) --no-print-directory skill
+	@echo
 	@echo "Setup complete. Next: \`make start\` — the one command (builds, prompts for credentials once, launches the menu bar, logs in)."
+	@echo "Then, in Claude Code / Codex / any agent that reads skills: \"read my <course> syllabus and put the due dates on my calendar\"."
 
 login:
 	cd session-capture && npm run capture

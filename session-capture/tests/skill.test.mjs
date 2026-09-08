@@ -7,7 +7,7 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync, symlinkSync } from "node:fs";
+import { readFileSync, readdirSync, readlinkSync, symlinkSync } from "node:fs";
 import path from "node:path";
 import { PKG_DIR, run, tempDir } from "./helpers.mjs";
 
@@ -69,6 +69,47 @@ test("the skill never tells an agent to write to Brightspace", () => {
     }
   }
   assert.match(SKILL, /never writes to Brightspace/i);
+});
+
+test("a COPIED skill (npx skills add) finds the checkout via BSB_REPO or the recorded path, else says how", async (t) => {
+  // Arrange — copy the skill somewhere with no checkout above it, as the
+  // skills CLI does, and hide the home-directory fallback.
+  const { cpSync, mkdirSync, writeFileSync } = await import("node:fs");
+  const elsewhere = tempDir(t);
+  const copy = path.join(elsewhere, "brightspace-bar");
+  cpSync(SKILL_DIR, copy, { recursive: true });
+  const root = path.join(elsewhere, "root");
+  const shim = path.join(copy, "scripts", "bsb");
+  const env = { ...process.env, HOME: path.join(elsewhere, "nohome"), BSB_ROOT: root };
+  delete env.BSB_REPO;
+
+  // Act / Assert — nothing to go on: a refusal that names every place it looked and the fix.
+  const lost = await run(shim, ["--help"], { cwd: elsewhere, env });
+  assert.equal(lost.code, 1);
+  assert.match(lost.stderr, /cannot find the Brightspace Bar checkout/);
+  assert.match(lost.stderr, /make setup/);
+
+  // BSB_REPO wins.
+  const repo = path.resolve(PKG_DIR, "..");
+  const explicit = await run(shim, ["--help"], { cwd: elsewhere, env: { ...env, BSB_REPO: repo } });
+  assert.equal(explicit.code, 0, explicit.stderr);
+  assert.match(explicit.stdout, /Usage: bsb/);
+
+  // The one-line file `make setup` writes.
+  mkdirSync(root, { recursive: true });
+  writeFileSync(path.join(root, "checkout"), `${repo}\n`);
+  const recorded = await run(shim, ["--help"], { cwd: elsewhere, env });
+  assert.equal(recorded.code, 0, recorded.stderr);
+  assert.match(recorded.stdout, /Usage: bsb/);
+
+  // And the arguments arrive untouched (the first one is not eaten by the resolver).
+  const status = await run(shim, ["frobnicate"], { cwd: elsewhere, env });
+  assert.match(status.stderr, /unknown command "frobnicate"/);
+});
+
+test("the project-level .claude/skills entry is a symlink to the skill, so an agent in the repo needs no install", () => {
+  const link = path.join(PKG_DIR, "..", ".claude", "skills", "brightspace-bar");
+  assert.equal(path.resolve(path.dirname(link), readlinkSync(link)), path.resolve(SKILL_DIR));
 });
 
 test("scripts/bsb reaches the CLI, directly and through the symlink make skill plants", async (t) => {

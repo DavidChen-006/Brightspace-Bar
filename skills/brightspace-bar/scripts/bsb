@@ -1,10 +1,20 @@
 #!/bin/sh
-# The skill's copy of the `bsb` entry point. Finds the checkout this skill
-# directory really lives in (through any symlink `make skill` planted in a
-# skills directory) and runs the repo's ./bsb with the arguments untouched.
+# The skill's copy of the `bsb` entry point. Finds the Brightspace Bar
+# checkout and runs its ./bsb with the arguments untouched.
 #
 #   scripts/bsb courses
 #   scripts/bsb syllabus --course 1631476 --out ./syllabus
+#
+# The skill can be installed three ways, and this shim must work from all
+# of them, so the checkout is looked for in this order:
+#
+#   1. $BSB_REPO                — an explicit override
+#   2. relative to this file    — the skill still inside its checkout, or a
+#                                 symlink into it (`make skill`, .claude/skills)
+#   3. $BSB_ROOT/checkout       — a one-line file `make setup` writes with
+#                                 the checkout's path, for a COPIED install
+#                                 (`npx skills add …` copies the directory)
+#   4. ~/Developer/BrightspaceBar — the historic default location
 set -eu
 
 self="$0"
@@ -16,6 +26,30 @@ while [ -L "$self" ]; do
   esac
 done
 here="$(cd "$(dirname "$self")" && pwd -P)"
+root="${BSB_ROOT:-$HOME/Library/Application Support/BrightspaceBar}"
 
-# scripts/ → brightspace-bar/ → skills/ → the repo root
-exec "$here/../../../bsb" "$@"
+# Runs the checkout's bsb if `$1` is one; returns otherwise. No pipe, no
+# subshell: `exec` must replace THIS process, or the error below would print
+# after a successful run.
+try() {
+  repo="$1"
+  shift
+  [ -n "$repo" ] || return 0
+  if [ -x "$repo/bsb" ] && [ -f "$repo/session-capture/src/bsb.mjs" ]; then
+    exec "$repo/bsb" "$@"
+  fi
+}
+
+try "${BSB_REPO:-}" "$@"
+try "$here/../../.." "$@"
+if [ -f "$root/checkout" ]; then
+  try "$(head -n 1 "$root/checkout")" "$@"
+fi
+try "$HOME/Developer/BrightspaceBar" "$@"
+
+cat >&2 <<EOF
+bsb: cannot find the Brightspace Bar checkout.
+  Looked at \$BSB_REPO, next to this skill, $root/checkout, and ~/Developer/BrightspaceBar.
+  Fix: run \`make setup\` in the checkout (it records the path), or set BSB_REPO=/path/to/Brightspace-Bar.
+EOF
+exit 1
