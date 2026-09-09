@@ -80,14 +80,22 @@ menu-bar icon**, you type it into Authenticator on your phone, and the icon
 reverts. After that, the daemon refreshes the session silently for weeks. If
 courses ever stop refreshing, run `make start` again.
 
-**If no number appears on the icon and the menu stays empty, run
-`make login`.** It is the same flow with the browser visible: a Chromium
-window opens, your stored credentials are typed in for you, and you finish
-whatever Microsoft asks in that window — the number match, a "choose a
-method" page, a verification code, an authenticator setup step. The headless
-login only knows the number-match page; the window handles every account
-the headless login cannot read, and stores the same credentials and session,
-so everything after it works exactly as if the headless login had succeeded.
+There are two ways to sign in, and the rule for choosing is short:
+
+- **`make start`** — the default. No browser window; the MFA number goes on
+  the icon. Use it first, and every time after.
+- **`make login`** — the same flow with the browser visible. Use it when
+  `make start` put no number on the icon and the menu stayed empty, when
+  your Microsoft sign-in is not an Authenticator number match (a text, a
+  code, a "choose a method" page, a setup step), or when you simply want to
+  watch the sign-in happen.
+
+`make login` opens a Chromium window, types your stored credentials in for
+you, and you finish whatever Microsoft asks in that window. It stores the
+same credentials and writes the same session and browser profile as
+`make start`, so everything after it — the silent refresh, the next
+automatic login — works exactly as if the headless login had succeeded. Both
+paths are tested end to end from an empty install.
 
 Day to day, `make start` is only needed once — and again whenever the session
 needs a fresh login. If you've quit the app and just want it back, `make run`
