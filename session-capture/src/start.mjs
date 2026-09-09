@@ -52,7 +52,13 @@ if (running) {
   console.error(`app bundle not found at ${APP}: run \`make start\` (it builds it first)`);
   process.exit(1);
 } else {
-  const app = spawn("open", ["-n", APP], { detached: true, stdio: "ignore" });
+  // The executable INSIDE the bundle, spawned directly — not `open -n`.
+  // LaunchServices does not pass the caller's environment through, so a
+  // BSB_ROOT set for `make start` would be dropped and the app would read
+  // the production root. Spawning the binary keeps the environment, and
+  // Bundle.main still resolves to the .app because that is where the
+  // executable lives, so MotionP.pdf loads either way.
+  const app = spawn(APP_BINARY, [], { detached: true, stdio: "ignore" });
   app.unref();
   console.error("launched BrightspaceBar into the menu bar");
 }
