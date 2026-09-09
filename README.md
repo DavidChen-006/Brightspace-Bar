@@ -97,10 +97,12 @@ same credentials and writes the same session and browser profile as
 automatic login — works exactly as if the headless login had succeeded. Both
 paths are tested end to end from an empty install.
 
-Day to day, `make start` is only needed once — and again whenever the session
-needs a fresh login. If you've quit the app and just want it back, `make run`
-is the "reopen" gesture: build and launch, nothing else (there's no `.app`
-bundle to double-click yet).
+Day to day, `make start` (or `make login`) is needed once. When the session
+later dies, the app's own timer signs in again and puts the number on the
+icon; you only run a command if that did not work for you, and then it is
+`make login`. If you've quit the app and just want it back, `make run` is the
+"reopen" gesture: build and launch, nothing else (there's no `.app` bundle to
+double-click yet).
 
 ## Agents
 
