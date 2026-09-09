@@ -44,7 +44,7 @@ skill:
 	@echo "Agents that read those directories now see the 'brightspace-bar' skill (restart a running session to load it)."
 
 start:
-	$(MAKE) -C BrightspaceBar build
+	$(MAKE) -C BrightspaceBar bundle
 	cd session-capture && npm run start
 
 setup:

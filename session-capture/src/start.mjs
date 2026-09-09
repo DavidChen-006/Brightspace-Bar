@@ -22,7 +22,8 @@ import { loadCredentials, promptForCredentials } from "./credentials.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.join(__dirname, "..", "..");
-const APP_BINARY = path.join(REPO_ROOT, "BrightspaceBar", ".build", "debug", "BrightspaceBar");
+const APP = path.join(REPO_ROOT, "BrightspaceBar", ".build", "debug", "BrightspaceBar.app");
+const APP_BINARY = path.join(APP, "Contents", "MacOS", "BrightspaceBar");
 
 // 1. Credentials: load, or prompt when a human is on the other end.
 let credentials = loadCredentials();
@@ -48,9 +49,15 @@ const running = spawnSync("pgrep", ["-f", APP_BINARY]).status === 0;
 if (running) {
   console.error("BrightspaceBar is already running — not launching a second copy.");
 } else if (!existsSync(APP_BINARY)) {
-  console.error(`app binary not found at ${APP_BINARY} — run \`make start\` (it builds first)`);
+  console.error(`app bundle not found at ${APP}: run \`make start\` (it builds it first)`);
   process.exit(1);
 } else {
+  // The executable INSIDE the bundle, spawned directly — not `open -n`.
+  // LaunchServices does not pass the caller's environment through, so a
+  // BSB_ROOT set for `make start` would be dropped and the app would read
+  // the production root. Spawning the binary keeps the environment, and
+  // Bundle.main still resolves to the .app because that is where the
+  // executable lives, so MotionP.pdf loads either way.
   const app = spawn(APP_BINARY, [], { detached: true, stdio: "ignore" });
   app.unref();
   console.error("launched BrightspaceBar into the menu bar");

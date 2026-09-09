@@ -2,6 +2,7 @@
 #
 #   make test              hermetic suite (no network, no daemon) — the default
 #   make live              adds the live-tenant tests, which spawn the real daemon
+#   make bundle            build, bundle, sign
 #   make run               build, bundle, sign, launch into the menu bar
 #   make smoke             launch + verify the process survives 3s, then kill
 #   make build / clean
@@ -12,7 +13,7 @@
 # Each module also has its own Makefile: `make -C Modules/CoursePipeline test`
 # runs just that module's suite.
 
-.PHONY: build test live run smoke clean
+.PHONY: build test live bundle run smoke clean
 
 # A CommandLineTools-only toolchain (no Xcode) ships Testing.framework but
 # doesn't tell swiftpm where it lives, so plain `swift test` dies with
@@ -26,6 +27,9 @@ test:
 
 build:
 	swift build
+
+bundle:
+	./Scripts/run.sh --bundle
 
 # BS_LIVE gates the cases that reach the tenant. They spawn the real daemon
 # with --no-full-login (a suite must never push MFA to a phone), so they need
