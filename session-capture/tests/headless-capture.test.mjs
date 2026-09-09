@@ -100,6 +100,7 @@ const {
   fillWhenReady,
   fullLoginCapture,
   launchOptionsFor,
+  rejectionOn,
   silentCapture,
 } = browser;
 
@@ -733,4 +734,49 @@ test("a completed autofill proceeds silently in both modes", () => {
     // Assert — nothing to tell the human yet; the MFA wait says its own line.
     assert.deepEqual(next, { proceed: true, reason: null, note: null });
   }
+});
+
+// ---------------------------------------------------------------------------
+// B6. rejectionOn — Microsoft said the credential was wrong.
+// ---------------------------------------------------------------------------
+
+const PASSWORD_ERROR = "#passwordError";
+const USERNAME_ERROR = "#usernameError";
+
+test("rejectionOn names the credential Microsoft is rejecting, or null when it is not", async () => {
+  // Arrange — the error line under the password field, the one under the
+  // email field, and a page showing neither.
+  const password = fakePage({ [PASSWORD_ERROR]: { afterChecks: 0 } });
+  const username = fakePage({ [USERNAME_ERROR]: { afterChecks: 0 } });
+  const clean = fakePage({ [EMAIL]: { afterChecks: 0 } });
+
+  // Act / Assert
+  assert.equal(await rejectionOn(password), "password");
+  assert.equal(await rejectionOn(username), "username");
+  assert.equal(await rejectionOn(clean), null);
+});
+
+test("rejectionOn is one look, not a wait — it polls nothing", async () => {
+  // Arrange — it runs inside the MFA loop every second; a wait here would
+  // stretch the loop.
+  const page = fakePage({});
+
+  // Act
+  await rejectionOn(page);
+
+  // Assert — one visibility check per error line, no sleeps.
+  assert.deepStrictEqual(page.calls.map((c) => c.op), ["isVisible", "isVisible"]);
+});
+
+test("the full capture looks for a rejection after the autofill AND inside the MFA wait", () => {
+  // Arrange / Act — the error line can appear a beat after the submit, so a
+  // single check right after typing would miss it and the headless run
+  // would sit five minutes on an error page. Both looks, and the discard
+  // that keeps a wrong password from being retried forever.
+  const source = fullLoginCapture.toString();
+
+  // Assert
+  assert.equal(source.match(/rejectionOn\(/g).length, 2, "one look after the autofill, one in the loop");
+  assert.equal(source.match(/discardRejected\(/g).length, 2);
+  assert.match(source, /credentialsRejected: true/);
 });

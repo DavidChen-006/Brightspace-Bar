@@ -13,8 +13,9 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chmodSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { credentialsFile } from "../src/credentials.mjs";
 import { run, tempPaths } from "./helpers.mjs";
 
 /** A stand-in app: exits at once. start.mjs only needs it to exist and be spawnable. */
@@ -25,22 +26,32 @@ function fakeApp(paths) {
   return app;
 }
 
-/** A stand-in refresh.mjs: records argv and the env it was handed, exits `code`. */
+/**
+ * A stand-in refresh.mjs: records argv and the env it was handed, exits
+ * `code`. With STUB_REJECT set it does what the real daemon does when
+ * Microsoft rejects the stored password: removes credentials.json.
+ */
 function fakeRefresh(paths, code) {
   const stub = path.join(paths.root, "refresh-stub.mjs");
-  writeFileSync(stub, `import { appendFileSync, writeFileSync } from "node:fs";
+  writeFileSync(stub, `import { appendFileSync, existsSync, rmSync, writeFileSync } from "node:fs";
 appendFileSync(${JSON.stringify(path.join(paths.root, "order.log"))}, "refresh\\n");
+const file = ${JSON.stringify(credentialsFile({ BSB_ROOT: paths.root }))};
 writeFileSync(process.env.STUB_OUT, JSON.stringify({
   argv: process.argv.slice(2),
   backoff: process.env.BSB_FULL_LOGIN_BACKOFF_MS ?? null,
   hasCredentials: Boolean(process.env.BS_EMAIL && process.env.BS_PASSWORD),
+  hasFile: existsSync(file),
 }));
+if (process.env.STUB_REJECT) rmSync(file, { force: true });
 process.exit(${code});`);
   return stub;
 }
 
-async function start(paths, args, { exit = 0 } = {}) {
+async function start(paths, args, { exit = 0, stored = false, reject = false } = {}) {
   const out = path.join(paths.root, "seen.json");
+  // Stored: credentials.json in the root and nothing in the environment,
+  // which is every run after the first. Otherwise the env stands in.
+  if (stored) writeFileSync(credentialsFile({ BSB_ROOT: paths.root }), JSON.stringify({ email: "student@example.edu", password: "hunter2-not-real" }));
   const result = await run("node", ["src/start.mjs", ...args], {
     env: {
       ...process.env,
@@ -48,8 +59,9 @@ async function start(paths, args, { exit = 0 } = {}) {
       BSB_APP_BINARY: fakeApp(paths),
       BSB_REFRESH_CLI: fakeRefresh(paths, exit),
       STUB_OUT: out,
-      BS_EMAIL: "student@example.edu",
-      BS_PASSWORD: "hunter2-not-real",
+      ...(reject ? { STUB_REJECT: "1" } : {}),
+      BS_EMAIL: stored ? "" : "student@example.edu",
+      BS_PASSWORD: stored ? "" : "hunter2-not-real",
     },
   });
   return { ...result, seen: JSON.parse(readFileSync(out, "utf8")) };
@@ -162,4 +174,60 @@ test("visible: the app is launched even when the sign-in failed, so the person h
   assert.equal(result.code, 2);
   const order = readFileSync(path.join(paths.root, "order.log"), "utf8").trim().split("\n");
   assert.deepEqual(order, ["refresh", "app"]);
+});
+
+test("stored credentials stay in the file — the daemon reads them there, they are not re-exported", async (t) => {
+  // Arrange — every run after the first: credentials.json, empty env. The
+  // daemon must see the FILE, because a rejected file is discarded and a
+  // rejected export is not; re-exporting would hide the difference.
+  const paths = tempPaths(t);
+
+  // Act
+  const result = await start(paths, [], { stored: true });
+
+  // Assert
+  assert.equal(result.code, 0, result.stderr);
+  assert.equal(result.seen.hasFile, true);
+  assert.equal(result.seen.hasCredentials, false, "file credentials must not be copied into the daemon's env");
+});
+
+test("a rejected stored password is reported, and the next run is told it will ask again", async (t) => {
+  // Arrange — the daemon removed credentials.json (Microsoft said no) and
+  // the headless ladder ended on needs-login.
+  const paths = tempPaths(t);
+
+  // Act
+  const result = await start(paths, [], { stored: true, reject: true, exit: 2 });
+
+  // Assert — the file is gone, the person is told why, and what happens next.
+  assert.equal(result.code, 2);
+  assert.equal(existsSync(credentialsFile({ BSB_ROOT: paths.root })), false);
+  assert.match(result.stderr, /stored password was rejected and removed/);
+  assert.match(result.stderr, /asks for it again/);
+});
+
+test("a visible login that succeeded after a rejection wants the password that worked (no TTY: says so)", async (t) => {
+  // Arrange — the human corrected the password in the window and signed in;
+  // the daemon had already discarded the wrong file. Under the test runner
+  // there is no TTY to prompt on, so the message stands in for the prompt.
+  const paths = tempPaths(t);
+
+  // Act
+  const result = await start(paths, ["--visible"], { stored: true, reject: true, exit: 0 });
+
+  // Assert — success is still success, and the missing file is not silent.
+  assert.equal(result.code, 0, result.stderr);
+  assert.match(result.stderr, /rejected and removed/);
+  assert.match(result.stderr, /menu bar is live/);
+});
+
+test("a run whose credentials came from the environment says nothing about the file", async (t) => {
+  // Arrange — BS_EMAIL/BS_PASSWORD exported, no file anywhere.
+  const paths = tempPaths(t);
+
+  // Act
+  const result = await start(paths, [], { exit: 2 });
+
+  // Assert
+  assert.doesNotMatch(result.stderr, /rejected/);
 });

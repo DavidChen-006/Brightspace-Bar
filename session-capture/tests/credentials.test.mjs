@@ -14,7 +14,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, statSync, writeFileSync } from "node:fs";
-import { credentialsFile, loadCredentials, saveCredentials } from "../src/credentials.mjs";
+import {
+  credentialsFile,
+  credentialsSource,
+  discardCredentials,
+  loadCredentials,
+  saveCredentials,
+} from "../src/credentials.mjs";
 import { PKG_DIR, run, tempDir } from "./helpers.mjs";
 
 const CREDS = { email: "student@purdue.edu", password: "hunter2-but-longer" };
@@ -120,4 +126,31 @@ test("promptForCredentials refuses when stdin is not a TTY", async (t) => {
   assert.equal(result.code, 3, `expected the TTY refusal, got: ${result.stdout} ${result.stderr}`);
   assert.match(result.stderr, /not a TTY/);
   assert.ok(!result.stdout.includes("PROMPTED"));
+});
+
+test("credentialsSource says where loadCredentials would answer from", (t) => {
+  // Arrange
+  const root = tempDir(t);
+  const bare = { BSB_ROOT: root, BS_EMAIL: "", BS_PASSWORD: "" };
+
+  // Act / Assert — nothing, then the file, then an export on top of the file.
+  assert.equal(credentialsSource(bare), null);
+  saveCredentials(CREDS, bare);
+  assert.equal(credentialsSource(bare), "file");
+  assert.equal(credentialsSource({ ...bare, BS_EMAIL: "x@purdue.edu", BS_PASSWORD: "y" }), "env");
+});
+
+test("discardCredentials removes the file, and says whether there was one", (t) => {
+  // Arrange — a rejected password must not be retried forever.
+  const root = tempDir(t);
+  const env = { BSB_ROOT: root, BS_EMAIL: "", BS_PASSWORD: "" };
+  saveCredentials(CREDS, env);
+
+  // Act
+  const removed = discardCredentials(env);
+
+  // Assert — gone, the next load has nothing, and a second discard is a no-op.
+  assert.equal(removed, true);
+  assert.equal(loadCredentials(env), null);
+  assert.equal(discardCredentials(env), false);
 });

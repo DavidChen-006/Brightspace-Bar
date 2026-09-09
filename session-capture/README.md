@@ -29,6 +29,17 @@ cannot read (a method chooser, a code prompt, an MFA setup page): the
 credentials are typed in for you, you finish the rest in the window, and the
 profile and session file it writes are the ones every later refresh uses.
 
+When Microsoft rejects the stored password (`#passwordError` /
+`#usernameError` on the page), the rung ends at once headless with the
+reason instead of waiting out the MFA timeout, and `credentials.json` is
+removed so the next run prompts again — a wrong password on disk would
+otherwise fail every automatic login with no way to change it. A `BS_EMAIL`
+/`BS_PASSWORD` export is left alone and named in the log. Under `--visible`
+the capture keeps waiting for the human to correct it, and `start.mjs` then
+asks in the terminal for the password that worked. `scripts/reset.sh
+--session` (what `make reset` runs) deletes the session and profile and
+keeps `credentials.json`; only `--all` removes that.
+
 ## `bsb` — the same session, opened to an agent
 
 ```sh

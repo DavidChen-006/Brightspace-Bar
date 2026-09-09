@@ -97,6 +97,20 @@ same credentials and writes the same session and browser profile as
 automatic login — works exactly as if the headless login had succeeded. Both
 paths are tested end to end from an empty install.
 
+Three things that follow from that:
+
+- **You never type your credentials twice.** `make login` reuses what
+  `make start` stored and types it into the window for you. It prompts only
+  when nothing is stored.
+- **A wrong password does not get stuck.** If Microsoft rejects the stored
+  password, the daemon says so, removes the stored file, and the next
+  `make start` or `make login` asks again. If you corrected it in the
+  `make login` window and signed in, you are asked once more in the terminal
+  for the password that worked, so automatic logins have it.
+- **To start over, `make reset`.** It deletes the session and browser
+  profile and keeps your credentials; the next `make start` or `make login`
+  signs in from scratch. Neither command ever deletes your credentials.
+
 Day to day, `make start` (or `make login`) is needed once. When the session
 later dies, the app's own timer signs in again and puts the number on the
 icon; you only run a command if that did not work for you, and then it is

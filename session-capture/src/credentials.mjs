@@ -15,7 +15,7 @@
  * that "prompts" is a hang, and an agent piping stdin must never be able to
  * feed a password through here by accident.
  */
-import { chmodSync, readFileSync } from "node:fs";
+import { chmodSync, readFileSync, unlinkSync } from "node:fs";
 import path from "node:path";
 import readline from "node:readline";
 import { writeJsonAtomic } from "./atomic-write.mjs";
@@ -24,6 +24,38 @@ import { resolvePaths } from "./paths.mjs";
 /** @param {{BSB_ROOT?: string}} [env] @returns {string} */
 export function credentialsFile(env = process.env) {
   return path.join(resolvePaths(env).root, "credentials.json");
+}
+
+/**
+ * Which source `loadCredentials` would answer from: "env", "file", or null.
+ * The full-login rung needs to know, because a rejected password from the
+ * FILE can be discarded so the next run asks again, while a rejected export
+ * is the shell's to fix.
+ *
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {"env" | "file" | null}
+ */
+export function credentialsSource(env = process.env) {
+  if (env.BS_EMAIL && env.BS_PASSWORD) return "env";
+  return loadCredentials({ ...env, BS_EMAIL: undefined, BS_PASSWORD: undefined }) ? "file" : null;
+}
+
+/**
+ * Remove the stored file — what happens when Microsoft rejected what was in
+ * it. A wrong password kept on disk would fail every automatic login from
+ * here on with no way to change it; gone, the next `make start` or
+ * `make login` prompts for it again.
+ *
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {boolean} whether there was a file to remove
+ */
+export function discardCredentials(env = process.env) {
+  try {
+    unlinkSync(credentialsFile(env));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**

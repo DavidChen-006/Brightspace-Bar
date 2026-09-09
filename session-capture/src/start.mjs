@@ -24,7 +24,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { loadCredentials, promptForCredentials } from "./credentials.mjs";
+import { credentialsFile, credentialsSource, loadCredentials, promptForCredentials } from "./credentials.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.join(__dirname, "..", "..");
@@ -46,6 +46,7 @@ const visible = args.includes("--visible");
 //    visible login prompts too: it is not a way around storing them — the
 //    stored credentials are what lets the next FULL login run headless, and
 //    the window only exists for the sign-in the autofill cannot finish alone.
+const storedBefore = credentialsSource();
 let credentials = loadCredentials();
 if (!credentials) {
   if (process.stdin.isTTY) {
@@ -123,11 +124,11 @@ function runRefresh() {
     {
       cwd: path.join(__dirname, ".."),
       stdio: "inherit",
-      env: {
-        ...process.env,
-        BSB_FULL_LOGIN_BACKOFF_MS: "0",
-        ...(credentials ? { BS_EMAIL: credentials.email, BS_PASSWORD: credentials.password } : {}),
-      },
+      // The daemon reads credentials.json itself — they are NOT re-exported
+      // into its environment. It discards the file when Microsoft rejects the
+      // password, and it can only tell a file from a shell export by where it
+      // found them. A real BS_EMAIL/BS_PASSWORD export is inherited as-is.
+      env: { ...process.env, BSB_FULL_LOGIN_BACKOFF_MS: "0" },
     },
   );
 }
@@ -155,6 +156,26 @@ refresh.on("exit", async (code) => {
     launchApp();
     await pause(1000);
   }
+
+  // The daemon removes credentials.json when Microsoft rejects what was in
+  // it. If the sign-in still succeeded — the human corrected it in the
+  // window — ask for the password that worked, right now, so the next
+  // automatic login has it. Nothing is read out of the browser: the person
+  // types it once more, into our prompt.
+  const rejectedFile = storedBefore === "file" && !existsSync(credentialsFile());
+  if (rejectedFile && code === 0 && process.stdin.isTTY) {
+    console.error("");
+    console.error("Microsoft rejected the stored password, but your sign-in in the window worked.");
+    console.error("Enter the email and password you used, so automatic logins work from now on.");
+    try {
+      await promptForCredentials();
+    } catch (error) {
+      console.error(`not saved: ${error.message} — run make start to enter them later`);
+    }
+  } else if (rejectedFile) {
+    console.error("The stored password was rejected and removed; the next make start or make login asks for it again.");
+  }
+
   const verdict = code === 0
     ? "session fresh — the menu bar is live"
     : code === 2

@@ -35,7 +35,7 @@
  * cookies leave through the return value only.
  */
 import { mkdirSync } from "node:fs";
-import { loadCredentials } from "../credentials.mjs";
+import { credentialsSource, discardCredentials, loadCredentials } from "../credentials.mjs";
 import {
   clickThroughSilentSurfaces,
   extractXsrf,
@@ -53,6 +53,13 @@ const SUBMIT_SELECTORS = ["#idSIButton9", "input[type=submit]", "button[type=sub
  * proven against the live tenant in experiment-10/src/prove-number.mjs.
  */
 const DISPLAY_SIGN_SELECTOR = "#idRichContext_DisplaySign";
+
+/**
+ * Where Microsoft says a credential was wrong: the error line under the
+ * password field ("Your account or password is incorrect") and the one under
+ * the email field ("We couldn't find an account with that username").
+ */
+const REJECTION_SELECTORS = { password: "#passwordError", username: "#usernameError" };
 
 /** Generous: a human has to find their phone and approve the number-match. */
 const MFA_TIMEOUT_MS = 5 * 60 * 1000;
@@ -154,11 +161,24 @@ export async function fullLoginCapture({ profileDir, baseUrl, log, onMfaNumber, 
       ? await autofillCredentials(page, { email: credentials.email, password: credentials.password, log })
       : false;
 
+    // Microsoft said no to what was typed. A wrong password kept on disk
+    // would fail every automatic login from here on, so the stored file goes
+    // now and the next run asks again; the verdict names the cause instead of
+    // "timed out". Visible, the human corrects it in the window and the
+    // capture carries on — and reports the rejection, so start.mjs can ask
+    // for the password that actually worked.
+    let rejected = credentials ? await rejectionOn(page) : null;
+    if (rejected) discardRejected(rejected, log);
+    if (rejected && !visible) {
+      return { ok: false, reason: `Microsoft rejected the stored ${rejected}`, credentialsRejected: true };
+    }
+    if (rejected) log(`>>> Microsoft rejected the stored ${rejected} — type the right one in the window <<<`);
+
     // Headless: a login that was never submitted ends here, because no
     // number-match is coming and the MFA wait would be spent on a prompt no
     // phone will show. Visible: the human at the window finishes whatever the
     // autofill could not, and the capture keeps waiting for the signed-in state.
-    const next = afterAutofill({ visible, hasCredentials: Boolean(credentials), autofilled });
+    const next = afterAutofill({ visible, hasCredentials: Boolean(credentials), autofilled: autofilled && !rejected });
     if (!next.proceed) return { ok: false, reason: next.reason };
     if (next.note) log(`>>> ${next.note} <<<`);
 
@@ -183,7 +203,19 @@ export async function fullLoginCapture({ profileDir, baseUrl, log, onMfaNumber, 
         await onMfaNumber?.(number);
       }
       if (await isAuthenticated(page, context, baseUrl)) {
-        return harvest({ page, context, baseUrl, log });
+        const result = await harvest({ page, context, baseUrl, log });
+        return rejected ? { ...result, credentialsRejected: true } : result;
+      }
+      // The error line can appear a beat after the submit — catch it here too.
+      if (!rejected && credentials) {
+        rejected = await rejectionOn(page);
+        if (rejected) {
+          discardRejected(rejected, log);
+          if (!visible) {
+            return { ok: false, reason: `Microsoft rejected the stored ${rejected}`, credentialsRejected: true };
+          }
+          log(`>>> Microsoft rejected the stored ${rejected} — type the right one in the window <<<`);
+        }
       }
       // "Stay signed in? → Yes" is what keeps future runs silent.
       await clickThroughSilentSurfaces(page, log);
@@ -221,6 +253,31 @@ async function harvest({ page, context, baseUrl, log }) {
   const csrfToken = await extractXsrf(page);
   log(csrfToken ? "XSRF token extracted" : "XSRF token NOT found");
   return { ok: true, cookies, csrfToken, landedUrl: page.url() };
+}
+
+/**
+ * Which credential Microsoft is rejecting on the page right now — "password",
+ * "username" — or null when neither error line is showing. One cheap DOM
+ * query each, no waiting, like `readDisplaySign`.
+ *
+ * @param {object} page
+ * @returns {Promise<"password" | "username" | null>}
+ */
+export async function rejectionOn(page) {
+  for (const [what, selector] of Object.entries(REJECTION_SELECTORS)) {
+    if (await page.locator(selector).first().isVisible().catch(() => false)) return what;
+  }
+  return null;
+}
+
+/** A rejected FILE is removed so the next run prompts; a rejected export is the shell's to fix. */
+function discardRejected(what, log) {
+  if (credentialsSource() === "file") {
+    discardCredentials();
+    log(`removed credentials.json: Microsoft rejected the stored ${what} — the next make start or make login asks for it again`);
+  } else {
+    log(`BS_EMAIL/BS_PASSWORD from the environment were rejected (${what}) — fix the export`);
+  }
 }
 
 /**

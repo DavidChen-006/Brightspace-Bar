@@ -7,6 +7,8 @@
 #   make login   the same as start, but the sign-in happens in a VISIBLE
 #                Chromium window you finish yourself — for accounts the
 #                headless flow cannot read (no number on the icon)
+#   make reset   start over: delete the session and browser profile so the
+#                next start/login signs in from scratch. Keeps credentials.
 #   make run     build & run the menu-bar app (delegates to BrightspaceBar/)
 #   make test    run the Swift test suite   (delegates to BrightspaceBar/)
 #   make skill   install the agent skill (skills/brightspace) into the
@@ -15,7 +17,7 @@
 #                skill tracks this checkout. SKILL_DIRS overrides the list.
 #   ./bsb        the agent CLI itself (`./bsb --help`)
 
-.PHONY: setup start login run test skill
+.PHONY: setup start login run test skill reset
 
 SKILL_DIRS ?= $(HOME)/.claude/skills $(HOME)/.agents/skills $(HOME)/.codex/skills
 BSB_ROOT ?= $(HOME)/Library/Application Support/BrightspaceBar
@@ -69,6 +71,10 @@ setup:
 login:
 	$(MAKE) -C BrightspaceBar bundle
 	cd session-capture && npm run login
+
+reset:
+	@session-capture/scripts/reset.sh --session
+	@echo "Credentials kept. Next: make start (headless) or make login (visible window)."
 
 run:
 	$(MAKE) -C BrightspaceBar run
