@@ -20,7 +20,7 @@ import { run, tempPaths } from "./helpers.mjs";
 /** A stand-in app: exits at once. start.mjs only needs it to exist and be spawnable. */
 function fakeApp(paths) {
   const app = path.join(paths.root, "fake-app");
-  writeFileSync(app, "#!/bin/sh\nexit 0\n");
+  writeFileSync(app, `#!/bin/sh\necho app >> "${path.join(paths.root, "order.log")}"\nexit 0\n`);
   chmodSync(app, 0o755);
   return app;
 }
@@ -28,7 +28,8 @@ function fakeApp(paths) {
 /** A stand-in refresh.mjs: records argv and the env it was handed, exits `code`. */
 function fakeRefresh(paths, code) {
   const stub = path.join(paths.root, "refresh-stub.mjs");
-  writeFileSync(stub, `import { writeFileSync } from "node:fs";
+  writeFileSync(stub, `import { appendFileSync, writeFileSync } from "node:fs";
+appendFileSync(${JSON.stringify(path.join(paths.root, "order.log"))}, "refresh\\n");
 writeFileSync(process.env.STUB_OUT, JSON.stringify({
   argv: process.argv.slice(2),
   backoff: process.env.BSB_FULL_LOGIN_BACKOFF_MS ?? null,
@@ -123,4 +124,42 @@ test("an unknown flag is refused before the app or the daemon is touched", async
   assert.equal(result.code, 1);
   assert.match(result.stderr, /unknown argument: --headed/);
   assert.throws(() => readFileSync(out), "the daemon must not have run");
+});
+
+test("headless: the app comes up first, then the daemon — the icon must exist to show the number", async (t) => {
+  // Arrange
+  const paths = tempPaths(t);
+
+  // Act
+  await start(paths, []);
+
+  // Assert
+  const order = readFileSync(path.join(paths.root, "order.log"), "utf8").trim().split("\n");
+  assert.deepEqual(order, ["app", "refresh"]);
+});
+
+test("visible: the daemon runs first, then the app — one browser, one push, no launch-fetch race", async (t) => {
+  // Arrange — an app launched onto an empty cache spawns a daemon run of its
+  // own; in the window the number is on screen, so the app can wait.
+  const paths = tempPaths(t);
+
+  // Act
+  await start(paths, ["--visible"]);
+
+  // Assert
+  const order = readFileSync(path.join(paths.root, "order.log"), "utf8").trim().split("\n");
+  assert.deepEqual(order, ["refresh", "app"]);
+});
+
+test("visible: the app is launched even when the sign-in failed, so the person has a menu to look at", async (t) => {
+  // Arrange
+  const paths = tempPaths(t);
+
+  // Act
+  const result = await start(paths, ["--visible"], { exit: 2 });
+
+  // Assert
+  assert.equal(result.code, 2);
+  const order = readFileSync(path.join(paths.root, "order.log"), "utf8").trim().split("\n");
+  assert.deepEqual(order, ["refresh", "app"]);
 });

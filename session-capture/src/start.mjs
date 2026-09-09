@@ -64,19 +64,32 @@ if (!credentials) {
   }
 }
 
-// 2. The menu-bar app. One instance only — the icon is a singleton by meaning
-// even if not by mechanism, and two writers on the cache help nobody. The
-// pattern is the BINARY PATH, not the bare name: `pgrep -f BrightspaceBar`
-// also matches the view Chromium, whose command line carries the profile dir
-// `.../Application Support/BrightspaceBar/profile` — a browser tab left open
-// then silently suppressed the app launch (live bug, 2026-08-24).
-const running = spawnSync("pgrep", ["-f", APP_BINARY]).status === 0;
-if (running) {
-  console.error("BrightspaceBar is already running — not launching a second copy.");
-} else if (!existsSync(APP_BINARY)) {
-  console.error(`app bundle not found at ${APP}: run \`make start\` (it builds it first)`);
-  process.exit(1);
-} else {
+// 2 and 3, in an order that depends on the mode.
+//
+// Headless: the app FIRST, then the refresh — the MFA number reaches the
+// human through the app's icon, so the app must be up while the daemon waits.
+// Visible: the refresh FIRST, then the app — the number is on the screen in
+// the window, and an app launched onto an empty cache would spawn a daemon
+// run of its own (an empty cache is infinitely stale) at the same moment as
+// this one. The daemon's run lock now serialises such a pair, but a fresh
+// install should not have to lean on it: one login, one browser, one push.
+
+function launchApp() {
+  // One instance only — the icon is a singleton by meaning even if not by
+  // mechanism, and two writers on the cache help nobody. The pattern is the
+  // BINARY PATH, not the bare name: `pgrep -f BrightspaceBar` also matches the
+  // view Chromium, whose command line carries the profile dir
+  // `.../Application Support/BrightspaceBar/profile` — a browser tab left open
+  // then silently suppressed the app launch (live bug, 2026-08-24).
+  const running = spawnSync("pgrep", ["-f", APP_BINARY]).status === 0;
+  if (running) {
+    console.error("BrightspaceBar is already running — not launching a second copy.");
+    return;
+  }
+  if (!existsSync(APP_BINARY)) {
+    console.error(`app bundle not found at ${APP}: run \`make start\` (it builds it first)`);
+    process.exit(1);
+  }
   // The executable INSIDE the bundle, spawned directly — not `open -n`.
   // LaunchServices does not pass the caller's environment through, so a
   // BSB_ROOT set for `make start` would be dropped and the app would read
@@ -88,40 +101,60 @@ if (running) {
   console.error("launched BrightspaceBar into the menu bar");
 }
 
-// Give the app a beat to draw its icon before the refresh starts writing the
-// cache it watches — cosmetic, not correctness (the writes are atomic).
-await new Promise((resolve) => setTimeout(resolve, 2000));
+function runRefresh() {
+  // The full rung is on by default (no flag needed), and its backoff is
+  // lifted: a human is present by definition — they just ran `make start` —
+  // so a timer tick's earlier attempt must not delay them.
+  console.error("");
+  if (visible) {
+    console.error("Refreshing the session with a VISIBLE browser. If a sign-in is needed, a Chromium");
+    console.error("window opens: your stored credentials are typed in for you, then you finish");
+    console.error("whatever Microsoft asks — MFA, a method choice, a setup step — in that window.");
+  } else {
+    console.error("Refreshing the session (headless). If an MFA prompt fires, the number");
+    console.error("appears ON THE MENU-BAR ICON — approve it on your phone.");
+    console.error("If no number appears and the menu stays empty, run `make login`.");
+  }
+  console.error("");
 
-// 3. One refresh. The full rung is on by default (no flag needed), and its
-//    backoff is lifted: a human is present by definition — they just ran
-//    `make start` — so a timer tick's earlier attempt must not delay them.
-console.error("");
-if (visible) {
-  console.error("Refreshing the session with a VISIBLE browser. If a sign-in is needed, a Chromium");
-  console.error("window opens: your stored credentials are typed in for you, then you finish");
-  console.error("whatever Microsoft asks — MFA, a method choice, a setup step — in that window.");
-} else {
-  console.error("Refreshing the session (headless). If an MFA prompt fires, the number");
-  console.error("appears ON THE MENU-BAR ICON — approve it on your phone.");
-  console.error("If no number appears and the menu stays empty, run `make login`.");
-}
-console.error("");
-
-const refresh = spawn(
-  process.execPath,
-  [REFRESH_CLI, ...(visible ? ["--visible"] : [])],
-  {
-    cwd: path.join(__dirname, ".."),
-    stdio: "inherit",
-    env: {
-      ...process.env,
-      BSB_FULL_LOGIN_BACKOFF_MS: "0",
-      ...(credentials ? { BS_EMAIL: credentials.email, BS_PASSWORD: credentials.password } : {}),
+  return spawn(
+    process.execPath,
+    [REFRESH_CLI, ...(visible ? ["--visible"] : [])],
+    {
+      cwd: path.join(__dirname, ".."),
+      stdio: "inherit",
+      env: {
+        ...process.env,
+        BSB_FULL_LOGIN_BACKOFF_MS: "0",
+        ...(credentials ? { BS_EMAIL: credentials.email, BS_PASSWORD: credentials.password } : {}),
+      },
     },
-  },
-);
+  );
+}
 
-refresh.on("exit", (code) => {
+const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+let refresh;
+if (visible) {
+  refresh = runRefresh();
+} else {
+  launchApp();
+  // Give the app a beat to draw its icon before the refresh starts writing the
+  // cache it watches — cosmetic, not correctness (the writes are atomic).
+  await pause(2000);
+  refresh = runRefresh();
+}
+
+refresh.on("exit", async (code) => {
+  // The visible login launches the app now, whatever the verdict: a menu with
+  // nothing in it is still where the person looks next, and its own launch
+  // fetch is harmless — the attempt just made stamped the backoff, so a
+  // failed sign-in is not immediately retried headless. The beat afterwards
+  // lets the icon appear before this command returns to the prompt.
+  if (visible) {
+    launchApp();
+    await pause(1000);
+  }
   const verdict = code === 0
     ? "session fresh — the menu bar is live"
     : code === 2

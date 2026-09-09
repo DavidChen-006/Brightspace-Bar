@@ -36,6 +36,7 @@
  */
 import { readFileSync } from "node:fs";
 import { writeJsonAtomic } from "./atomic-write.mjs";
+import { DEFAULT_LOCK_WAIT_MS, acquireRunLock } from "./run-lock.mjs";
 
 /**
  * How long after a full-login attempt the next one may begin. Four hours: long
@@ -77,7 +78,9 @@ export const DEFAULT_FULL_LOGIN_BACKOFF_MS = 4 * 60 * 60 * 1000;
  *
  * @param {{paths: object, fetcher: {fetch: Function}, clock: () => Date,
  *          rungs?: Rung[], allowFullLogin?: boolean, fullLoginBackoffMs?: number,
- *          log?: (m: string) => void}} deps
+ *          log?: (m: string) => void, lock?: object}} deps
+ *   `lock` — options for the run lock (see run-lock.mjs): a test injects
+ *   `isAlive`, `waitMs`, `sleep`; the real run takes the defaults.
  */
 export async function runRefresh({
   paths,
@@ -87,7 +90,31 @@ export async function runRefresh({
   allowFullLogin = true,
   fullLoginBackoffMs = DEFAULT_FULL_LOGIN_BACKOFF_MS,
   log = () => {},
+  lock = {},
 }) {
+  // One run per root at a time. The previous status is read only once the
+  // lock is ours — a run that waited must judge the backoff against the
+  // attempt that just finished, not the one before it.
+  const held = await acquireRunLock(paths.lockFile, { log, ...lock });
+  if (!held) {
+    const waited = Math.round((lock.waitMs ?? DEFAULT_LOCK_WAIT_MS) / 60000);
+    const now = clock().toISOString();
+    const previous = readPreviousStatus(paths.statusFile);
+    const status = statusFrom(
+      { ok: false, state: "error", rungUsed: "none", error: `another refresh held the lock for over ${waited} minutes — not starting a second one` },
+      { now, previous },
+    );
+    return status;
+  }
+
+  try {
+    return await refreshUnderLock({ paths, fetcher, clock, rungs, allowFullLogin, fullLoginBackoffMs, log });
+  } finally {
+    held.release();
+  }
+}
+
+async function refreshUnderLock({ paths, fetcher, clock, rungs, allowFullLogin, fullLoginBackoffMs, log }) {
   const now = clock().toISOString();
   const previous = readPreviousStatus(paths.statusFile);
 

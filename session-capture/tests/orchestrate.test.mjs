@@ -749,3 +749,45 @@ test("maps an unrecognized state to exit 1", () => {
   // Act / Assert
   assert.equal(exitCode(result), 1);
 });
+
+// ---------------------------------------------------------------------------
+// One refresh per root at a time.
+// ---------------------------------------------------------------------------
+
+test("a run holds the root's refresh.lock while it works and leaves none behind", async (t) => {
+  // Arrange — a rung that looks at the lock while it is being climbed.
+  const paths = tempPaths(t);
+  const { existsSync } = await import("node:fs");
+  let lockedDuringClimb = null;
+  const { rung } = ladder();
+  const seen = rung("silent-1", { onAttempt: async () => { lockedDuringClimb = existsSync(paths.lockFile); } });
+
+  // Act
+  await runRefresh(deps(paths, { rungs: [seen], fetcher: scriptedFetcher([expired(), ok(SAMPLE_DATA)]) }));
+
+  // Assert
+  assert.equal(lockedDuringClimb, true, "the lock was not held during the climb");
+  assert.equal(existsSync(paths.lockFile), false, "the lock outlived the run");
+});
+
+test("a run that cannot get the lock in time reports an error and touches nothing", async (t) => {
+  // Arrange — a live holder that never finishes, and no patience.
+  const paths = tempPaths(t);
+  const { writeFileSync, mkdirSync, existsSync } = await import("node:fs");
+  mkdirSync(paths.root, { recursive: true });
+  writeFileSync(paths.lockFile, JSON.stringify({ pid: 1, since: "2026-09-09T00:00:00.000Z" }));
+  const fetcher = scriptedFetcher([ok(SAMPLE_DATA)]);
+
+  // Act
+  const status = await runRefresh(deps(paths, {
+    fetcher,
+    lock: { isAlive: () => true, waitMs: 0, sleep: () => Promise.resolve() },
+  }));
+
+  // Assert — exit 1 territory, the cache untouched, the holder's lock intact.
+  assert.equal(status.state, "error");
+  assert.match(status.error, /another refresh held the lock/);
+  assert.equal(fetcher.calls?.length ?? 0, 0);
+  assert.equal(existsSync(paths.dataFile), false);
+  assert.equal(JSON.parse((await import("node:fs")).readFileSync(paths.lockFile, "utf8")).pid, 1);
+});

@@ -18,7 +18,7 @@ const DEFAULT_ROOT = ["Library", "Application Support", "BrightspaceBar"];
  * @param {{BSB_ROOT?: string}} [env] defaults to the process environment
  * @returns {{root: string, profileDir: string, sessionFile: string,
  *            cacheDir: string, dataFile: string, statusFile: string,
- *            mfaFile: string}}
+ *            mfaFile: string, lockFile: string}}
  */
 export function resolvePaths(env = process.env) {
   // An empty BSB_ROOT (`BSB_ROOT= node …`) means "unset", never "/" — the
@@ -36,5 +36,8 @@ export function resolvePaths(env = process.env) {
     statusFile: path.join(cacheDir, "status.json"),
     // Ephemeral: written only while a full login has a number on the screen.
     mfaFile: path.join(cacheDir, "mfa.json"),
+    // Held for the duration of one refresh, so two never share the profile.
+    // In the root, not cache/: a cache reset must not free a running login.
+    lockFile: path.join(root, "refresh.lock"),
   };
 }

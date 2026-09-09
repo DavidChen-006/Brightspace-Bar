@@ -16,7 +16,7 @@ import path from "node:path";
 import { resolvePaths } from "../src/paths.mjs";
 import { tempDir } from "./helpers.mjs";
 
-test("lays the four daemon locations out under BSB_ROOT", () => {
+test("lays the daemon locations out under BSB_ROOT", () => {
   // Arrange
   const root = "/tmp/bsb-layout-check";
 
@@ -32,6 +32,8 @@ test("lays the four daemon locations out under BSB_ROOT", () => {
     dataFile: path.join(root, "cache", "data.json"),
     statusFile: path.join(root, "cache", "status.json"),
     mfaFile: path.join(root, "cache", "mfa.json"),
+    // In the root, not cache/: a cache reset must not free a running login.
+    lockFile: path.join(root, "refresh.lock"),
   });
 });
 
