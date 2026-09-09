@@ -110,7 +110,7 @@ leaves your tenant.
 ### The skill — how your agent learns this
 
 An agent does not know `bsb` exists until it reads the skill in
-[`skills/brightspace-bar/`](skills/brightspace-bar/SKILL.md): the commands,
+[`skills/brightspace/`](skills/brightspace/SKILL.md): the commands,
 the read endpoints, the write contract, and the syllabus-to-calendar recipe.
 It follows the [Agent Skills](https://agentskills.io) format, so any agent
 that reads skills can use it. Three ways to install it, pick one:
@@ -119,12 +119,12 @@ that reads skills can use it. Three ways to install it, pick one:
 | --- | --- |
 | `make setup` (already ran it) | Done — setup symlinks the skill into `~/.claude/skills`, `~/.agents/skills` and `~/.codex/skills`. `make skill` re-runs just that step. |
 | Claude Code, Codex, Cursor, Gemini CLI, Copilot, OpenCode… without cloning | `npx skills add DavidChen-006/Brightspace-Bar` — the [skills](https://github.com/vercel-labs/skills) CLI installs it into each agent's skills folder. Run `make setup` in your checkout once, so the copied skill can find the CLI. |
-| Claude Code inside this repo | Nothing — `.claude/skills/brightspace-bar` is in the repo, so it is a project skill the moment you open the folder. |
+| Claude Code inside this repo | Nothing — `.claude/skills/brightspace` is in the repo, so it is a project skill the moment you open the folder. |
 
 Then start a new agent session and ask in plain words: "read my PHIL 219
 syllabus and put the due dates on my calendar", or "what's due this week in
 CS 252". In Claude Code you can also invoke it directly as
-`/brightspace-bar`. The skill tells the agent to show you the list before it
+`/brightspace`. The skill tells the agent to show you the list before it
 writes anything, and how you undo it.
 
 ### Environment configuration
@@ -142,7 +142,7 @@ the stored file.
 | --- | --- |
 | `BrightspaceBar/` | The Swift package: the menu-bar app and its modules (`Modules/<Name>/`), tests included |
 | `session-capture/` | The Node daemon: login ladder, data fetch, deep-link opener — and `src/bsb.mjs`, the agent CLI |
-| `skills/brightspace-bar/` | The agent skill: how to use `bsb`, the read endpoints, the write contract |
+| `skills/brightspace/` | The agent skill: how to use `bsb`, the read endpoints, the write contract |
 | `bsb` | The CLI's entry point (`./bsb --help`) |
 | `docs/` | Design documents |
 

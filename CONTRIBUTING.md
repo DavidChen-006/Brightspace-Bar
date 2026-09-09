@@ -79,7 +79,7 @@ comments that explain *why*, not what.
   (`session-capture/src/bsb.mjs`, `src/agent/`) sends GET and nothing else,
   only under `/d2l/api/` on the session's own origin, and writes only
   `manual-items.json` — never `cache/`, never `session.json`. A new `bsb`
-  command must be named in `skills/brightspace-bar/SKILL.md`
+  command must be named in `skills/brightspace/SKILL.md`
   (`tests/skill.test.mjs` enforces it), and a change to the manual-items
   shape must keep `AgentContractTests` (Swift) decoding the CLI's fixture.
 

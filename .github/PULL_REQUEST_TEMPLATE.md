@@ -22,5 +22,5 @@
       and the full-login backoff still guards unattended ticks
 - [ ] Respects D9: `bsb` still sends only GET, only to `/d2l/api/` on the
       session's own origin, and writes only `manual-items.json`; a new `bsb`
-      command is named in `skills/brightspace-bar/SKILL.md`
+      command is named in `skills/brightspace/SKILL.md`
 - [ ] No secrets, tokens, or real credentials committed (code, tests, or fixtures)

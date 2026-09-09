@@ -1,5 +1,5 @@
 ---
-name: brightspace-bar
+name: brightspace
 description: Read a student's Brightspace (D2L) courses, syllabi, content files, announcements and grades through the Brightspace Bar menu-bar app's own session, and add assignments, quizzes and tests to the app's calendar heatmap. Use when the user mentions Brightspace, D2L, a syllabus, due dates, a course schedule, "what's due", grades, or wants dates from a syllabus put on their Brightspace Bar calendar. Uses the `bsb` CLI; never writes to Brightspace.
 license: MIT
 compatibility: macOS with Brightspace Bar checked out and set up (`make setup`, `make start`); node >= 22 on PATH

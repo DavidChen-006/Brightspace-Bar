@@ -47,7 +47,7 @@ only (`src/agent/api.mjs`) — and writes exactly one file, the app's
 `manual-items.json`, after validating every item against the Swift decoder's
 contract (`src/agent/manual-items.mjs`). `bsb refresh` runs `refresh.mjs`.
 The skill that teaches an agent to use it lives in
-`../skills/brightspace-bar/`; `make skill` at the repo root installs it.
+`../skills/brightspace/`; `make skill` at the repo root installs it.
 
 ## Why two capture scripts
 

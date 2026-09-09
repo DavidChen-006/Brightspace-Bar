@@ -1,5 +1,5 @@
 /**
- * The skill (skills/brightspace-bar) is documentation an agent acts on, so
+ * The skill (skills/brightspace) is documentation an agent acts on, so
  * it is held to the CLI the way a test holds code: every `bsb <command>` it
  * names must exist, its frontmatter must be the Agent Skills shape, and its
  * shim must reach the CLI through a symlink — which is how `make skill`
@@ -11,7 +11,7 @@ import { readFileSync, readdirSync, readlinkSync, symlinkSync } from "node:fs";
 import path from "node:path";
 import { PKG_DIR, run, tempDir } from "./helpers.mjs";
 
-const SKILL_DIR = path.join(PKG_DIR, "..", "skills", "brightspace-bar");
+const SKILL_DIR = path.join(PKG_DIR, "..", "skills", "brightspace");
 const SKILL = readFileSync(path.join(SKILL_DIR, "SKILL.md"), "utf8");
 
 /** The commands the CLI really has, read off its own --help. */
@@ -76,7 +76,7 @@ test("a COPIED skill (npx skills add) finds the checkout via BSB_REPO or the rec
   // skills CLI does, and hide the home-directory fallback.
   const { cpSync, mkdirSync, writeFileSync } = await import("node:fs");
   const elsewhere = tempDir(t);
-  const copy = path.join(elsewhere, "brightspace-bar");
+  const copy = path.join(elsewhere, "brightspace");
   cpSync(SKILL_DIR, copy, { recursive: true });
   const root = path.join(elsewhere, "root");
   const shim = path.join(copy, "scripts", "bsb");
@@ -108,7 +108,7 @@ test("a COPIED skill (npx skills add) finds the checkout via BSB_REPO or the rec
 });
 
 test("the project-level .claude/skills entry is a symlink to the skill, so an agent in the repo needs no install", () => {
-  const link = path.join(PKG_DIR, "..", ".claude", "skills", "brightspace-bar");
+  const link = path.join(PKG_DIR, "..", ".claude", "skills", "brightspace");
   assert.equal(path.resolve(path.dirname(link), readlinkSync(link)), path.resolve(SKILL_DIR));
 });
 
@@ -118,7 +118,7 @@ test("scripts/bsb reaches the CLI, directly and through the symlink make skill p
   assert.match(direct.stdout, /Usage: bsb/);
 
   const skills = tempDir(t);
-  const link = path.join(skills, "brightspace-bar");
+  const link = path.join(skills, "brightspace");
   symlinkSync(SKILL_DIR, link);
   const linked = await run(path.join(link, "scripts", "bsb"), ["--help"], { cwd: skills });
   assert.equal(linked.code, 0, linked.stderr);

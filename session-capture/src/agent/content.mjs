@@ -1,7 +1,7 @@
 /**
  * Pure readings of what the content API answers — no I/O, so the shapes are
  * pinned without a tenant. The routes themselves are documented for the
- * agent in the skill (skills/brightspace-bar/references/endpoints.md).
+ * agent in the skill (skills/brightspace/references/endpoints.md).
  */
 
 /**

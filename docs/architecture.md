@@ -18,7 +18,7 @@ escalates only as far as it must (existing credentials → silent Entra SSO →
 full headless login with an MFA number shown on the menu-bar icon).
 
 **The agent surface** (`bsb`, `session-capture/src/bsb.mjs`, and the skill
-in `skills/brightspace-bar/`) is a second entry point of the daemon's package,
+in `skills/brightspace/`) is a second entry point of the daemon's package,
 not a third process: it shares the daemon's `BSB_ROOT` layout, file contracts
 and session. It was the deliberate answer to "does an agent talk to the
 endpoints directly, or through the daemon?" — through, because the daemon is

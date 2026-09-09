@@ -7,7 +7,7 @@
 #   make login   one-time interactive Chromium login (captures the session)
 #   make run     build & run the menu-bar app (delegates to BrightspaceBar/)
 #   make test    run the Swift test suite   (delegates to BrightspaceBar/)
-#   make skill   install the agent skill (skills/brightspace-bar) into the
+#   make skill   install the agent skill (skills/brightspace) into the
 #                skills directories agents read: ~/.claude/skills,
 #                ~/.agents/skills, ~/.codex/skills — as symlinks, so the
 #                skill tracks this checkout. SKILL_DIRS overrides the list.
@@ -31,17 +31,21 @@ skill:
 	  && echo "skill: recorded this checkout in $(BSB_ROOT)/checkout"
 	@for dir in $(SKILL_DIRS); do \
 	  mkdir -p "$$dir"; \
-	  target="$$dir/brightspace-bar"; \
-	  if [ -L "$$target" ] && [ "$$(readlink "$$target")" = "$(CURDIR)/skills/brightspace-bar" ]; then \
+	  stale="$$dir/brightspace-bar"; \
+	  if [ -L "$$stale" ] && [ "$$(readlink "$$stale")" = "$(CURDIR)/skills/brightspace-bar" ]; then \
+	    rm "$$stale" && echo "skill: removed the old brightspace-bar link at $$stale (the skill is now 'brightspace')"; \
+	  fi; \
+	  target="$$dir/brightspace"; \
+	  if [ -L "$$target" ] && [ "$$(readlink "$$target")" = "$(CURDIR)/skills/brightspace" ]; then \
 	    echo "skill: already installed at $$target"; \
 	  elif [ -e "$$target" ] || [ -L "$$target" ]; then \
 	    echo "skill: $$target exists and is not this checkout's link — left alone"; \
 	  else \
-	    ln -s "$(CURDIR)/skills/brightspace-bar" "$$target"; \
+	    ln -s "$(CURDIR)/skills/brightspace" "$$target"; \
 	    echo "skill: installed at $$target"; \
 	  fi; \
 	done
-	@echo "Agents that read those directories now see the 'brightspace-bar' skill (restart a running session to load it)."
+	@echo "Agents that read those directories now see the 'brightspace' skill (restart a running session to load it)."
 
 start:
 	$(MAKE) -C BrightspaceBar bundle
