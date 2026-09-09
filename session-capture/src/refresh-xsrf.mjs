@@ -15,12 +15,10 @@
  */
 import { chromium } from "playwright";
 import { readFileSync, writeFileSync } from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { resolvePaths } from "./paths.mjs";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const SESSION_PATH = process.env.SESSION_JSON
-  ?? path.join(__dirname, "..", "artifacts", "session.json");
+// The daemon's own session file (under BSB_ROOT), unless pointed elsewhere.
+const SESSION_PATH = process.env.SESSION_JSON ?? resolvePaths().sessionFile;
 
 const log = (msg) => console.error(`[${new Date().toISOString()}] ${msg}`);
 

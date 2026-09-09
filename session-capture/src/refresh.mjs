@@ -8,8 +8,10 @@
  * app's timer, its launch, a terminal — may climb the whole ladder, full login
  * included, because the last rung is the one that makes the menu bar never go
  * stale. Pass the flag for a run that must not touch a phone: a test suite, a
- * cron on a shared machine. (The full rung is headless either way; the MFA
- * number reaches the human through the status-bar icon.)
+ * cron on a shared machine. (The full rung is headless by default; the MFA
+ * number reaches the human through the status-bar icon. `--visible` is the
+ * other way round: a window opens and the human finishes the sign-in in it —
+ * what `make login` runs, for the accounts the headless flow cannot read.)
  *
  * `--help` must stay free of side effects — no files, no browser import. It is
  * the one command a human runs to find out what this thing does.
@@ -20,7 +22,7 @@ import { resolvePaths } from "./paths.mjs";
 import { createFullLoginRung } from "./rungs/full-login.mjs";
 import { createSilentRung } from "./rungs/silent.mjs";
 
-const USAGE = `Usage: node src/refresh.mjs [--no-full-login]
+const USAGE = `Usage: node src/refresh.mjs [--no-full-login | --visible]
 
 Climbs the session ladder and writes the course cache under BSB_ROOT
 (default ~/Library/Application Support/BrightspaceBar).
@@ -30,6 +32,12 @@ Climbs the session ladder and writes the course cache under BSB_ROOT
                    By default it is allowed, so the ladder never stops one
                    rung short of a working session. Pass this for runs that
                    must never reach a phone: tests, a shared machine.
+  --visible        run the full login rung in a VISIBLE Chromium window and
+                   let the human finish the sign-in there — the fallback when
+                   the headless flow cannot (a method chooser, a code prompt,
+                   an MFA setup page, a field that never appears). Same
+                   profile, same session file, same everything after. This
+                   is what \`make login\` runs. Contradicts --no-full-login.
   --help           print this and exit
 
 Environment:
@@ -49,10 +57,17 @@ if (args.includes("--help") || args.includes("-h")) {
   process.exit(0);
 }
 
-const unknown = args.filter((arg) => arg !== "--no-full-login");
+const KNOWN = new Set(["--no-full-login", "--visible"]);
+const unknown = args.filter((arg) => !KNOWN.has(arg));
 if (unknown.length > 0) {
   // A typo'd opt-out must not silently become a run that reaches for a phone.
   console.error(`unknown argument: ${unknown[0]}\n\n${USAGE}`);
+  process.exit(1);
+}
+const visible = args.includes("--visible");
+if (visible && args.includes("--no-full-login")) {
+  // One flag asks for the rung with a window, the other forbids the rung.
+  console.error(`--visible and --no-full-login contradict each other\n\n${USAGE}`);
   process.exit(1);
 }
 
@@ -60,7 +75,7 @@ const status = await runRefresh({
   paths: resolvePaths(),
   // The ladder, cheapest rung first. The full one is climbed unless the caller
   // passed --no-full-login; the gate itself lives in orchestrate.mjs.
-  rungs: [createSilentRung(), createFullLoginRung()],
+  rungs: [createSilentRung(), createFullLoginRung({ visible })],
   fetcher: createFetcher(),
   clock: () => new Date(),
   allowFullLogin: !args.includes("--no-full-login"),

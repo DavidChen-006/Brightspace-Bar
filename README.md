@@ -80,11 +80,19 @@ menu-bar icon**, you type it into Authenticator on your phone, and the icon
 reverts. After that, the daemon refreshes the session silently for weeks. If
 courses ever stop refreshing, run `make start` again.
 
+**If no number appears on the icon and the menu stays empty, run
+`make login`.** It is the same flow with the browser visible: a Chromium
+window opens, your stored credentials are typed in for you, and you finish
+whatever Microsoft asks in that window — the number match, a "choose a
+method" page, a verification code, an authenticator setup step. The headless
+login only knows the number-match page; the window handles every account
+the headless login cannot read, and stores the same credentials and session,
+so everything after it works exactly as if the headless login had succeeded.
+
 Day to day, `make start` is only needed once — and again whenever the session
 needs a fresh login. If you've quit the app and just want it back, `make run`
 is the "reopen" gesture: build and launch, nothing else (there's no `.app`
-bundle to double-click yet). A third target, `make login`, runs the
-interactive Chromium login alone.
+bundle to double-click yet).
 
 ## Agents
 

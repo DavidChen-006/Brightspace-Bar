@@ -4,7 +4,10 @@
  * reaches it, which is what makes a dead Entra wristband self-heal — and only
  * skipped when the caller opted out (`--no-full-login`). Nothing is shown to
  * that human except the number on the status-bar icon — the browser itself
- * runs headless (D3 as amended by BUILD 3).
+ * runs headless (D3 as amended by BUILD 3) — unless the rung was built
+ * `visible` (`refresh.mjs --visible`, which is what `make login` runs): then
+ * the same capture opens a window so the human can finish a sign-in the
+ * autofill could not, and everything downstream is unchanged.
  *
  * The mechanics are `auto-capture.mjs`'s: autofilling BS_EMAIL/BS_PASSWORD,
  * generous MFA wait. Everything playwright is in `browser.mjs`; everything
@@ -22,11 +25,15 @@ import { createCaptureRung } from "./capture-rung.mjs";
 import { fullLoginCapture } from "./browser.mjs";
 import { createMfaPublisher } from "./mfa-file.mjs";
 
-/** @param {{capture?: Function, baseUrl?: string, clock?: () => Date}} [deps] */
+/**
+ * @param {{capture?: Function, baseUrl?: string, clock?: () => Date,
+ *          visible?: boolean}} [deps]
+ */
 export function createFullLoginRung({
   capture = fullLoginCapture,
   baseUrl,
   clock = () => new Date(),
+  visible = false,
 } = {}) {
   return {
     kind: "full",
@@ -35,7 +42,7 @@ export function createFullLoginRung({
       const mfa = createMfaPublisher({ file: world.paths.mfaFile, clock, log: world.log });
       const rung = createCaptureRung({
         kind: "full",
-        capture: (browserWorld) => capture({ ...browserWorld, onMfaNumber: mfa.publish }),
+        capture: (browserWorld) => capture({ ...browserWorld, onMfaNumber: mfa.publish, visible }),
         baseUrl,
       });
 

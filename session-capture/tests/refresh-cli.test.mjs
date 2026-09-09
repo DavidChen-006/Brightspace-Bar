@@ -28,6 +28,8 @@ test("--help exits 0 and documents the full-login opt-out flag", async (t) => {
   const output = `${result.stdout}${result.stderr}`;
   assert.match(output, /usage/i);
   assert.match(output, /--no-full-login/);
+  assert.match(output, /--visible/);
+  assert.match(output, /make login/);
 });
 
 test("--help touches no files", async (t) => {
@@ -40,5 +42,22 @@ test("--help touches no files", async (t) => {
   });
 
   // Assert
+  assert.deepStrictEqual(readdirSync(paths.root), []);
+});
+
+test("--visible with --no-full-login is refused before anything runs", async (t) => {
+  // Arrange — one flag asks for the rung with a window, the other forbids the
+  // rung. A run that silently picked one would either pop a window a test did
+  // not want or skip the login a human was waiting at.
+  const paths = tempPaths(t);
+
+  // Act
+  const result = await run("node", ["src/refresh.mjs", "--visible", "--no-full-login"], {
+    env: { ...process.env, BSB_ROOT: paths.root },
+  });
+
+  // Assert
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /contradict/);
   assert.deepStrictEqual(readdirSync(paths.root), []);
 });

@@ -94,6 +94,7 @@ import { recorder } from "./helpers.mjs";
 const {
   FIELD_POLL_MS,
   FIELD_TIMEOUT_MS,
+  afterAutofill,
   autofillCredentials,
   clickWhenReady,
   fillWhenReady,
@@ -663,4 +664,73 @@ test("the full capture still announces the number it scrapes", () => {
 
   // Assert
   assert.equal(mentions(source, /onMfaNumber/), true, "the capture announces nothing to the icon");
+});
+
+// ---------------------------------------------------------------------------
+// The visible login (`make login`): the same capture, with a window.
+// ---------------------------------------------------------------------------
+
+test("the full login opens a window when built visible, with no env var at all", () => {
+  // Arrange / Act — `make login`: a human is present by definition.
+  const options = launchOptionsFor("full", {}, { visible: true });
+
+  // Assert
+  assert.equal(options.headless, false);
+});
+
+test("visible is a request, not a default — false and absent both stay headless", () => {
+  for (const options of [undefined, {}, { visible: false }]) {
+    // Act
+    const decision = launchOptionsFor("full", {}, options);
+
+    // Assert
+    assert.equal(decision.headless, true, `options ${JSON.stringify(options)} opened a window`);
+  }
+});
+
+test("the silent capture stays headless even when asked to be visible", () => {
+  // Arrange / Act — the window is for finishing a sign-in; the silent rung has
+  // no sign-in to finish, and cron must never pop one.
+  const options = launchOptionsFor("silent", {}, { visible: true });
+
+  // Assert
+  assert.equal(options.headless, true);
+});
+
+test("headless: an autofill that never ran or never finished ends the attempt with the reason", () => {
+  // Arrange / Act — nobody is looking, so waiting would be five minutes on a
+  // prompt no phone will show.
+  const noCredentials = afterAutofill({ visible: false, hasCredentials: false, autofilled: false });
+  const fieldMissing = afterAutofill({ visible: false, hasCredentials: true, autofilled: false });
+
+  // Assert
+  assert.equal(noCredentials.proceed, false);
+  assert.match(noCredentials.reason, /no credentials found/);
+  assert.match(noCredentials.reason, /make start/);
+  assert.equal(fieldMissing.proceed, false);
+  assert.match(fieldMissing.reason, /autofill did not complete/);
+});
+
+test("visible: whatever the autofill could not do, the human at the window can", () => {
+  // Arrange / Act — the whole reason the window exists.
+  const noCredentials = afterAutofill({ visible: true, hasCredentials: false, autofilled: false });
+  const fieldMissing = afterAutofill({ visible: true, hasCredentials: true, autofilled: false });
+
+  // Assert — the capture keeps waiting, and says what is left for the human.
+  assert.equal(noCredentials.proceed, true);
+  assert.equal(noCredentials.reason, null);
+  assert.match(noCredentials.note, /sign in in the window/);
+  assert.equal(fieldMissing.proceed, true);
+  assert.equal(fieldMissing.reason, null);
+  assert.match(fieldMissing.note, /finish signing in in the window/);
+});
+
+test("a completed autofill proceeds silently in both modes", () => {
+  for (const visible of [false, true]) {
+    // Act
+    const next = afterAutofill({ visible, hasCredentials: true, autofilled: true });
+
+    // Assert — nothing to tell the human yet; the MFA wait says its own line.
+    assert.deepEqual(next, { proceed: true, reason: null, note: null });
+  }
 });

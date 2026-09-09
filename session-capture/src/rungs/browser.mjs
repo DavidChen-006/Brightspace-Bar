@@ -10,19 +10,26 @@
  *                      (env BS_EMAIL/BS_PASSWORD or credentials.json, via
  *                      credentials.mjs)
  *                      and waits for the human to approve the number-match on
- *                      their phone. `BSB_FULL_HEADED=1` opens a window for a
- *                      developer who wants to watch a login go by.
+ *                      their phone.
+ *
+ *                      `visible: true` (`make login`) is the SAME capture with a
+ *                      window: the human can finish whatever the autofill could
+ *                      not — a method chooser, a code prompt, an MFA setup page,
+ *                      a field that never appeared — and everything after the
+ *                      sign-in (the harvest, the session file, the profile that
+ *                      keeps the silent rung working) is identical. It is the
+ *                      fallback for every account the headless flow cannot
+ *                      read. `BSB_FULL_HEADED=1` is the same window for a
+ *                      developer who wants to watch a headless login go by.
  *
  * playwright is imported LAZILY, inside the call. `refresh.mjs --help` builds
  * both rungs on the way to parsing argv, and a top-level import would make the
  * one command a human runs to read the usage text pay for a browser bundle.
  *
- * The autofill choreography below is a deliberate copy of `auto-capture.mjs`'s,
- * not an extraction: that script is a standalone CLI with its own artifacts
- * path, and rewriting it to hand its flow over would put a working capture tool
- * at risk for no gain here. The login MECHANICS both share — silent SSO, the
- * auth check, the XSRF read — are already extracted in `login-flow.mjs` and are
- * imported, not duplicated.
+ * The autofill choreography below is the only copy: the standalone capture
+ * scripts it was ported from wrote to a location nothing reads any more and
+ * were removed. The login MECHANICS — silent SSO, the auth check, the XSRF
+ * read — live in `login-flow.mjs` and are imported, not duplicated.
  *
  * Secrets discipline: the password is typed into the page and never logged;
  * cookies leave through the return value only.
@@ -49,6 +56,11 @@ const DISPLAY_SIGN_SELECTOR = "#idRichContext_DisplaySign";
 
 /** Generous: a human has to find their phone and approve the number-match. */
 const MFA_TIMEOUT_MS = 5 * 60 * 1000;
+/**
+ * More generous: in the window the human may be typing a password, picking a
+ * method, and setting up an authenticator, not just tapping a phone.
+ */
+const HUMAN_TIMEOUT_MS = 10 * 60 * 1000;
 const POLL_MS = 2000;
 
 /**
@@ -63,15 +75,52 @@ export const FIELD_POLL_MS = 250;
 /**
  * Whether a browser window opens, as a value rather than a literal buried in a
  * playwright call. Nothing opens a window except a full login that was asked
- * for one, by exactly `BSB_FULL_HEADED=1`.
+ * for one — by `visible: true` (`make login`, a human present by definition)
+ * or by exactly `BSB_FULL_HEADED=1` (a developer watching). The silent rung is
+ * headless whatever it is handed: cron must never pop a window at 3am.
  *
  * @param {string} kind — the rung kind ("silent" | "full")
  * @param {Record<string, string|undefined>} [env]
+ * @param {{visible?: boolean}} [options]
  * @returns {{headless: boolean}}
  */
-export function launchOptionsFor(kind, env = process.env) {
-  const headed = kind === "full" && env.BSB_FULL_HEADED === "1";
+export function launchOptionsFor(kind, env = process.env, { visible = false } = {}) {
+  const headed = kind === "full" && (visible === true || env.BSB_FULL_HEADED === "1");
   return { headless: !headed };
+}
+
+/**
+ * What to do once the autofill has had its chance — the one decision that
+ * separates the headless login from the visible one, as data so it can be
+ * tested without a browser.
+ *
+ * Headless, nobody is looking: a login that was never submitted ends the
+ * attempt now, because no number-match is coming and five minutes of waiting
+ * would be spent on a prompt no phone will show. Visible, a human is at the
+ * window: whatever the autofill could not do — no stored credentials, a field
+ * that never appeared, a page it does not know — they can, so the capture
+ * keeps waiting for the signed-in state and says what is left for them.
+ *
+ * @param {{visible: boolean, hasCredentials: boolean, autofilled: boolean}} state
+ * @returns {{proceed: boolean, reason: string|null, note: string|null}}
+ *   `proceed` — keep waiting for authentication; `reason` — why not, for the
+ *   rung's verdict; `note` — what to tell the human, when proceeding anyway.
+ */
+export function afterAutofill({ visible, hasCredentials, autofilled }) {
+  if (autofilled) return { proceed: true, reason: null, note: null };
+  if (!hasCredentials) {
+    return visible
+      ? { proceed: true, reason: null, note: "no stored credentials — sign in in the window (email, password, MFA)" }
+      : {
+          proceed: false,
+          reason:
+            "silent SSO failed and no credentials found — run `make start` (it prompts and stores them) or set BS_EMAIL/BS_PASSWORD",
+          note: null,
+        };
+  }
+  return visible
+    ? { proceed: true, reason: null, note: "the autofill did not complete — finish signing in in the window" }
+    : { proceed: false, reason: "a sign-in field never appeared — the autofill did not complete", note: null };
 }
 
 /** No human, no window. Fails rather than waiting when the wristband is gone. */
@@ -91,8 +140,9 @@ export async function silentCapture({ profileDir, baseUrl, log }) {
  * it is awaited, so by the time this capture goes back to waiting for the human
  * the icon is already showing the digits. The rung owns what happens to it.
  */
-export async function fullLoginCapture({ profileDir, baseUrl, log, onMfaNumber }) {
-  return withBrowser({ profileDir, ...launchOptionsFor("full") }, async ({ page, context }) => {
+export async function fullLoginCapture({ profileDir, baseUrl, log, onMfaNumber, visible = false }) {
+  const launch = launchOptionsFor("full", process.env, { visible });
+  return withBrowser({ profileDir, ...launch }, async ({ page, context }) => {
     if (await trySilentLogin(page, context, baseUrl, log)) {
       log("silent SSO covered it — credentials never touched");
       return harvest({ page, context, baseUrl, log });
@@ -100,27 +150,25 @@ export async function fullLoginCapture({ profileDir, baseUrl, log, onMfaNumber }
 
     // Env first, then the stored credentials.json — one lookup, one priority.
     const credentials = loadCredentials();
-    if (!credentials) {
-      return {
-        ok: false,
-        reason:
-          "silent SSO failed and no credentials found — run `make start` (it prompts and stores them) or set BS_EMAIL/BS_PASSWORD",
-      };
-    }
-    const { email, password } = credentials;
+    const autofilled = credentials
+      ? await autofillCredentials(page, { email: credentials.email, password: credentials.password, log })
+      : false;
 
-    if (!(await autofillCredentials(page, { email, password, log }))) {
-      // A step that never found its field means the login was never submitted,
-      // so no number-match is coming. Falling through to the MFA wait would
-      // spend five minutes on a prompt nobody's phone will ever show.
-      return {
-        ok: false,
-        reason: "a sign-in field never appeared — the autofill did not complete",
-      };
-    }
+    // Headless: a login that was never submitted ends here, because no
+    // number-match is coming and the MFA wait would be spent on a prompt no
+    // phone will show. Visible: the human at the window finishes whatever the
+    // autofill could not, and the capture keeps waiting for the signed-in state.
+    const next = afterAutofill({ visible, hasCredentials: Boolean(credentials), autofilled });
+    if (!next.proceed) return { ok: false, reason: next.reason };
+    if (next.note) log(`>>> ${next.note} <<<`);
 
-    log(">>> approve the number-match on your PHONE — up to 5 minutes <<<");
-    const deadline = Date.now() + MFA_TIMEOUT_MS;
+    const timeoutMs = visible ? HUMAN_TIMEOUT_MS : MFA_TIMEOUT_MS;
+    log(
+      visible
+        ? `>>> finish signing in in the Chromium window — up to ${timeoutMs / 60000} minutes <<<`
+        : ">>> approve the number-match on your PHONE — up to 5 minutes <<<",
+    );
+    const deadline = Date.now() + timeoutMs;
     let announced = null;
     while (Date.now() < deadline) {
       // Read the number BEFORE the auth check: the digits are on the screen
@@ -141,7 +189,12 @@ export async function fullLoginCapture({ profileDir, baseUrl, log, onMfaNumber }
       await clickThroughSilentSurfaces(page, log);
       await page.waitForTimeout(POLL_MS);
     }
-    return { ok: false, reason: "timed out waiting for the MFA approval" };
+    return {
+      ok: false,
+      reason: visible
+        ? `timed out after ${timeoutMs / 60000} minutes waiting for the sign-in to finish in the window`
+        : "timed out waiting for the MFA approval",
+    };
   });
 }
 

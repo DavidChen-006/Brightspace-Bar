@@ -11,8 +11,7 @@
   },
   "scripts": {
     "start": "node src/start.mjs",
-    "capture": "node src/manual-capture.mjs",
-    "auto": "node src/auto-capture.mjs",
+    "login": "node src/start.mjs --visible",
     "xsrf": "node src/refresh-xsrf.mjs",
     "refresh": "node src/refresh.mjs",
     "bsb": "node src/bsb.mjs",

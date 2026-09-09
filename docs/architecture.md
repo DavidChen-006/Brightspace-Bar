@@ -15,7 +15,10 @@ network code, no credential types, and no way to log in — by construction, not
 by policy. **The Node daemon** (`session-capture/`) owns the session: a
 persistent Chromium profile, a `session.json`, and a login ladder that
 escalates only as far as it must (existing credentials → silent Entra SSO →
-full headless login with an MFA number shown on the menu-bar icon).
+full headless login with an MFA number shown on the menu-bar icon). The same
+full-login rung runs with a visible window under `make login`
+(`refresh.mjs --visible`), for the accounts whose sign-in the headless flow
+cannot read — same profile, same session file, same everything after.
 
 **The agent surface** (`bsb`, `session-capture/src/bsb.mjs`, and the skill
 in `skills/brightspace/`) is a second entry point of the daemon's package,

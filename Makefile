@@ -4,7 +4,9 @@
 #                install the agent skill, record where this checkout is
 #   make start   THE one command: build the app, ensure credentials (prompting
 #                once if needed), launch the menu bar, run the headless login
-#   make login   one-time interactive Chromium login (captures the session)
+#   make login   the same as start, but the sign-in happens in a VISIBLE
+#                Chromium window you finish yourself — for accounts the
+#                headless flow cannot read (no number on the icon)
 #   make run     build & run the menu-bar app (delegates to BrightspaceBar/)
 #   make test    run the Swift test suite   (delegates to BrightspaceBar/)
 #   make skill   install the agent skill (skills/brightspace) into the
@@ -65,7 +67,8 @@ setup:
 	@echo "Then, in Claude Code / Codex / any agent that reads skills: \"read my <course> syllabus and put the due dates on my calendar\"."
 
 login:
-	cd session-capture && npm run capture
+	$(MAKE) -C BrightspaceBar bundle
+	cd session-capture && npm run login
 
 run:
 	$(MAKE) -C BrightspaceBar run

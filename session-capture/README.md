@@ -9,27 +9,25 @@ starts showing stale data.
 ## Use
 
 ```sh
-npm run capture     # silent if possible; otherwise YOU sign in, including MFA
-npm run auto        # silent if possible; otherwise types BS_EMAIL/BS_PASSWORD for you
+npm run start       # what `make start` runs: credentials, app, one headless refresh
+npm run login       # what `make login` runs: the same, with a VISIBLE browser window
+npm run refresh     # one climb of the ladder, nothing else (the app's timer runs this)
 npm run xsrf        # re-derive just the CSRF token for a still-live cookie
 ```
 
-Both capture scripts run on a **persistent browser profile**
-(`artifacts/profile/`, gitignored — it is a credential store). The profile
-keeps the Microsoft Entra cookie (`ESTSAUTHPERSISTENT`, ~90-day lifetime) from
-your last real login, so most captures complete **silently in seconds** — the
-dead D2L session re-mints itself through SSO with no password and no MFA
-(proven in `experiment-10-entra-silent-sso`). You are only asked to sign in
-when the Entra session itself has expired.
+Everything lives under one root, `BSB_ROOT` (default
+`~/Library/Application Support/BrightspaceBar`): the persistent Chromium
+profile (`profile/`, a credential store — it holds the Microsoft Entra cookie
+from your last real login, so most refreshes complete **silently in seconds**),
+`session.json`, `credentials.json`, and the `cache/` the app renders.
 
-Then install it into the app:
-
-```sh
-cd ../BrightspaceBar && ./Scripts/refresh-session.sh ../session-capture/artifacts/session.json
-```
-
-The app re-reads that file on every fetch, so a running app picks up a fresh
-session on its next poll — no relaunch needed.
+`refresh.mjs` climbs the ladder: silent SSO on the profile first; if that is
+dead, the full login types the stored credentials into Microsoft's page
+headless and puts the MFA number on the menu-bar icon. `--visible` is the
+same rung with a window, for the accounts whose sign-in the headless flow
+cannot read (a method chooser, a code prompt, an MFA setup page): the
+credentials are typed in for you, you finish the rest in the window, and the
+profile and session file it writes are the ones every later refresh uses.
 
 ## `bsb` — the same session, opened to an agent
 
@@ -49,26 +47,7 @@ contract (`src/agent/manual-items.mjs`). `bsb refresh` runs `refresh.mjs`.
 The skill that teaches an agent to use it lives in
 `../skills/brightspace/`; `make skill` at the repo root installs it.
 
-## Why two capture scripts
-
-Both try the silent path first; they differ only in the **fallback** when a
-real login is due:
-
-**`manual-capture.mjs`** waits for YOU. You pick your campus, type your
-credentials, and approve MFA yourself. Nothing is typed for you and no
-credential is ever read, stored, or logged — which makes it the only capture
-path safe to run from an agent's shell. It is also the closer analogue of
-where the app is heading: an in-app `WKWebView` login window where the user
-signs in and the app only reads the resulting cookie store.
-
-**`auto-capture.mjs`** (ported from `experiment-1-fresh-cookie`, which stays
-frozen as the experiment record) types `BS_EMAIL`/`BS_PASSWORD` for you, so a
-full login costs only the MFA tap on your phone. Credentials are demanded only
-*after* the silent path has actually failed — a cron can run it with no
-environment at all, and it only errors on the rare day a real login is due.
-The cost: a password in the environment lands in shell history and in the
-transcript of any agent that invokes it. Prefer `capture` from an agent's
-shell.
+## How authentication is judged
 
 Authentication is detected **positively** — the `d2lSessionVal` cookie must exist
 *and* `window.D2L.LP` must be reachable. "The URL no longer looks like a login
@@ -105,12 +84,13 @@ still unmeasured — it would take a fresh cookie polled on a schedule to find o
 ## Files
 
 ```
+src/start.mjs            make start / make login: credentials, app, one refresh
+src/refresh.mjs          the daemon entry point: climb the ladder, exit 0/2/1
+src/orchestrate.mjs      the ladder itself, behind injected seams
+src/rungs/               silent.mjs, full-login.mjs, browser.mjs (playwright)
+src/login-flow.mjs       silent SSO, the auth check, the XSRF read
 src/session.mjs          the session.json contract, as pure functions
-src/manual-capture.mjs   headed browser + human login -> session.json
 src/refresh-xsrf.mjs     live cookie -> fresh CSRF token, merged in place
-artifacts/session.json   the capture. A CREDENTIAL — gitignored, never committed
+src/bsb.mjs, src/agent/  the agent CLI
+$BSB_ROOT/session.json   the capture. A CREDENTIAL — 0600, never committed
 ```
-
-`node_modules` is a symlink to `experiment-1-fresh-cookie`'s Playwright install so
-there is one 300 MB browser download in this repo, not two. `npm install` here
-works if that ever breaks.

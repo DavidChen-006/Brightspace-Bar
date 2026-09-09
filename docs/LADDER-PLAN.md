@@ -150,7 +150,8 @@ attempt (same shape `buildSession` writes today).
 **Exists, proven, reuse as-is or extract:**
 - Rung 1 mechanics: `session-capture/src/login-flow.mjs` (`trySilentLogin`,
   `isAuthenticated`, `extractXsrf`, `clickThroughSilentSurfaces`).
-- Rung 2 mechanics: `session-capture/src/auto-capture.mjs` (headed autofill + MFA wait).
+- Rung 2 mechanics: `session-capture/src/rungs/browser.mjs` (`fullLoginCapture`:
+  autofill + MFA wait; the standalone `auto-capture.mjs` it was ported from is gone).
 - Session shape: `session-capture/src/session.mjs` (`buildSession`, `buildCookieHeader`).
 - Endpoints (David's own, in Swift, port to Node in phase 2):
   cookie+XSRF → `POST /d2l/lp/auth/oauth2/token` → JWT (dead session = HTTP 200 +
@@ -179,8 +180,11 @@ attempt (same shape `buildSession` writes today).
   `BrightspaceQuizSource`, `FileSessionProvider` wiring — deleted in phase 3 once
   the contract suite passes against the daemon sources. Their live-contract tests
   (`BS_LIVE`) migrate to the daemon sources.
-- `session-capture`'s `manual-capture.mjs`/`auto-capture.mjs` CLIs remain as
-  standalone tools (they now share rung modules instead of owning the logic).
+- `session-capture`'s `manual-capture.mjs`/`auto-capture.mjs` CLIs were removed
+  (2026-09-09): they wrote to `artifacts/`, which nothing read after the move to
+  `BSB_ROOT`, so `make login` captured a session the app never saw. The manual
+  path is now the full rung itself with a window: `refresh.mjs --visible`, run
+  by `make login` (= `start.mjs --visible`), same profile and session file.
 
 ## Phases
 
@@ -392,8 +396,11 @@ never appears instead of hanging to the 5-min MFA timeout.
 Live acceptance (scripts/e2e-icon.sh, one MFA): NO window opened; number "68"
 published 68s in; status item 30pt→62pt→30pt; login done 16s after the phone
 tap; fresh, rungUsed full, 27 courses, wristband re-seeded. Suite 199 (195/4).
-Seam: `launchOptionsFor(kind, env)` — silent always headless, full headless
-unless BSB_FULL_HEADED=1; cron/silent can NEVER open a window regardless.
+Seam: `launchOptionsFor(kind, env, {visible})` — silent always headless, full
+headless unless `visible: true` (`--visible`, what `make login` runs) or
+BSB_FULL_HEADED=1; cron/silent can NEVER open a window regardless. In the
+visible run the human may finish what the autofill could not (`afterAutofill`
+decides: headless fails fast, visible keeps waiting up to 10 minutes).
 NOTE: this repo now drives the interactive Entra form headless for the first
 time and it works (proven live); watch for tenant UA/conditional-access changes.
 

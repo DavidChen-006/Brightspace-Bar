@@ -326,3 +326,35 @@ for (const { name, create, kind } of RUNGS) {
 function okCapture(cookies) {
   return { ok: true, cookies, csrfToken: CSRF_TOKEN, landedUrl: `${TEST_BASE}/d2l/home` };
 }
+
+// ---------------------------------------------------------------------------
+// The visible login reaches the capture — and only when asked for.
+// ---------------------------------------------------------------------------
+
+test("a full-login rung built visible hands `visible: true` to its capture", async (t) => {
+  // Arrange — `refresh.mjs --visible` (what `make login` runs) builds the rung
+  // this way; the capture is where the window actually opens.
+  const paths = tempPaths(t);
+  const capture = fakeCapture();
+  const rung = createFullLoginRung({ capture, visible: true });
+
+  // Act
+  await rung.attempt({ paths, log: () => {} });
+
+  // Assert
+  assert.equal(capture.calls.length, 1);
+  assert.equal(capture.calls[0].visible, true);
+});
+
+test("a full-login rung built the default way hands `visible: false` — the timer never opens a window", async (t) => {
+  // Arrange
+  const paths = tempPaths(t);
+  const capture = fakeCapture();
+  const rung = createFullLoginRung({ capture });
+
+  // Act
+  await rung.attempt({ paths, log: () => {} });
+
+  // Assert
+  assert.equal(capture.calls[0].visible, false);
+});
