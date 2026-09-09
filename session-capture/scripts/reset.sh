@@ -52,7 +52,7 @@ case "$1" in
   --session)
     rm -f "$ROOT/session.json"
     rm -rf "$ROOT/profile"
-    echo "reset: credentials cleared (session.json + profile/) — the ladder must climb"
+    echo "reset: session cleared (session.json + profile/), credentials.json kept — the next run signs in from scratch"
     ;;
   --all)
     if [ -d "$ROOT" ]; then
