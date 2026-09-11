@@ -570,9 +570,25 @@ final class GraphRasterNSView: NSView {
         }
     }
 
-    /// Darker means more important. While highlighted the palette goes
-    /// white-alpha: accent-coloured cells are invisible against the accent
-    /// capsule, which is the one place a colour choice is a correctness bug (§5).
+    /// Further from the menu's own background means more important. Which
+    /// DIRECTION that is depends on the appearance, which is why this is not
+    /// simply "darker means more important".
+    ///
+    /// That single ramp is non-monotonic in a dark menu, and it hid the one
+    /// distinction a student most needs at a glance. An assignment is drawn at
+    /// 45% alpha, so it composites toward whatever is behind it; a test was
+    /// blended toward black. On a dark background both of those move the same
+    /// way — down — so the lightest tier and the heaviest tier both came out a
+    /// muted dark blue with the full-accent quiz brighter than either, and an
+    /// assignment and a test were nearly indistinguishable without hovering.
+    ///
+    /// So the heavy end follows the background: blended toward black in a light
+    /// menu, toward white in a dark one. Both directions keep the ramp
+    /// monotonic in contrast, which is what "heavier" actually reads as.
+    ///
+    /// While highlighted the palette goes white-alpha instead: accent-coloured
+    /// cells are invisible against the accent capsule, which is the one place a
+    /// colour choice is a correctness bug (§5).
     private func fillColor(for tier: CellTier?) -> NSColor {
         if self.isHighlighted {
             let base = NSColor.selectedMenuItemTextColor
@@ -587,11 +603,13 @@ final class GraphRasterNSView: NSView {
         case .none: return .quaternaryLabelColor
         case .assignment: return NSColor.controlAccentColor.withAlphaComponent(0.45)
         case .quiz: return .controlAccentColor
-        // Darker than the accent itself, continuing the "darker means more
-        // important" ramp — a test outranks a quiz in the tier contract, so it
-        // must read as the heavier square.
-        case .test: return NSColor.controlAccentColor
-            .blended(withFraction: 0.35, of: .black) ?? .controlAccentColor
+        case .test:
+            // Read at draw time: `draw(_:)` has already made the view's
+            // appearance current, and a menu can be reopened under a changed
+            // system appearance without this view being recreated.
+            let dark = self.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            return NSColor.controlAccentColor
+                .blended(withFraction: 0.45, of: dark ? .white : .black) ?? .controlAccentColor
         }
     }
 }
