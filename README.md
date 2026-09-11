@@ -56,6 +56,11 @@ push or two, not a phone that will not stop.
 - macOS 14+
 - Xcode Command Line Tools with Swift 6.2+ (`xcode-select --install`)
 - Node 22+ (`brew install node`)
+- Playwright's Chromium, which `make setup` downloads. If `make start` or the
+  daemon log ever says "the daemon's Chromium is not installed", run
+  `cd session-capture && npx playwright install chromium` from the repo root —
+  in that directory specifically, so it fetches the build the pinned
+  Playwright looks for.
 - Purdue Brightspace via Entra specifically — the SAML entityId is
   Purdue-hardcoded today; PRs generalising it are welcome.
 

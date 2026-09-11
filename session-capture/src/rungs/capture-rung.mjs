@@ -20,6 +20,7 @@
  */
 import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { explainLaunchError } from "../browser-install.mjs";
 import { buildSession } from "../session.mjs";
 
 const DEFAULT_BASE_URL = "https://purdue.brightspace.com";
@@ -44,8 +45,11 @@ export function createCaptureRung({ kind, capture, baseUrl }) {
         captured = await capture({ profileDir: paths.profileDir, baseUrl: tenant, log });
       } catch (error) {
         // A locked profile, a missing chromium: real, and not the orchestrator's
-        // problem to interpret. A rung reports, it never throws.
-        return { ok: false, reason: String(error?.message ?? error) };
+        // problem to interpret. A rung reports, it never throws. The one
+        // message it rewrites is Playwright's "Executable doesn't exist": its
+        // banner names a command that, run outside session-capture/, fetches
+        // the wrong browser build — so the reason names the right one.
+        return { ok: false, reason: explainLaunchError(String(error?.message ?? error)) };
       }
       if (!captured?.ok) {
         return { ok: false, reason: captured?.reason ?? "the capture gave no reason" };

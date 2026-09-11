@@ -62,6 +62,10 @@ setup:
 	@node --version >/dev/null 2>&1 || { echo "error: node not found — need node >= 22 (try: brew install node)"; exit 1; }
 	@node -e 'process.exit(parseInt(process.versions.node) >= 22 ? 0 : 1)' || { echo "error: node >= 22 required, found $$(node --version)"; exit 1; }
 	cd session-capture && npm install
+	@# The browser download is npm's postinstall and can be skipped or interrupted
+	@# without npm failing. Ask for it once more (a no-op when present), then
+	@# refuse to say "complete" unless both Chromium builds are really there.
+	cd session-capture && npx playwright install chromium && npm run --silent check-browser
 	@echo
 	@$(MAKE) --no-print-directory skill
 	@echo

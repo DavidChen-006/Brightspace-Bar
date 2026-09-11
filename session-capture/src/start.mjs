@@ -24,6 +24,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { installProblem } from "./browser-install.mjs";
 import { credentialsFile, credentialsSource, loadCredentials, promptForCredentials } from "./credentials.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -41,6 +42,21 @@ if (unknown.length > 0) {
   process.exit(1);
 }
 const visible = args.includes("--visible");
+
+// 0. The browser. Playwright's download runs in npm install and can be
+//    skipped or interrupted without anything failing; the ladder would then
+//    fail twice with a banner naming the wrong command. Cheaper to look now,
+//    before the app is launched or a password is asked for, and say the fix.
+//    The path comes from Playwright itself so $PLAYWRIGHT_BROWSERS_PATH is
+//    honoured; the check is a file lookup, not a launch.
+{
+  const { chromium } = await import("playwright");
+  const problem = installProblem(chromium.executablePath());
+  if (problem) {
+    console.error(`error: ${problem}`);
+    process.exit(1);
+  }
+}
 
 // 1. Credentials: load, or prompt when a human is on the other end. The
 //    visible login prompts too: it is not a way around storing them — the

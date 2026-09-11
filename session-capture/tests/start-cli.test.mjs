@@ -231,3 +231,31 @@ test("a run whose credentials came from the environment says nothing about the f
   // Assert
   assert.doesNotMatch(result.stderr, /rejected/);
 });
+
+test("make start refuses first, before the app or a prompt, when Playwright's Chromium is not installed", async (t) => {
+  // Arrange — point Playwright's browser cache at an empty directory: the
+  // exact state of a machine whose download was skipped or interrupted.
+  const paths = tempPaths(t);
+  const out = path.join(paths.root, "seen.json");
+  const empty = path.join(paths.root, "no-browsers");
+
+  // Act
+  const result = await run("node", ["src/start.mjs"], {
+    env: {
+      ...process.env,
+      BSB_ROOT: paths.root,
+      BSB_APP_BINARY: fakeApp(paths),
+      BSB_REFRESH_CLI: fakeRefresh(paths, 0),
+      STUB_OUT: out,
+      PLAYWRIGHT_BROWSERS_PATH: empty,
+      BS_EMAIL: "student@example.edu",
+      BS_PASSWORD: "hunter2-not-real",
+    },
+  });
+
+  // Assert — exit 1 with the fix and the directory it must run in; nothing launched.
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /Chromium is not installed/);
+  assert.match(result.stderr, /cd session-capture && npx playwright install chromium/);
+  assert.equal(existsSync(path.join(paths.root, "order.log")), false, "neither the app nor the daemon ran");
+});

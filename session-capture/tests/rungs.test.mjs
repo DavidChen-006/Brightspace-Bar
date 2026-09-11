@@ -258,6 +258,22 @@ for (const { name, create, kind } of RUNGS) {
     assert.ok(result.reason.length > 0, "a failed rung must say why");
   });
 
+  test(`${name} names the install fix when Playwright says the browser is not there`, async (t) => {
+    // Arrange — the message a user with a skipped browser download sees.
+    const paths = tempPaths(t);
+    const rung = create({
+      capture: fakeCapture({ throws: "browserType.launchPersistentContext: Executable doesn't exist at /x/chromium_headless_shell-1208/shell\n╔══╗\n║ npx playwright install ║" }),
+    });
+
+    // Act
+    const result = await rung.attempt({ paths, log: () => {} });
+
+    // Assert — the reason is the fix, from the directory it works in.
+    assert.equal(result.ok, false);
+    assert.match(result.reason, /cd session-capture && npx playwright install chromium/);
+    assert.ok(!result.reason.includes("╔"));
+  });
+
   test(`${name} writes no session file when the capture failed`, async (t) => {
     // Arrange
     const paths = tempPaths(t);
