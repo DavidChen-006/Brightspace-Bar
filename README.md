@@ -205,6 +205,7 @@ Looking for something to pick up? The
 make -C BrightspaceBar build  # build the Swift app (or: cd BrightspaceBar && swift build)
 make test                     # full suite, from the repo root
 make -C BrightspaceBar run    # run the app from source
+make reset                    # start over: drop the session and browser profile, keep credentials
 ```
 
 ## License
