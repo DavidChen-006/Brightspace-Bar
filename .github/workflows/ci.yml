@@ -13,7 +13,7 @@ jobs:
     # fails at manifest load.
     runs-on: macos-26
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # The Makefile's CLT framework/rpath flags are conditional on
       # /Library/Developer/CommandLineTools existing, so the same target
       # works both on a CLT-only machine and on Xcode runners.
@@ -31,7 +31,7 @@ jobs:
         # field says >=22 for the same reason.
         node-version: ["22", "24"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
