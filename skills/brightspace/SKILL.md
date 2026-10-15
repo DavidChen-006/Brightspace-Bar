@@ -1,13 +1,25 @@
 ---
 name: brightspace
-description: Read a student's Brightspace (D2L) courses, syllabi, content files, announcements and grades through the Brightspace Bar menu-bar app's own session, and add assignments, quizzes and tests to the app's calendar heatmap. Use when the user mentions Brightspace, D2L, a syllabus, due dates, a course schedule, "what's due", grades, or wants dates from a syllabus put on their Brightspace Bar calendar. Uses the `bsb` CLI; never writes to Brightspace.
+description: Read Brightspace data through the Brightspace Bar menu-bar app and manage its calendar heatmap. Use only when the user explicitly asks for Brightspace Bar, its menu-bar calendar or heatmap, or the `bsb` CLI. Do not use for generic Brightspace or D2L requests, or when the user asks for the Brightspace MCP or `brightspace-mcp-server`.
 license: MIT
-compatibility: macOS with Brightspace Bar checked out and set up (`make setup`, `make start`); node >= 22 on PATH
 metadata:
   repo: https://github.com/DavidChen-006/Brightspace-Bar
 ---
 
 # Brightspace Bar for agents
+
+## Routing boundary
+
+This skill is only for the Brightspace Bar app. Do not select it merely because
+the user mentions Brightspace, D2L, courses, grades, syllabi, or due dates.
+
+If the user asks for the Brightspace MCP or `brightspace-mcp-server`, use the
+available Brightspace MCP tools. If those tools are unavailable, say so. Never
+substitute Brightspace Bar or start its MFA flow without the user's explicit
+request.
+
+This workflow requires macOS, a configured Brightspace Bar checkout, and Node
+22 or newer on `PATH`.
 
 Brightspace Bar is a macOS menu-bar app that shows a student's Brightspace
 (D2L) work as a heatmap per course. It is deliberately deterministic: it only
